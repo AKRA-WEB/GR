@@ -1,3 +1,4 @@
+<!-- GitHub Repo: https://github.com/AKRA-WEB/GR -->
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -267,6 +268,9 @@
 
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
+    const GR_CACHE_TTL = 10 * 60 * 1000;
+    function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
+    function setCache(key, data) { localStorage.setItem(key, JSON.stringify({ _ts: Date.now(), _d: data })); }
     function showNotification(msg, type='success') {
         const c = document.getElementById('toast-container'); if(!c) return;
         const t = document.createElement('div'); t.className = `toast ${type}`;
@@ -305,10 +309,10 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
-        const cachedData = localStorage.getItem('CACHE_GR_DATA');
+        const cachedData = getCache('CACHE_GR_DATA', GR_CACHE_TTL);
         if (cachedData && !isManualRefresh) {
             try {
-                appData = JSON.parse(cachedData);
+                appData = cachedData;
                 groupPendingPOs();
                 renderPOListForReceiving();
                 showView('receiving-list-view');
@@ -733,7 +737,7 @@
         try {
             const response = await apiCall('getInitialData');
             if (response.success) { 
-                localStorage.setItem('CACHE_GR_DATA', JSON.stringify(response));
+                setCache('CACHE_GR_DATA', response);
                 appData = response; 
                 groupPendingPOs(); 
                 renderPOListForReceiving(); 
