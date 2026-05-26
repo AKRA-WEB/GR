@@ -627,6 +627,9 @@
         } else {
             btnDraft.classList.remove('hidden');
             btnReview.classList.remove('hidden');
+            if (currentGroupStatus === 'Draft GR' && isAdmin) {
+                btnReset.classList.remove('hidden');
+            }
             setInputDisabledStatus(false);
         }
         
