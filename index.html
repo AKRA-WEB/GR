@@ -178,7 +178,7 @@
     var APP_CONFIG = {
         API_URL: "https://script.google.com/macros/s/AKfycbwv2oGqYocA-k-EN2qjs_rf64gc9kDCG2o2nIKlAW0BDCT0rXLvcgLurCRaQXjuC-OG/exec",
         PORTAL_URL: "https://akra-web.github.io/Main/", 
-        REQUIRED_ROLES: ["ADMIN", "AKRA", "WAREHOUSE"], 
+        REQUIRED_ROLES: ["ADMIN", "SUPERVISOR", "AKRA", "WAREHOUSE"],
         APP_NAME: "ระบบรับสินค้า (GR)",
         STORAGE_KEY: "akra_gr_session"
     };
@@ -233,7 +233,8 @@
                         return;
                     }
 
-                    localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify({ name: result.user.name, id: result.user.id, roles: result.user.roles }));
+                    localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify({ name: result.user.name, id: result.user.id, roles: result.user.roles, perms: result.user.perms || {} }));
+                    window.appSession = result.user;
                     window.currentUser = result.user.name;
                     UI.showApp(result.user.name);
                     AuthGuard.bindEvents();
@@ -243,7 +244,7 @@
                     if (!cached) { UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal"); return; }
                     let session;
                     try { session = JSON.parse(cached); } catch(e) { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); UI.showError("Session ไม่ถูกต้อง"); return; }
-
+                    window.appSession = session;
                     const hasPermission = APP_CONFIG.REQUIRED_ROLES.length === 0 || session.roles.some(r => APP_CONFIG.REQUIRED_ROLES.includes(r));
                     if (!hasPermission) { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); UI.showError("คุณไม่มีสิทธิ์เข้าถึง"); return; }
 
@@ -265,6 +266,15 @@
         }
     };
     document.addEventListener('DOMContentLoaded', AuthGuard.init);
+
+    function can(perm) {
+        if (!window.appSession) return false;
+        var perms = (window.appSession.perms && window.appSession.perms["app-gr"]) || [];
+        if (perms.length > 0) return perms.includes(perm);
+        // backward compat: token without perms field
+        var roles = window.appSession.roles || [];
+        return roles.includes("ADMIN") || roles.includes("SUPERVISOR");
+    }
 
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
@@ -563,7 +573,11 @@
         
         // --- ใช้งานเงื่อนไขจาก currentGroupStatus ที่แม่นยำที่สุด ---
         if (currentGroupStatus === 'Pending Review') {
-            document.getElementById('btn-confirm-receive').classList.remove('hidden');
+            if (can('approveGR')) {
+                document.getElementById('btn-confirm-receive').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-confirm-receive').classList.add('hidden');
+            }
             document.getElementById('btn-draft').classList.add('hidden');
             document.getElementById('btn-review').classList.add('hidden');
         } else {
