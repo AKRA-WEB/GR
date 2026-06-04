@@ -178,7 +178,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260602.01";
+    const CURRENT_VERSION = "20260604.02";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -205,7 +205,7 @@
         STORAGE_KEY: "akra_gr_session"
     };
 
-    var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyBlyaL8W_Jfs46yMcjfZrcwSeZ_7F7CCWqZR74MQiubynZPGXq8f3u6aWoA6MBTic/exec";
+    var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNYOeQ9H46LBpsmW1fpE65_-tTr3Spmt0m-eUDQLpm4s007SJYXxmmqwoteErt2U_d/exec";
     
     var appData = { products: [], pendingPOs: [] };
     var groupedPOs = []; 
@@ -337,10 +337,17 @@
 
     async function apiCall(action, payload = null) {
       if (!navigator.onLine) return { success: false, message: 'Offline' };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       try {
-        const res = await fetch(DATA_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, data: payload }) });
+        const res = await fetch(DATA_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, data: payload }), signal: controller.signal });
+        clearTimeout(timeoutId);
         return await res.json();
-      } catch (error) { return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' }; }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') return { success: false, error: 'หมดเวลาเชื่อมต่อ (timeout 30s) กรุณาลองใหม่' };
+        return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' };
+      }
     }
 
     async function openReceiving(isManualRefresh = false) {
