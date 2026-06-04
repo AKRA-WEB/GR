@@ -81,7 +81,7 @@
           </div>
 
           <div class="mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
-            <input type="text" id="r-search-input" oninput="renderPOListForReceiving()" placeholder="🔍 ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
+            <input type="text" id="r-search-input" oninput="schedulePOListRender()" placeholder="🔍 ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
             <select id="r-status-filter" onchange="renderPOListForReceiving()" class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
               <option value="">📌 ทุกสถานะ</option>
               <option value="Overdue">🚨 นานผิดปกติ (Overdue)</option>
@@ -178,7 +178,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260604.02";
+    const CURRENT_VERSION = "20260604.04";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -210,6 +210,7 @@
     var appData = { products: [], pendingPOs: [] };
     var groupedPOs = []; 
     var currentActiveGroup = null; 
+    var poListRenderTimer = null;
 
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -303,7 +304,7 @@
 
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
-    const GR_CACHE_TTL = 10 * 60 * 1000;
+    const GR_CACHE_TTL = 30 * 60 * 1000;
     function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
     function setCache(key, data) { localStorage.setItem(key, JSON.stringify({ _ts: Date.now(), _d: data })); }
     function showNotification(msg, type='success') {
@@ -369,7 +370,7 @@
         if (!cachedData || isManualRefresh) hideDataLoading();
 
         if (response.success) { 
-            localStorage.setItem('CACHE_GR_DATA', JSON.stringify(response));
+            setCache('CACHE_GR_DATA', response);
             appData = response; 
             groupPendingPOs(); 
             renderPOListForReceiving(); 
@@ -401,6 +402,15 @@
         };
         return getScore(b) - getScore(a);
       });
+      groupedPOs.forEach((group, index) => {
+          group.index = index;
+          group.searchText = `${group.vendor || ''} ${group.poNumber || ''} ${group.items.map(item => item.product || '').join(' ')}`.toLowerCase();
+      });
+    }
+
+    function schedulePOListRender() {
+        clearTimeout(poListRenderTimer);
+        poListRenderTimer = setTimeout(renderPOListForReceiving, 200);
     }
 
     function renderPOListForReceiving() {
@@ -428,7 +438,7 @@
                 if (isCompleted && !search) return false;
             }
             
-            if(search && !g.vendor.toLowerCase().includes(search) && !g.items.some(i => i.product.toLowerCase().includes(search)) && !(g.poNumber||'').toLowerCase().includes(search)) return false;
+            if(search && !g.searchText.includes(search)) return false;
             return true;
         });
 
@@ -436,7 +446,7 @@
         let htmlStr = '';
 
         displayGroups.forEach(group => {
-            const idx = groupedPOs.indexOf(group);
+            const idx = group.index;
             const hasOverdue = group.items.some(i => i.displayStatus === 'Overdue'); 
             const isDraft = group.status === 'Draft GR';
             const isPendingReview = group.status === 'Pending Review';
