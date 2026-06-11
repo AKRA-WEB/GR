@@ -178,7 +178,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260608.02";
+    const CURRENT_VERSION = "20260611.03";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -196,6 +196,115 @@
         }
         return true;
     }
+
+    /* ===== AKRA Global Version Guard (shared inline, Conductor plan 20260611-003) =====
+       Watches version.json after load (interval/focus/visibility/pageshow). On mismatch it
+       shows a non-blocking reload banner; a blocking modal + abort only fires before a
+       mutation via blockIfStale(). Reads listed in readActions stay allowed. */
+    const AppVersionGuard = (function () {
+        var cfg = { current: '', readActions: [] };
+        var stale = false, started = false;
+        var POLL_MS = 5 * 60 * 1000;
+
+        function reload() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('update', Date.now());
+            window.location.replace(url.toString());
+        }
+        function injectStyles() {
+            if (document.getElementById('avg-style')) return;
+            var s = document.createElement('style');
+            s.id = 'avg-style';
+            s.textContent = '#avg-banner{position:fixed;top:0;left:0;right:0;z-index:2147483646;background:#E35205;color:#fff;font:600 14px/1.4 system-ui,sans-serif;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.2)}#avg-banner button{cursor:pointer;border:0;border-radius:8px;font-weight:700;padding:8px 16px;background:#fff;color:#E35205}#avg-modal{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}#avg-modal .avg-card{background:#fff;color:#1f2937;max-width:380px;width:100%;border-radius:16px;padding:24px;text-align:center;font:400 15px/1.5 system-ui,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.3)}#avg-modal .avg-card h2{font-size:18px;font-weight:800;margin:0 0 8px}#avg-modal .avg-card button{cursor:pointer;border:0;margin-top:16px;background:#E35205;color:#fff;width:100%;padding:12px;border-radius:8px;font-weight:700}';
+            document.head.appendChild(s);
+        }
+        function showBanner() {
+            injectStyles();
+            if (document.getElementById('avg-banner')) return;
+            var bar = document.createElement('div');
+            bar.id = 'avg-banner';
+            bar.setAttribute('role', 'status');
+            bar.setAttribute('aria-live', 'polite');
+            var msg = document.createElement('span');
+            msg.textContent = 'มีเวอร์ชันใหม่ของระบบ กรุณารีโหลดเพื่ออัปเดต';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = 'รีโหลด';
+            btn.addEventListener('click', reload);
+            bar.appendChild(msg);
+            bar.appendChild(btn);
+            document.body.appendChild(bar);
+        }
+        function showModal() {
+            injectStyles();
+            var existing = document.getElementById('avg-modal');
+            if (existing) { existing.querySelector('button').focus(); return; }
+            var m = document.createElement('div');
+            m.id = 'avg-modal';
+            m.setAttribute('role', 'alertdialog');
+            m.setAttribute('aria-modal', 'true');
+            m.setAttribute('aria-labelledby', 'avg-modal-title');
+            var card = document.createElement('div');
+            card.className = 'avg-card';
+            var h = document.createElement('h2');
+            h.id = 'avg-modal-title';
+            h.textContent = 'ต้องอัปเดตระบบ';
+            var p = document.createElement('div');
+            p.setAttribute('aria-live', 'assertive');
+            p.textContent = 'พบเวอร์ชันใหม่ ไม่สามารถบันทึกจากหน้าเดิมได้ กรุณารีโหลดก่อนทำรายการ';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = 'รีโหลดเดี๋ยวนี้';
+            btn.addEventListener('click', reload);
+            card.appendChild(h);
+            card.appendChild(p);
+            card.appendChild(btn);
+            m.appendChild(card);
+            document.body.appendChild(m);
+            btn.focus();
+        }
+        async function fetchRemote() {
+            try {
+                var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+                if (!res.ok) return null;
+                var c = await res.json();
+                return (c && c.version) ? String(c.version) : null;
+            } catch (e) { console.warn('Version check skipped:', e); return null; }
+        }
+        function markStale() {
+            if (stale) return;
+            stale = true;
+            showBanner();
+        }
+        async function check() {
+            if (stale) return false;
+            var remote = await fetchRemote();
+            if (remote && remote !== cfg.current) { markStale(); return false; }
+            return true;
+        }
+        // Returns true when the caller's mutation should be BLOCKED. Awaits a fresh check
+        // right before a save to close the polling race window (see plan Risk note).
+        async function blockIfStale(action) {
+            if (action && cfg.readActions.indexOf(action) !== -1) return false;
+            if (!stale) await check();
+            if (!stale) return false;
+            showModal();
+            return true;
+        }
+        function start(options) {
+            cfg.current = options.current;
+            cfg.readActions = options.readActions || [];
+            if (started) return;
+            started = true;
+            setInterval(check, POLL_MS);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') check();
+            });
+            window.addEventListener('focus', check);
+            window.addEventListener('pageshow', function (e) { if (e.persisted) check(); });
+        }
+        return { start: start, check: check, blockIfStale: blockIfStale, isStale: function () { return stale; }, reloadNow: reload };
+    })();
 
     var APP_CONFIG = {
         API_URL: "https://script.google.com/macros/s/AKfycbyQJLwb5HTexG6gxqTehGWlAxfSXVT--CpWnnp2JTcP4xCcMA1vUjSY_eWqPjUKwzq7/exec",
@@ -227,6 +336,7 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData'] });
 
             lucide.createIcons();
             UI.showLoading();
@@ -303,6 +413,13 @@
         return roles.includes("ADMIN") || roles.includes("SUPERVISOR");
     }
 
+    function canViewOrderedQuantity() {
+        var roles = (window.appSession && window.appSession.roles) || [];
+        return roles.some(function (role) {
+            return ["ADMIN", "SUPERVISOR"].includes(String(role).toUpperCase());
+        });
+    }
+
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
     const GR_CACHE_TTL = 30 * 60 * 1000;
@@ -338,6 +455,7 @@
     }
 
     async function apiCall(action, payload = null) {
+      if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -621,20 +739,25 @@
 
         const container = document.getElementById('r-items-container');
         let htmlStr = '';
+        const showOrderedQuantity = canViewOrderedQuantity();
         
         group.items.forEach((item, i) => {
             const isSavedData = item.status === 'Draft GR' || item.status === 'Pending Review' || item.status === 'GR Completed';
+            const itemSpeechText = showOrderedQuantity ? `${item.product} จำนวน ${item.quantity} ${item.unit || ''}` : item.product;
+            const orderedQtyBadge = showOrderedQuantity
+                ? `<span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${item.quantity}</span> ${item.unit || ''}</span>`
+                : '';
             htmlStr += `
             <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}">
                 <div class="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
                     <div class="font-bold text-gray-800 flex-1 pr-2 flex items-center gap-2 text-sm">
                         <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
                         <span>${item.product}</span>
-                        <button type="button" data-text="${item.product} จำนวน ${item.quantity} ${item.unit || ''}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
+                        <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
                             <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
-                    <span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${item.quantity}</span> ${item.unit || ''}</span>
+                    ${orderedQtyBadge}
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-1">
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับจริง</label>
@@ -956,8 +1079,11 @@
         if (!group) return;
         
         let fullText = "รายการสินค้าที่ต้องรับ มีดังนี้. ";
+        const showOrderedQuantity = canViewOrderedQuantity();
         group.items.forEach((item, i) => {
-            fullText += `รายการที่ ${i+1}. ${item.product} จำนวน ${item.quantity} ${item.unit || ''}. `;
+            fullText += showOrderedQuantity
+                ? `รายการที่ ${i+1}. ${item.product} จำนวน ${item.quantity} ${item.unit || ''}. `
+                : `รายการที่ ${i+1}. ${item.product}. `;
         });
         
         speakText(fullText);
