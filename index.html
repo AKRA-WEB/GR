@@ -96,7 +96,9 @@
               <option value="W4">W4</option><option value="W5">W5</option><option value="C1">C1</option><option value="C2">C2</option>
             </select>
           </div>
-          
+
+          <div id="wh-chips" class="flex flex-wrap gap-2 mb-5 px-1"></div>
+
           <div id="po-list-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
 
@@ -178,7 +180,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260611.03";
+    const CURRENT_VERSION = "20260613.01";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -317,10 +319,11 @@
     var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTXs88G-eNSApVFKpNauH2Qz4y7RJs9pmuBrmwG0qfNnBo2JbFEfP84NZqp-bnoGc_/exec";
     
     var appData = { products: [], pendingPOs: [] };
-    var groupedPOs = []; 
-    var currentActiveGroup = null; 
+    var groupedPOs = [];
+    var currentActiveGroup = null;
     var poListRenderTimer = null;
     var grCompletedLoaded = false;
+    var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
 
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -452,6 +455,92 @@
             case 'C2': return `<span class="bg-brand-blue text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">C2</span>`;
             default: return `<span class="bg-gray-200 text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">${warehouse}</span>`;
         }
+    }
+
+    // ===== Warehouse-locked location helpers (Conductor 20260613-001) =====
+    // Canonical location string format: WH-<floor>F[-zone], e.g. W2-2F-2-1 (zone optional, may contain dashes).
+    function serializeLoc(wh, floor, zone) {
+        wh = (wh || '').trim();
+        floor = (floor === null || floor === undefined) ? '' : String(floor).trim();
+        zone = (zone || '').trim();
+        if (!wh) return zone; // legacy fallback: nothing structured
+        var parts = [wh];
+        if (floor) parts.push(floor + 'F');
+        if (zone) parts.push(zone);
+        return parts.join('-');
+    }
+    function parseLoc(str) {
+        str = (str || '').trim();
+        if (!str) return { wh: '', floor: '', zone: '' };
+        var m = str.match(/^(W[1-5]|C[12])-([1-5])F(?:-(.*))?$/);
+        if (m) return { wh: m[1], floor: m[2], zone: m[3] || '' };
+        return { wh: '', floor: '', zone: str }; // legacy free-text preserved in zone
+    }
+    function whSelectOptions(selected) {
+        return GR_WAREHOUSES.map(function (w) {
+            return `<option value="${w}" ${w === selected ? 'selected' : ''}>${w}</option>`;
+        }).join('');
+    }
+    function floorSelectOptions(selected) {
+        var opts = '<option value="">ชั้น</option>';
+        for (var n = 1; n <= 5; n++) {
+            opts += `<option value="${n}" ${String(n) === String(selected) ? 'selected' : ''}>${n}F</option>`;
+        }
+        return opts;
+    }
+    function locInputsHtml(prefix, defaultWh, parsed) {
+        parsed = parsed || { wh: '', floor: '', zone: '' };
+        var wh = parsed.wh || defaultWh || '';
+        return `
+            <div class="grid grid-cols-3 gap-2">
+                <select class="input-field ${prefix}-loc-wh py-2 text-sm border-gray-200 focus:border-brand-blue m-0">${whSelectOptions(wh)}</select>
+                <select class="input-field ${prefix}-loc-floor py-2 text-sm border-gray-200 focus:border-brand-blue m-0">${floorSelectOptions(parsed.floor)}</select>
+                <input type="text" class="input-field ${prefix}-loc-zone py-2 text-sm border-gray-200 focus:border-brand-blue m-0" placeholder="โซน (ไม่บังคับ)" value="${parsed.zone || ''}">
+            </div>`;
+    }
+
+    function chipCls(active) {
+        return active
+            ? 'px-3 py-1.5 rounded-full text-xs font-bold bg-brand-orange text-white shadow-sm border border-brand-orange whitespace-nowrap transition active:scale-95'
+            : 'px-3 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-brand-orange/50 shadow-sm whitespace-nowrap transition active:scale-95';
+    }
+    function renderWarehouseChips() {
+        var container = document.getElementById('wh-chips');
+        if (!container) return;
+        var active = document.getElementById('r-warehouse-filter').value;
+        var counts = {};
+        GR_WAREHOUSES.forEach(function (w) { counts[w] = 0; });
+        var total = 0;
+        groupedPOs.forEach(function (g) {
+            if (g.status === 'GR Completed') return; // match default hidden-completed list view
+            if (counts[g.warehouse] === undefined) counts[g.warehouse] = 0;
+            counts[g.warehouse]++;
+            total++;
+        });
+        var badge = function (n) { return `<span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] bg-black/10">${n}</span>`; };
+        var html = `<button type="button" onclick="setWarehouseFilter('')" class="${chipCls(active === '')}">ทั้งหมด${badge(total)}</button>`;
+        GR_WAREHOUSES.forEach(function (w) {
+            html += `<button type="button" onclick="setWarehouseFilter('${w}')" class="${chipCls(active === w)}">${w}${badge(counts[w] || 0)}</button>`;
+        });
+        container.innerHTML = html;
+    }
+    function setWarehouseFilter(w) {
+        document.getElementById('r-warehouse-filter').value = w;
+        renderPOListForReceiving();
+    }
+    function toggleItemSplit(btn) {
+        var row = btn.closest('.po-item-row');
+        var wrap = row.querySelector('.po-split');
+        if (!wrap) return;
+        var hidden = wrap.classList.toggle('hidden');
+        btn.innerHTML = hidden
+            ? '<i data-lucide="split" class="w-3.5 h-3.5"></i> แยกคลัง'
+            : '<i data-lucide="x" class="w-3.5 h-3.5"></i> ยกเลิกแยกคลัง';
+        // Clarify that the main qty becomes warehouse-1 qty while split is open.
+        var qtyInput = row.querySelector('.po-qty');
+        var qtyLabel = qtyInput && qtyInput.parentElement.querySelector('label');
+        if (qtyLabel) qtyLabel.textContent = hidden ? 'จำนวนรับจริง' : 'จำนวน (คลังที่ 1)';
+        lucide.createIcons({ root: btn });
     }
 
     async function apiCall(action, payload = null) {
@@ -642,6 +731,7 @@
             </div>`;
         });
         container.innerHTML = htmlStr; lucide.createIcons({ root: container });
+        renderWarehouseChips();
     }
 
     function openReceivingDetail(index) {
@@ -743,6 +833,7 @@
         
         group.items.forEach((item, i) => {
             const isSavedData = item.status === 'Draft GR' || item.status === 'Pending Review' || item.status === 'GR Completed';
+            const parsedLoc = parseLoc(isSavedData ? (item.locIn || '') : '');
             const itemSpeechText = showOrderedQuantity ? `${item.product} จำนวน ${item.quantity} ${item.unit || ''}` : item.product;
             const orderedQtyBadge = showOrderedQuantity
                 ? `<span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${item.quantity}</span> ${item.unit || ''}</span>`
@@ -759,17 +850,32 @@
                     </div>
                     ${orderedQtyBadge}
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-1">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับจริง</label>
                     <input type="number" class="input-field po-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${isSavedData ? (item.grQty||'') : ''}"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                     <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ</label>
                     <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2569" value="${isSavedData ? (item.exp||'') : ''}"></div>
-                    <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">Loc.IN <span class="text-red-500">*</span></label>
-                    <input type="text" class="input-field po-loc py-2 border-gray-200 focus:border-brand-blue" placeholder="ตู้ A ชั้น 1" value="${isSavedData ? (item.locIn||'') : ''}"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อคเก่า</label>
                     <input type="number" class="input-field po-old-stock py-2 bg-white border-gray-200 focus:border-brand-blue" placeholder="ไม่บังคับ" value="${isSavedData && item.oldStock ? item.oldStock : ''}"></div>
+                </div>
+                <div class="mt-3 bg-gray-50/70 p-3 rounded-lg border border-gray-100">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-[10px] text-gray-500 font-medium">ตำแหน่งเก็บ (Loc.IN) <span class="text-red-500">*</span></label>
+                        <button type="button" onclick="toggleItemSplit(this)" class="po-split-btn text-[11px] flex items-center gap-1 text-brand-blue bg-brand-blueLight/50 hover:bg-brand-blueLight px-2 py-1 rounded-md font-bold transition active:scale-95"><i data-lucide="split" class="w-3.5 h-3.5"></i> แยกคลัง</button>
+                    </div>
+                    ${locInputsHtml('po', group.warehouse, parsedLoc)}
+                    <div class="po-split hidden mt-2 pt-2 border-t border-dashed border-gray-200">
+                        <p class="text-[10px] text-gray-500 mb-1 font-medium">คลังที่ 2 (เก็บส่วนที่เหลือ)</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <select class="input-field po-loc-wh2 py-2 text-sm border-gray-200 m-0">${whSelectOptions(group.warehouse)}</select>
+                            <select class="input-field po-loc-floor2 py-2 text-sm border-gray-200 m-0">${floorSelectOptions('')}</select>
+                            <input type="text" class="input-field po-loc-zone2 py-2 text-sm border-gray-200 m-0" placeholder="โซน (ไม่บังคับ)">
+                            <input type="number" class="input-field po-qty2 py-2 text-sm border-gray-200 m-0 bg-orange-50/50 text-brand-orange font-bold" placeholder="จำนวนคลังที่ 2">
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-1">จำนวนรับจริงด้านบน = คลังที่ 1 · ระบบรวมยอดทั้งสองคลังให้อัตโนมัติ</p>
+                    </div>
                 </div>
             </div>`;
         });
@@ -829,7 +935,7 @@
 
     function setInputDisabledStatus(disabled) {
         document.querySelectorAll('.po-item-row input').forEach(input => {
-            if (input.classList.contains('po-qty') || input.classList.contains('po-exp') || input.classList.contains('po-loc') || input.classList.contains('po-old-stock')) {
+            if (input.classList.contains('po-qty') || input.classList.contains('po-exp') || input.classList.contains('po-old-stock') || input.classList.contains('po-loc-zone') || input.classList.contains('po-qty2') || input.classList.contains('po-loc-zone2')) {
                 input.disabled = disabled;
                 if (disabled) {
                     input.classList.add('bg-gray-100', 'cursor-not-allowed');
@@ -838,7 +944,12 @@
                 }
             }
         });
-        
+        document.querySelectorAll('.po-item-row select, .po-item-row .po-split-btn').forEach(el => {
+            el.disabled = disabled;
+            if (disabled) { el.classList.add('bg-gray-100', 'cursor-not-allowed', 'opacity-60'); }
+            else { el.classList.remove('bg-gray-100', 'cursor-not-allowed', 'opacity-60'); }
+        });
+
         document.getElementById('r-ata').disabled = disabled;
         document.getElementById('r-receiver').disabled = disabled;
         document.getElementById('r-remark').disabled = disabled;
@@ -885,6 +996,7 @@
 
     function addExtraItemRow() {
         const container = document.getElementById('r-extra-items-container'); const div = document.createElement('div');
+        const defWh = (currentActiveGroup && currentActiveGroup.warehouse) || '';
         div.className = "extra-item-row bg-white p-4 rounded-xl border border-orange-200 shadow-sm relative";
         div.innerHTML = `
             <button type="button" onclick="this.closest('.extra-item-row').remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -894,17 +1006,19 @@
                 <input type="hidden" class="ex-sku">
                 <ul class="suggestion-box absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto hidden mt-1 divide-y divide-gray-50"></ul>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับ <span class="text-red-500">*</span></label>
                 <input type="number" class="input-field ex-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                 <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ</label>
                 <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="วว/ดด/ปป"></div>
-                <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">โลเคชั่น <span class="text-red-500">*</span></label>
-                <input type="text" class="input-field ex-loc py-2 border-orange-300 focus:border-brand-orange" placeholder="ตำแหน่งเก็บ"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อคเก่า</label>
                 <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ไม่บังคับ"></div>
+            </div>
+            <div class="mt-3">
+                <label class="block text-[10px] text-gray-500 mb-1 font-medium">ตำแหน่งเก็บ (Loc.IN) <span class="text-red-500">*</span></label>
+                ${locInputsHtml('ex', defWh, null)}
             </div>
         `;
         container.appendChild(div);
@@ -971,17 +1085,42 @@
       let formHasError = false;
 
       const poItemsData = [];
+      const splitNotes = [];
       document.querySelectorAll('.po-item-row').forEach(row => {
           const rowNum = row.dataset.rownum;
           const uid = row.dataset.uid;
-          const qtyInput = row.querySelector('.po-qty'); const locInput = row.querySelector('.po-loc');
-          qtyInput.classList.remove('input-error'); locInput.classList.remove('input-error');
+          const qtyInput = row.querySelector('.po-qty');
+          const whSel = row.querySelector('.po-loc-wh'); const floorSel = row.querySelector('.po-loc-floor'); const zoneInp = row.querySelector('.po-loc-zone');
+          qtyInput.classList.remove('input-error'); floorSel.classList.remove('input-error');
 
-          const grQty = qtyInput.value.trim(); const locIn = locInput.value.trim(); const unit = row.querySelector('.po-unit').value.trim(); const exp = row.querySelector('.po-exp').value.trim();
+          const unit = row.querySelector('.po-unit').value.trim(); const exp = row.querySelector('.po-exp').value.trim();
           const oldStockInput = row.querySelector('.po-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
 
+          let grQty = qtyInput.value.trim();
+          let locIn = serializeLoc(whSel.value, floorSel.value, zoneInp.value);
+
+          const splitWrap = row.querySelector('.po-split');
+          const splitOn = splitWrap && !splitWrap.classList.contains('hidden');
+          const floor2El = row.querySelector('.po-loc-floor2');
+          if (floor2El) floor2El.classList.remove('input-error');
+          let splitActive = false;
+
+          if (splitOn) {
+              const wh2 = row.querySelector('.po-loc-wh2'); const zone2 = row.querySelector('.po-loc-zone2'); const qty2Inp = row.querySelector('.po-qty2');
+              const q2 = parseFloat(qty2Inp.value) || 0;
+              if (q2 > 0) {
+                  splitActive = true;
+                  const q1 = parseFloat(grQty) || 0;
+                  grQty = String(q1 + q2);
+                  locIn = locIn + ' | ' + serializeLoc(wh2.value, floor2El.value, zone2.value);
+                  const meta = group.items.find(it => String(it.uid) === String(uid)) || {};
+                  splitNotes.push(`[${meta.product || ''}] ลง ${whSel.value}-${q1} ${unit} / ${wh2.value}-${q2} ${unit}`);
+              }
+          }
+
           if (grQty && parseFloat(grQty) > 0) {
-              if (!isDraft && !locIn) { locInput.classList.add('input-error'); formHasError = true; }
+              if (!isDraft && !floorSel.value) { floorSel.classList.add('input-error'); formHasError = true; }
+              if (!isDraft && splitActive && !floor2El.value) { floor2El.classList.add('input-error'); formHasError = true; }
               poItemsData.push({ rowNumber: rowNum, uid: uid, grQty, unit, locIn, exp, oldStock });
           } else if (isDraft) {
               poItemsData.push({ rowNumber: rowNum, uid: uid, grQty: "", unit, locIn, exp, oldStock });
@@ -990,17 +1129,20 @@
 
       const extraItemsData = [];
       document.querySelectorAll('.extra-item-row').forEach(row => {
-          const pInput = row.querySelector('.ex-product'); const qInput = row.querySelector('.ex-qty'); const lInput = row.querySelector('.ex-loc');
-          pInput.classList.remove('input-error'); qInput.classList.remove('input-error'); lInput.classList.remove('input-error');
+          const pInput = row.querySelector('.ex-product'); const qInput = row.querySelector('.ex-qty');
+          const whSel = row.querySelector('.ex-loc-wh'); const floorSel = row.querySelector('.ex-loc-floor'); const zoneInp = row.querySelector('.ex-loc-zone');
+          pInput.classList.remove('input-error'); qInput.classList.remove('input-error'); floorSel.classList.remove('input-error');
 
           const sku = row.querySelector('.ex-sku') ? row.querySelector('.ex-sku').value.trim() : '';
-          const product = pInput.value.trim(); const grQty = qInput.value.trim(); const locIn = lInput.value.trim(); const unit = row.querySelector('.ex-unit').value.trim(); const exp = row.querySelector('.ex-exp').value.trim();
+          const product = pInput.value.trim(); const grQty = qInput.value.trim();
+          const locIn = serializeLoc(whSel.value, floorSel.value, zoneInp.value);
+          const unit = row.querySelector('.ex-unit').value.trim(); const exp = row.querySelector('.ex-exp').value.trim();
           const oldStockInput = row.querySelector('.ex-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
 
           if (product || grQty) {
               if (!product) { pInput.classList.add('input-error'); formHasError = true; }
               if (!grQty) { qInput.classList.add('input-error'); formHasError = true; }
-              if (!isDraft && !locIn) { lInput.classList.add('input-error'); formHasError = true; }
+              if (!isDraft && !floorSel.value) { floorSel.classList.add('input-error'); formHasError = true; }
               if (product && grQty) extraItemsData.push({ sku, product, grQty, unit, locIn, exp, oldStock });
           }
       });
@@ -1009,8 +1151,11 @@
       const totalReceived = poItemsData.filter(i => i.grQty && parseFloat(i.grQty) > 0).length + extraItemsData.length;
       if (!isDraft && totalReceived === 0) return showNotification("โปรดใส่จำนวนรับสินค้าอย่างน้อย 1 รายการ", "warning");
 
+      let finalRemark = remark.trim();
+      if (splitNotes.length) finalRemark = (finalRemark ? finalRemark + ' ' : '') + splitNotes.join(' | ');
+
       const bulkPayload = {
-          ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: remark.trim(), targetStatus: targetStatus,
+          ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: finalRemark, targetStatus: targetStatus,
           groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: group.warehouse },
           items: poItemsData, extraItems: extraItemsData
       };
