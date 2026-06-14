@@ -97,6 +97,8 @@
             </select>
           </div>
 
+          <div id="delivery-plan-summary" class="mb-5 px-1"></div>
+
           <div id="wh-chips" class="flex flex-wrap gap-2 mb-5 px-1"></div>
 
           <div id="po-list-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
@@ -120,6 +122,7 @@
                 <p class="text-xs text-gray-500 font-medium">เลขที่อ้างอิง</p>
                 <p class="text-sm font-bold text-brand-blue" id="r-display-po">-</p>
               </div>
+              <div id="r-delivery-plan"></div>
             </div>
             
             <form id="form-receiving" class="space-y-6" novalidate>
@@ -180,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260613.01";
+    const CURRENT_VERSION = "20260614.02";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -323,6 +326,9 @@
     var currentActiveGroup = null;
     var poListRenderTimer = null;
     var grCompletedLoaded = false;
+    var deliveryPlanFilter = '';
+    var deliveryPlanDayOffset = null;
+    var isDeliveryPlanVisible = true;
     var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
 
     if ('speechSynthesis' in window) {
@@ -420,6 +426,13 @@
         var roles = (window.appSession && window.appSession.roles) || [];
         return roles.some(function (role) {
             return ["ADMIN", "SUPERVISOR"].includes(String(role).toUpperCase());
+        });
+    }
+
+    function esc(v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
     }
 
@@ -528,6 +541,151 @@
         document.getElementById('r-warehouse-filter').value = w;
         renderPOListForReceiving();
     }
+    function getDeliveryPlanGroups() {
+        return groupedPOs.filter(function (g) {
+            return g.status !== 'GR Completed' && g.plannedDate;
+        });
+    }
+    function formatCalendarDate(offset) {
+        var date = new Date();
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() + offset);
+        return {
+            label: offset === 0 ? 'วันนี้' : date.toLocaleDateString('th-TH', { weekday: 'short' }),
+            shortDate: date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' })
+        };
+    }
+    function deliveryPlanTone(group) {
+        return group.planSource === 'confirmed' ? 'confirmed' : (group.plannedDate ? 'estimated' : 'none');
+    }
+    function calendarDayClass(active) {
+        return active
+            ? 'border-brand-orange bg-brand-orangeLight shadow-sm'
+            : 'border-gray-200 bg-white hover:border-brand-orange/50 hover:bg-brand-orangeLight/30';
+    }
+    function renderCalendarPills(dayGroups) {
+        if (!dayGroups.length) {
+            return '<span class="text-[10px] text-gray-400">ไม่มีแผน</span>';
+        }
+        return dayGroups.slice(0, 2).map(function (group) {
+            var isConfirmed = deliveryPlanTone(group) === 'confirmed';
+            var cls = isConfirmed
+                ? 'bg-red-50 text-red-700 border-red-100'
+                : 'bg-blue-50 text-brand-blue border-brand-blueLight';
+            var label = isConfirmed ? 'ยืนยัน' : 'คาดการณ์';
+            return `<span class="block truncate rounded-md border px-1.5 py-0.5 ${cls}">${esc(label)} · ${esc(group.vendor || '-')}</span>`;
+        }).join('') + (dayGroups.length > 2 ? `<span class="block text-[10px] font-bold text-gray-500">+${dayGroups.length - 2} บิล</span>` : '');
+    }
+    function clearDeliveryPlanFilter() {
+        deliveryPlanFilter = '';
+        deliveryPlanDayOffset = null;
+        renderPOListForReceiving();
+    }
+    function setDeliveryPlanFilter(filter) {
+        deliveryPlanFilter = deliveryPlanFilter === filter ? '' : filter;
+        deliveryPlanDayOffset = null;
+        renderPOListForReceiving();
+    }
+    function setDeliveryPlanDayFilter(offset) {
+        offset = Number(offset);
+        if (deliveryPlanFilter === 'day' && deliveryPlanDayOffset === offset) {
+            clearDeliveryPlanFilter();
+            return;
+        }
+        deliveryPlanFilter = 'day';
+        deliveryPlanDayOffset = offset;
+        renderPOListForReceiving();
+    }
+    function toggleDeliveryPlanVisibility() {
+        isDeliveryPlanVisible = !isDeliveryPlanVisible;
+        renderDeliveryPlanSummary();
+    }
+    function renderDeliveryPlanSummary() {
+        var container = document.getElementById('delivery-plan-summary');
+        if (!container) return;
+        var activeGroups = groupedPOs.filter(function (g) { return g.status !== 'GR Completed'; });
+        var planGroups = getDeliveryPlanGroups();
+        var overdue = activeGroups.filter(function (g) { return g.isPlanOverdue; }).length;
+        var confirmed = planGroups.filter(function (g) { return g.planSource === 'confirmed'; }).length;
+        var estimated = planGroups.filter(function (g) { return g.planSource !== 'confirmed'; }).length;
+        var summary = (appData.deliveryPlanning || {});
+        var calendarHtml = '';
+        for (var offset = 0; offset < 14; offset++) {
+            var meta = formatCalendarDate(offset);
+            var dayGroups = planGroups.filter(function (g) { return Number(g.daysUntil) === offset; });
+            var confirmedCount = dayGroups.filter(function (g) { return g.planSource === 'confirmed'; }).length;
+            var estimatedCount = dayGroups.length - confirmedCount;
+            var active = deliveryPlanFilter === 'day' && deliveryPlanDayOffset === offset;
+            calendarHtml += `
+                <button type="button" onclick="setDeliveryPlanDayFilter(${offset})" aria-pressed="${active ? 'true' : 'false'}" class="text-left rounded-xl border p-2 min-h-[112px] transition active:scale-[0.99] ${calendarDayClass(active)}">
+                    <span class="flex items-start justify-between gap-2">
+                        <span>
+                            <span class="block text-[11px] font-bold text-gray-800">${esc(meta.label)}</span>
+                            <span class="block text-[11px] text-gray-500">${esc(meta.shortDate)}</span>
+                        </span>
+                        <span class="text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-100 rounded-full px-2 py-0.5">${dayGroups.length}</span>
+                    </span>
+                    <span class="mt-2 flex flex-wrap gap-1 text-[10px]">
+                        ${confirmedCount ? `<span class="rounded-full bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5">ยืนยัน ${confirmedCount}</span>` : ''}
+                        ${estimatedCount ? `<span class="rounded-full bg-blue-50 text-brand-blue border border-brand-blueLight px-1.5 py-0.5">คาดการณ์ ${estimatedCount}</span>` : ''}
+                    </span>
+                    <span class="mt-2 block space-y-1 text-[10px]">${renderCalendarPills(dayGroups)}</span>
+                </button>`;
+        }
+        container.innerHTML = `
+            <div class="bg-white border border-gray-200 rounded-2xl p-3 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="calendar-days" class="w-4 h-4 text-brand-orange"></i> แผนรับสินค้า</h3>
+                        <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีจะคาดการณ์จาก P75 ของ Vendor</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                            <span class="inline-flex items-center gap-1 text-red-700"><span class="w-2 h-2 rounded-full bg-red-600"></span> Vendor ยืนยัน ${esc(confirmed)}</span>
+                            <span class="inline-flex items-center gap-1 text-brand-blue"><span class="w-2 h-2 rounded-full bg-brand-blue"></span> คาดการณ์ ${esc(estimated)}</span>
+                            <span class="text-gray-400">${esc(summary.sampleCount || 0)} ตัวอย่าง · ${esc(summary.vendorCount || 0)} Vendor</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${deliveryPlanFilter ? `<button type="button" onclick="clearDeliveryPlanFilter()" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 bg-white hover:border-brand-orange/50">ล้างตัวกรอง</button>` : ''}
+                        <button type="button" onclick="toggleDeliveryPlanVisibility()" aria-expanded="${isDeliveryPlanVisible ? 'true' : 'false'}" aria-controls="delivery-plan-calendar-body" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-white hover:border-brand-orange/50">
+                            ${isDeliveryPlanVisible ? 'ซ่อนแผนรับสินค้า' : 'เปิดแผนรับสินค้า'}
+                        </button>
+                    </div>
+                </div>
+                <div id="delivery-plan-calendar-body" class="${isDeliveryPlanVisible ? '' : 'hidden'} mt-3">
+                    ${overdue ? `<button type="button" onclick="setDeliveryPlanFilter('overdue')" aria-pressed="${deliveryPlanFilter === 'overdue' ? 'true' : 'false'}" class="mb-3 w-full rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${deliveryPlanFilter === 'overdue' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:border-red-200'}">มีบิลเลยแผน ${overdue} บิล</button>` : ''}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                        ${calendarHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+        lucide.createIcons({ root: container });
+    }
+    function deliveryPlanText(group) {
+        if (!group.plannedDate) return 'ยังประเมินไม่ได้';
+        if (group.status === 'GR Completed') return 'รับเข้าแล้ว';
+        if (group.daysUntil === null || group.daysUntil === undefined) return group.plannedDate;
+        var days = Number(group.daysUntil);
+        if (days === 0) return 'วันนี้';
+        if (days > 0) return 'อีก ' + days + ' วัน';
+        return 'เลยมา ' + Math.abs(days) + ' วัน';
+    }
+    function deliverySourceText(source) {
+        if (source === 'confirmed') return 'Vendor ยืนยัน';
+        if (source === 'estimated_p75') return 'คาดการณ์ P75';
+        return 'ข้อมูลไม่พอ';
+    }
+    function deliveryPlanBadge(group) {
+        if (!group.plannedDate) {
+            return `<div class="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">ยังไม่มีแผนรับ</div>`;
+        }
+        var cls = group.planSource === 'confirmed' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-brand-blue border-brand-blueLight';
+        return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg ${cls}">
+            <span>${esc(group.plannedDate)}</span>
+            <span class="font-medium opacity-80"> · ${esc(deliveryPlanText(group))}</span>
+            <span class="font-medium opacity-80"> · ${esc(deliverySourceText(group.planSource))}</span>
+        </div>`;
+    }
     function toggleItemSplit(btn) {
         var row = btn.closest('.po-item-row');
         var wrap = row.querySelector('.po-split');
@@ -560,7 +718,7 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
-        const cachedData = getCache('CACHE_GR_ACTIVE_DATA', GR_CACHE_TTL);
+        const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
         if (cachedData && !isManualRefresh) {
             try {
                 appData = cachedData;
@@ -578,7 +736,7 @@
         if (!cachedData || isManualRefresh) hideDataLoading();
 
         if (response.success) { 
-            setCache('CACHE_GR_ACTIVE_DATA', response);
+            setCache('CACHE_GR_ACTIVE_DATA_V2', response);
             appData = response; 
             grCompletedLoaded = false;
             groupPendingPOs(); 
@@ -601,18 +759,46 @@
       ];
       allPOs.forEach(po => {
         const key = po.poNumber + '|' + po.vendor + '|' + po.poDate + '|' + po.warehouse + '|' + po.status;
-        if (!groups[key]) groups[key] = { poNumber: po.poNumber, vendor: po.vendor, poDate: po.poDate, warehouse: po.warehouse, status: po.status, items: [] };
+        if (!groups[key]) {
+            groups[key] = {
+                poNumber: po.poNumber,
+                vendor: po.vendor,
+                poDate: po.poDate,
+                warehouse: po.warehouse,
+                status: po.status,
+                expectedDate: po.expectedDate || '',
+                plannedDate: po.plannedDate || '',
+                planSource: po.planSource || 'no_data',
+                daysUntil: (po.daysUntil === null || po.daysUntil === undefined) ? null : Number(po.daysUntil),
+                isPlanOverdue: !!po.isPlanOverdue,
+                vendorAvgLeadDays: po.vendorAvgLeadDays || '',
+                vendorP75LeadDays: po.vendorP75LeadDays || '',
+                vendorLeadSampleCount: po.vendorLeadSampleCount || 0,
+                vendorLeadConfidence: po.vendorLeadConfidence || 'none',
+                items: []
+            };
+        }
+        if (!groups[key].expectedDate && po.expectedDate) groups[key].expectedDate = po.expectedDate;
+        if (!groups[key].plannedDate && po.plannedDate) groups[key].plannedDate = po.plannedDate;
+        if (po.planSource === 'confirmed') groups[key].planSource = 'confirmed';
+        if (po.isPlanOverdue) groups[key].isPlanOverdue = true;
         groups[key].items.push(po);
       });
       groupedPOs = Object.values(groups).sort((a, b) => {
         let getScore = (group) => {
+            if (group.isPlanOverdue && group.status === 'Pending GR') return 6;
             if (group.items.some(i => i.displayStatus === 'Overdue')) return 5;
             if (group.status === 'Pending Review') return 4;
             if (group.status === 'Draft GR') return 3;
             if (group.status === 'Pending GR') return 2;
             return 1;
         };
-        return getScore(b) - getScore(a);
+        var scoreDiff = getScore(b) - getScore(a);
+        if (scoreDiff) return scoreDiff;
+        if (a.daysUntil === null && b.daysUntil !== null) return 1;
+        if (a.daysUntil !== null && b.daysUntil === null) return -1;
+        if (a.daysUntil !== null && b.daysUntil !== null) return a.daysUntil - b.daysUntil;
+        return 0;
       });
       groupedPOs.forEach((group, index) => {
           group.index = index;
@@ -639,7 +825,7 @@
         const response = await apiCall('getInitialData', { includeCompleted: true });
         hideDataLoading();
         if (response.success) {
-            setCache('CACHE_GR_FULL_DATA', response);
+            setCache('CACHE_GR_FULL_DATA_V2', response);
             appData = response;
             grCompletedLoaded = true;
             groupPendingPOs();
@@ -674,6 +860,8 @@
             }
             
             if(search && !g.searchText.includes(search)) return false;
+            if (deliveryPlanFilter === 'overdue' && !g.isPlanOverdue) return false;
+            if (deliveryPlanFilter === 'day' && Number(g.daysUntil) !== Number(deliveryPlanDayOffset)) return false;
             return true;
         });
 
@@ -718,6 +906,7 @@
                     ${statusBadge}
                 </div>
                 ${productsHtml}
+                <div class="mb-3">${deliveryPlanBadge(group)}</div>
                 <div class="mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
                     <div>
                         <p class="font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5"><i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i> <span class="truncate max-w-[120px]">${group.vendor}</span></p>
@@ -731,6 +920,7 @@
             </div>`;
         });
         container.innerHTML = htmlStr; lucide.createIcons({ root: container });
+        renderDeliveryPlanSummary();
         renderWarehouseChips();
     }
 
@@ -749,6 +939,23 @@
         document.getElementById('r-display-date').innerText = group.poDate;
         document.getElementById('r-display-po').innerText = `${group.poNumber || '-'}`;
         document.getElementById('r-group-index').value = index;
+        document.getElementById('r-delivery-plan').innerHTML = `
+            <div class="bg-brand-blueLight/30 border border-brand-blue/10 rounded-xl p-3">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                        <p class="text-[11px] font-bold text-brand-blue uppercase tracking-wide">แผนรับสินค้า</p>
+                        <p class="text-sm font-bold text-gray-800 mt-0.5">${esc(group.plannedDate || 'ยังประเมินไม่ได้')}</p>
+                    </div>
+                    ${deliveryPlanBadge(group)}
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-3 text-[11px] text-gray-500">
+                    <p>ที่มา: <span class="font-bold text-gray-700">${esc(deliverySourceText(group.planSource))}</span></p>
+                    <p>Vendor P75: <span class="font-bold text-gray-700">${group.vendorP75LeadDays ? esc(group.vendorP75LeadDays) + ' วัน' : '-'}</span></p>
+                    <p>Vendor Avg: <span class="font-bold text-gray-700">${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : '-'}</span></p>
+                    <p>ตัวอย่าง: <span class="font-bold text-gray-700">${esc(group.vendorLeadSampleCount || 0)} ครั้ง</span></p>
+                </div>
+            </div>
+        `;
         
         let firstItem = group.items.find(i => i.status === 'Draft GR' || i.status === 'Pending Review') || group.items[0];
         document.getElementById('r-ata').value = (firstItem.ata && firstItem.ata.includes('/')) ? parseDateToInput(firstItem.ata) : new Date().toISOString().split('T')[0];
@@ -1189,7 +1396,7 @@
         try {
             const response = await apiCall('getInitialData', { includeCompleted: false });
             if (response.success) { 
-                setCache('CACHE_GR_ACTIVE_DATA', response);
+                setCache('CACHE_GR_ACTIVE_DATA_V2', response);
                 appData = response; 
                 grCompletedLoaded = false;
                 groupPendingPOs(); 
