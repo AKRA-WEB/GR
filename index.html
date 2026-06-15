@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260615.01";
+    const CURRENT_VERSION = "20260615.02";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -671,7 +671,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="calendar-days" class="w-4 h-4 text-brand-orange"></i> แผนรับสินค้า</h3>
-                        <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีจะคาดการณ์จาก P75 ของ Vendor</p>
+                        <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีระบบจะแสดงวันที่คาดว่าจะเข้าโดยอิงจากประวัติส่งของ</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                             <span class="inline-flex items-center gap-1 text-red-700"><span class="w-2 h-2 rounded-full bg-red-600"></span> Vendor ยืนยัน ${esc(confirmed)}</span>
                             <span class="inline-flex items-center gap-1 text-brand-blue"><span class="w-2 h-2 rounded-full bg-brand-blue"></span> คาดการณ์ ${esc(estimated)}</span>
@@ -706,7 +706,7 @@
     }
     function deliverySourceText(source) {
         if (source === 'confirmed') return 'Vendor ยืนยัน';
-        if (source === 'estimated_p75') return 'คาดการณ์ P75';
+        if (source === 'estimated_p75') return 'วันที่คาดว่าจะเข้า';
         return 'ข้อมูลไม่พอ';
     }
     function deliveryPlanBadge(group) {
@@ -714,10 +714,12 @@
             return `<div class="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">ยังไม่มีแผนรับ</div>`;
         }
         var cls = group.planSource === 'confirmed' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-brand-blue border-brand-blueLight';
+        var metaText = group.planSource === 'estimated_p75'
+            ? 'วันที่คาดว่าจะเข้า: ' + deliveryPlanText(group)
+            : deliveryPlanText(group) + ' · ' + deliverySourceText(group.planSource);
         return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg ${cls}">
             <span>${esc(group.plannedDate)}</span>
-            <span class="font-medium opacity-80"> · ${esc(deliveryPlanText(group))}</span>
-            <span class="font-medium opacity-80"> · ${esc(deliverySourceText(group.planSource))}</span>
+            <span class="font-medium opacity-80"> · ${esc(metaText)}</span>
         </div>`;
     }
     function toggleItemSplit(btn) {
@@ -984,7 +986,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2 mt-3 text-[11px] text-gray-500">
                     <p>ที่มา: <span class="font-bold text-gray-700">${esc(deliverySourceText(group.planSource))}</span></p>
-                    <p>Vendor P75: <span class="font-bold text-gray-700">${group.vendorP75LeadDays ? esc(group.vendorP75LeadDays) + ' วัน' : '-'}</span></p>
+                    <p>คาดว่าจะเข้าใน: <span class="font-bold text-gray-700">${esc(deliveryPlanText(group))}</span></p>
                     <p>Vendor Avg: <span class="font-bold text-gray-700">${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : '-'}</span></p>
                     <p>ตัวอย่าง: <span class="font-bold text-gray-700">${esc(group.vendorLeadSampleCount || 0)} ครั้ง</span></p>
                 </div>
