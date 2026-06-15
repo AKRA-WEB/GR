@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260615.02";
+    const CURRENT_VERSION = "20260615.03";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -319,7 +319,7 @@
         STORAGE_KEY: "akra_gr_session"
     };
 
-    var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTXs88G-eNSApVFKpNauH2Qz4y7RJs9pmuBrmwG0qfNnBo2JbFEfP84NZqp-bnoGc_/exec";
+    var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzN9bIC6gxWGMR4tbj96E0yzWbHrrZ9NeYLtJR_Al7mRW_4L_sALC1rU4nCizVn3I/exec";
     
     var appData = { products: [], pendingPOs: [] };
     var groupedPOs = [];
@@ -722,6 +722,23 @@
             <span class="font-medium opacity-80"> · ${esc(metaText)}</span>
         </div>`;
     }
+    function parseReceivingRemark(remark) {
+        var text = String(remark || '');
+        var parsed = { note: text.trim(), liftRounds: '', liftPayment: '' };
+        var matchNew = text.match(/\[ค่าลิฟท์\s*(\d+)?\s*รอบ\s*(จ่ายสด|เชื่อ)\]\s*/);
+        if (matchNew) {
+            parsed.liftRounds = matchNew[1] || '';
+            parsed.liftPayment = matchNew[2] || '';
+            parsed.note = text.replace(matchNew[0], '').trim();
+            return parsed;
+        }
+        var matchOld = text.match(/\[ค่าลิฟท์:\s*(จ่ายสด|เชื่อ)\]\s*/);
+        if (matchOld) {
+            parsed.liftPayment = matchOld[1] || '';
+            parsed.note = text.replace(matchOld[0], '').trim();
+        }
+        return parsed;
+    }
     function toggleItemSplit(btn) {
         var row = btn.closest('.po-item-row');
         var wrap = row.querySelector('.po-split');
@@ -994,10 +1011,10 @@
         `;
         
         let firstItem = group.items.find(i => i.status === 'Draft GR' || i.status === 'Pending Review') || group.items[0];
+        const savedReceivingRemark = parseReceivingRemark(firstItem?.remark || '');
         document.getElementById('r-ata').value = (firstItem.ata && firstItem.ata.includes('/')) ? parseDateToInput(firstItem.ata) : new Date().toISOString().split('T')[0];
         document.getElementById('r-receiver').value = firstItem?.receiverName || window.currentUser;
-        
-        document.getElementById('r-remark').value = '';
+        document.getElementById('r-remark').value = savedReceivingRemark.note;
 
         // เช็ค Overdue ปกติ 
         const isOverdue = group.items.some(i => i.displayStatus === 'Overdue');
@@ -1032,18 +1049,8 @@
                 defaultLiftFee = 'เชื่อ';
             }
 
-            let previousRounds = '';
-            let previousPayment = defaultLiftFee;
-            if (firstItem?.remark) {
-                const matchNew = firstItem.remark.match(/\[ค่าลิฟท์\s*(\d+)?\s*รอบ\s*(จ่ายสด|เชื่อ)\]/);
-                if(matchNew) {
-                    previousRounds = matchNew[1] || '';
-                    previousPayment = matchNew[2];
-                } else {
-                    const matchOld = firstItem.remark.match(/\[ค่าลิฟท์:\s*(จ่ายสด|เชื่อ)\]/);
-                    if(matchOld) previousPayment = matchOld[1];
-                }
-            }
+            let previousRounds = savedReceivingRemark.liftRounds;
+            let previousPayment = savedReceivingRemark.liftPayment || defaultLiftFee;
             
             liftFeeSection.innerHTML = `
                 <div class="bg-brand-blueLight/30 p-4 rounded-xl border border-brand-blue/20 shadow-sm mb-6" id="lift-fee-container">
