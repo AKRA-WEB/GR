@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260615.03";
+    const CURRENT_VERSION = "20260615.04";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -713,6 +713,12 @@
         if (!group.plannedDate) {
             return `<div class="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">ยังไม่มีแผนรับ</div>`;
         }
+        if (group.planSource === 'partial') {
+            return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg bg-brand-orangeLight text-brand-orange border-brand-orange/30">
+                <span>ยืนยัน ${esc(group.confirmedItemCount)}/${esc(group.totalItemCount)} รายการ</span>
+                <span class="font-medium opacity-80"> · เข้าไว ${esc(group.plannedDate)}</span>
+            </div>`;
+        }
         var cls = group.planSource === 'confirmed' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-brand-blue border-brand-blueLight';
         var metaText = group.planSource === 'estimated_p75'
             ? 'วันที่คาดว่าจะเข้า: ' + deliveryPlanText(group)
@@ -721,6 +727,15 @@
             <span>${esc(group.plannedDate)}</span>
             <span class="font-medium opacity-80"> · ${esc(metaText)}</span>
         </div>`;
+    }
+    function itemPlanBadge(item) {
+        if (item.planSource === 'confirmed' && item.expectedDate) {
+            return `<span class="text-[10px] font-bold whitespace-nowrap rounded-md border px-1.5 py-0.5 bg-red-50 text-red-700 border-red-100">ยืนยัน ${esc(item.expectedDate)}</span>`;
+        }
+        if (item.plannedDate) {
+            return `<span class="text-[10px] font-bold whitespace-nowrap rounded-md border px-1.5 py-0.5 bg-blue-50 text-brand-blue border-brand-blueLight">คาด ~${esc(item.plannedDate)}</span>`;
+        }
+        return '';
     }
     function parseReceivingRemark(remark) {
         var text = String(remark || '');
@@ -828,14 +843,47 @@
                 vendorP75LeadDays: po.vendorP75LeadDays || '',
                 vendorLeadSampleCount: po.vendorLeadSampleCount || 0,
                 vendorLeadConfidence: po.vendorLeadConfidence || 'none',
+                confirmedCount: 0,
+                confirmedDate: '',
+                confirmedDaysUntil: null,
+                estimatedDate: '',
+                estimatedDaysUntil: null,
                 items: []
             };
         }
-        if (!groups[key].expectedDate && po.expectedDate) groups[key].expectedDate = po.expectedDate;
-        if (!groups[key].plannedDate && po.plannedDate) groups[key].plannedDate = po.plannedDate;
-        if (po.planSource === 'confirmed') groups[key].planSource = 'confirmed';
+        const poDays = (po.daysUntil === null || po.daysUntil === undefined || po.daysUntil === '') ? null : Number(po.daysUntil);
+        if (po.planSource === 'confirmed' && po.expectedDate) {
+            groups[key].confirmedCount++;
+            if (groups[key].confirmedDaysUntil === null || (poDays !== null && poDays < groups[key].confirmedDaysUntil)) {
+                groups[key].confirmedDaysUntil = poDays;
+                groups[key].confirmedDate = po.expectedDate;
+            }
+        } else if (po.plannedDate) {
+            if (groups[key].estimatedDaysUntil === null || (poDays !== null && poDays < groups[key].estimatedDaysUntil)) {
+                groups[key].estimatedDaysUntil = poDays;
+                groups[key].estimatedDate = po.plannedDate;
+            }
+        }
         if (po.isPlanOverdue) groups[key].isPlanOverdue = true;
         groups[key].items.push(po);
+      });
+      // Finalize bill-level plan: a single confirmed item must not paint the whole bill confirmed.
+      Object.values(groups).forEach(g => {
+        const total = g.items.length;
+        g.confirmedItemCount = g.confirmedCount;
+        g.totalItemCount = total;
+        if (g.confirmedCount > 0) {
+            g.expectedDate = g.confirmedDate;
+            g.plannedDate = g.confirmedDate;
+            g.daysUntil = g.confirmedDaysUntil;
+            g.planSource = (g.confirmedCount >= total) ? 'confirmed' : 'partial';
+        } else if (g.estimatedDate) {
+            g.plannedDate = g.estimatedDate;
+            g.daysUntil = g.estimatedDaysUntil;
+            g.planSource = 'estimated_p75';
+        } else {
+            g.planSource = 'no_data';
+        }
       });
       groupedPOs = Object.values(groups).sort((a, b) => {
         let getScore = (group) => {
@@ -947,7 +995,7 @@
             
             let productsHtml = '<div class="space-y-1 my-3">';
             group.items.slice(0,3).forEach((item, i) => {
-                productsHtml += `<p class="font-medium text-gray-800 text-[13px] leading-snug truncate"><span class="text-gray-400 mr-1">${i+1}.</span> ${item.product}</p>`;
+                productsHtml += `<div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${item.product}</p>${itemPlanBadge(item)}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
@@ -1098,7 +1146,7 @@
                             <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
-                    ${orderedQtyBadge}
+                    <div class="flex flex-col items-end gap-1 flex-shrink-0">${orderedQtyBadge}${itemPlanBadge(item)}</div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับจริง</label>
