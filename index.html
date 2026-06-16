@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260615.04";
+    const CURRENT_VERSION = "20260615.05";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -326,6 +326,7 @@
     var currentActiveGroup = null;
     var poListRenderTimer = null;
     var grCompletedLoaded = false;
+    var receivingMutationInFlight = false;
     var deliveryPlanFilter = '';
     var deliveryPlanDayOffset = null;
     var isDeliveryPlanVisible = true;
@@ -475,6 +476,32 @@
     const GR_CACHE_TTL = 30 * 60 * 1000;
     function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
     function setCache(key, data) { localStorage.setItem(key, JSON.stringify({ _ts: Date.now(), _d: data })); }
+    function clearReceivingCaches() {
+        localStorage.removeItem('CACHE_GR_ACTIVE_DATA_V2');
+        localStorage.removeItem('CACHE_GR_FULL_DATA_V2');
+    }
+    function itemUids(items) {
+        const seen = {};
+        return (items || []).map(item => String(item.uid || '').trim()).filter(uid => {
+            if (!uid || seen[uid]) return false;
+            seen[uid] = true;
+            return true;
+        });
+    }
+    function isSameBillItem(item, group) {
+        return String(item.poNumber || '') === String(group.poNumber || '')
+            && String(item.vendor || '') === String(group.vendor || '')
+            && String(item.poDate || '') === String(group.poDate || '')
+            && String(item.warehouse || '') === String(group.warehouse || '');
+    }
+    function loadedBillItems(group) {
+        const allItems = [
+            ...((appData && appData.pendingPOs) || []),
+            ...((appData && appData.grCompleted) || [])
+        ];
+        const matched = allItems.filter(item => isSameBillItem(item, group));
+        return matched.length ? matched : (group.items || []);
+    }
     function showNotification(msg, type='success') {
         const c = document.getElementById('toast-container'); if(!c) return;
         const t = document.createElement('div'); t.className = `toast ${type}`;
@@ -1267,28 +1294,37 @@
     }
 
     async function handleRecallOrReset(actionType) {
+        if (receivingMutationInFlight) return;
         const actionLabel = actionType === 'reset' ? 'รีเซ็ตสถานะเป็นรอรับเข้า (ล้างข้อมูลรับสินค้าทั้งหมด)' : 'ดึงบิลกลับมาแก้ไข (ย้อนสถานะกลับเป็นฉบับร่าง)';
         const confirmMsg = `คุณแน่ใจหรือไม่ว่าต้องการ ${actionLabel} สำหรับบิลนี้?`;
         
         if (!confirm(confirmMsg)) return;
-        
+
         const index = document.getElementById('r-group-index').value;
         const group = currentActiveGroup || groupedPOs[index];
         if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า", "error");
-        
-        const poUids = group.items.map(item => item.uid);
-        
-        showDataLoading(`กำลังดำเนินการ...`);
-        
-        const res = await apiCall('recallGR', { poUids, actionType });
-        hideDataLoading();
-        
-        if (res.success) {
-            showNotification(res.message, "success");
-            showView('receiving-list-view');
-            openReceiving(true); // Force manual refresh to reload lists and cache
-        } else {
-            showNotification("เกิดข้อผิดพลาด: " + res.message, "error");
+
+        const poUids = itemUids(loadedBillItems(group));
+        if (poUids.length === 0) return showNotification("ไม่พบ UID ของรายการในบิลนี้ กรุณารีเฟรชข้อมูล", "error");
+
+        receivingMutationInFlight = true;
+        try {
+            showDataLoading(`กำลังดำเนินการ...`);
+
+            const res = await apiCall('recallGR', { poUids, actionType });
+            hideDataLoading();
+
+            if (res.success) {
+                clearReceivingCaches();
+                showNotification(res.message, "success");
+                showView('receiving-list-view');
+                await openReceiving(true); // Force manual refresh to reload lists and cache
+            } else {
+                showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error");
+            }
+        } finally {
+            receivingMutationInFlight = false;
+            hideDataLoading();
         }
     }
 
@@ -1455,6 +1491,7 @@
       const bulkPayload = {
           ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: finalRemark, targetStatus: targetStatus,
           groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: group.warehouse },
+          groupPoUids: itemUids(group.items),
           items: poItemsData, extraItems: extraItemsData
       };
 
@@ -1477,6 +1514,7 @@
           
           showNotification(msg, "success"); 
           showView('receiving-list-view');
+          clearReceivingCaches();
           
           openReceivingInBackground(); 
       } 
