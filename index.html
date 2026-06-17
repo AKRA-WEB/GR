@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260615.05";
+    const CURRENT_VERSION = "20260617.01";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -488,7 +488,19 @@
             return true;
         });
     }
+    function usableBillRefUid(value) {
+        const ref = String(value || '').trim();
+        return ref && ref !== 'DIRECT' ? ref : '';
+    }
+    function poBillGroupKey(po, statusSuffix = '') {
+        const ref = usableBillRefUid(po && po.refPrUid);
+        if (ref) return 'bill:' + ref + statusSuffix;
+        return 'legacy:' + [po.poNumber || '', po.vendor || '', po.poDate || '', po.warehouse || ''].join('|') + statusSuffix;
+    }
     function isSameBillItem(item, group) {
+        const itemRef = usableBillRefUid(item && item.refPrUid);
+        const groupRef = usableBillRefUid(group && group.refPrUid);
+        if (itemRef || groupRef) return itemRef && groupRef && itemRef === groupRef;
         return String(item.poNumber || '') === String(group.poNumber || '')
             && String(item.vendor || '') === String(group.vendor || '')
             && String(item.poDate || '') === String(group.poDate || '')
@@ -853,9 +865,10 @@
         ...(appData.grCompleted || [])
       ];
       allPOs.forEach(po => {
-        const key = po.poNumber + '|' + po.vendor + '|' + po.poDate + '|' + po.warehouse + '|' + po.status;
+        const key = poBillGroupKey(po, '|' + (po.status || ''));
         if (!groups[key]) {
             groups[key] = {
+                refPrUid: usableBillRefUid(po.refPrUid),
                 poNumber: po.poNumber,
                 vendor: po.vendor,
                 poDate: po.poDate,
