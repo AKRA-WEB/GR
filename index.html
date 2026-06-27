@@ -183,7 +183,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260621.01";
+    const CURRENT_VERSION = "20260627.01";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -376,7 +376,7 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData'] });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts'] });
 
             lucide.createIcons();
             UI.showLoading();
@@ -474,11 +474,30 @@
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
     const GR_CACHE_TTL = 30 * 60 * 1000;
+    const GR_PRODUCTS_CACHE_TTL = 2 * 60 * 60 * 1000;
+    var grProductsLoaded = false;
     function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
     function setCache(key, data) { localStorage.setItem(key, JSON.stringify({ _ts: Date.now(), _d: data })); }
     function clearReceivingCaches() {
         localStorage.removeItem('CACHE_GR_ACTIVE_DATA_V2');
         localStorage.removeItem('CACHE_GR_FULL_DATA_V2');
+    }
+    async function loadGRProductsBackground() {
+        if (grProductsLoaded) return;
+        const cached = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
+        if (cached) {
+            appData.products = cached.products || [];
+            grProductsLoaded = true;
+            return;
+        }
+        try {
+            const response = await apiCall('getProducts', {});
+            if (response.success) {
+                setCache('CACHE_GR_PRODUCTS_V1', response);
+                appData.products = response.products || [];
+                grProductsLoaded = true;
+            }
+        } catch(e) { console.warn('GR products background load error', e); }
     }
     function itemUids(items) {
         const seen = {};
@@ -826,9 +845,11 @@
 
     async function openReceiving(isManualRefresh = false) {
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
+        const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
         if (cachedData && !isManualRefresh) {
             try {
                 appData = cachedData;
+                if (cachedProducts) { appData.products = cachedProducts.products || []; grProductsLoaded = true; }
                 groupPendingPOs();
                 renderPOListForReceiving();
                 showView('receiving-list-view');
@@ -838,23 +859,25 @@
             showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
         }
 
-        const response = await apiCall('getInitialData', { includeCompleted: false });
-        
+        const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+
         if (!cachedData || isManualRefresh) hideDataLoading();
 
-        if (response.success) { 
+        if (response.success) {
             setCache('CACHE_GR_ACTIVE_DATA_V2', response);
-            appData = response; 
+            appData = response;
+            appData.products = cachedProducts ? (cachedProducts.products || []) : [];
             grCompletedLoaded = false;
             groupPendingPOs(); 
             if (document.getElementById('r-status-filter').value === 'GR Completed') {
                 await ensureCompletedLoaded();
             }
-            renderPOListForReceiving(); 
-            
-            if (!cachedData && !isManualRefresh) showView('receiving-list-view'); 
-        } else if (!cachedData) { 
-            showNotification('ดึงข้อมูลไม่สำเร็จ', 'error'); 
+            renderPOListForReceiving();
+
+            if (!cachedData && !isManualRefresh) showView('receiving-list-view');
+            if (!grProductsLoaded) loadGRProductsBackground();
+        } else if (!cachedData) {
+            showNotification('ดึงข้อมูลไม่สำเร็จ', 'error');
         }
     }
 
@@ -963,11 +986,13 @@
     async function ensureCompletedLoaded() {
         if (grCompletedLoaded) return;
         showDataLoading('กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
-        const response = await apiCall('getInitialData', { includeCompleted: true });
+        const response = await apiCall('getInitialData', { includeCompleted: true, includeProducts: false });
         hideDataLoading();
         if (response.success) {
             setCache('CACHE_GR_FULL_DATA_V2', response);
+            const prevProducts = appData.products;
             appData = response;
+            appData.products = prevProducts || [];
             grCompletedLoaded = true;
             groupPendingPOs();
         } else {
@@ -1536,13 +1561,15 @@
 
     async function openReceivingInBackground() {
         try {
-            const response = await apiCall('getInitialData', { includeCompleted: false });
-            if (response.success) { 
+            const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+            if (response.success) {
                 setCache('CACHE_GR_ACTIVE_DATA_V2', response);
-                appData = response; 
+                const prevProducts = appData.products;
+                appData = response;
+                appData.products = prevProducts || [];
                 grCompletedLoaded = false;
-                groupPendingPOs(); 
-                renderPOListForReceiving(); 
+                groupPendingPOs();
+                renderPOListForReceiving();
             }
         } catch(e) {}
     }
