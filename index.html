@@ -5,14 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://script.google.com">
-  <title>ระบบรับสินค้า (GR)</title> 
-  
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <title>ระบบรับสินค้า (GR)</title>
+
+  <link rel="stylesheet" href="tailwind.css">
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script>
-    tailwind.config = { theme: { extend: { colors: { brand: { blue: '#171C8F', orange: '#E35205', blueLight: '#E8E9F4', orangeLight: '#FCECE5'} } } } }
-  </script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; letter-spacing: 0.2px; }
@@ -183,7 +182,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260627.02";
+    const CURRENT_VERSION = "20260702.01";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -322,6 +321,7 @@
     var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzN9bIC6gxWGMR4tbj96E0yzWbHrrZ9NeYLtJR_Al7mRW_4L_sALC1rU4nCizVn3I/exec";
     
     var appData = { products: [], pendingPOs: [] };
+    var initialDataPrefetch = null;
     var groupedPOs = [];
     var currentActiveGroup = null;
     var poListRenderTimer = null;
@@ -377,6 +377,10 @@
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
             AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts'] });
+
+            // Prefetch data in parallel with token verification so the two slow
+            // Apps Script round trips overlap instead of running sequentially.
+            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
 
             lucide.createIcons();
             UI.showLoading();
@@ -867,7 +871,11 @@
             showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
         }
 
-        const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+        const fetchPromise = (!isManualRefresh && initialDataPrefetch)
+            ? initialDataPrefetch
+            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+        initialDataPrefetch = null;
+        const response = await fetchPromise;
 
         if (!cachedData || isManualRefresh) hideDataLoading();
 
