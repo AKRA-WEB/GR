@@ -18,7 +18,7 @@
     .glass-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.3); }
     .glass-card.status-card { background: var(--status-bg, rgba(255, 255, 255, 0.95)); border: 1px solid var(--status-border, #e5e7eb); border-left: 6px solid var(--status-accent, #9ca3af); box-shadow: 0 8px 24px var(--status-shadow, rgba(0, 0, 0, 0.06)); }
     .glass-card.status-card:hover { box-shadow: 0 12px 30px var(--status-shadow-strong, rgba(0, 0, 0, 0.1)); }
-    .status-card--pending { --status-bg: linear-gradient(135deg, #fef08a 0%, #fed7aa 100%); --status-border: #f59e0b; --status-accent: #d97706; --status-shadow: rgba(217, 119, 6, 0.18); --status-shadow-strong: rgba(217, 119, 6, 0.28); }
+    .status-card--pending { --status-bg: #ffffff; --status-border: #e5e7eb; --status-accent: #d97706; --status-shadow: rgba(0, 0, 0, 0.05); --status-shadow-strong: rgba(217, 119, 6, 0.16); }
     .status-card--overdue { --status-bg: linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%); --status-border: #fecaca; --status-accent: #dc2626; --status-shadow: rgba(220, 38, 38, 0.12); --status-shadow-strong: rgba(220, 38, 38, 0.2); }
     .status-card--review { --status-bg: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); --status-border: #fed7aa; --status-accent: #E35205; --status-shadow: rgba(227, 82, 5, 0.14); --status-shadow-strong: rgba(227, 82, 5, 0.22); }
     .status-card--draft { --status-bg: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); --status-border: #bfdbfe; --status-accent: #171C8F; --status-shadow: rgba(23, 28, 143, 0.12); --status-shadow-strong: rgba(23, 28, 143, 0.2); }
@@ -191,7 +191,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260703.06";
+    const CURRENT_VERSION = "20260703.07";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
