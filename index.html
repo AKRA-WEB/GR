@@ -182,7 +182,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260703.02";
+    const CURRENT_VERSION = "20260703.03";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -481,16 +481,21 @@
         return roles.includes("ADMIN") || roles.includes("SUPERVISOR");
     }
 
+    function hasApproveRole(session) {
+        var roles = normalizeRoles(session && session.roles);
+        return roles.includes("ADMIN") || roles.includes("SUPERVISOR");
+    }
+
     function getSessionToken() {
         return (window.appSession && window.appSession.token) || "";
     }
 
     function canReceiveGR() {
-        return can('receiveGR') || can('approveGR');
+        return can('receiveGR') || canApproveGR();
     }
 
     function canApproveGR() {
-        return can('approveGR');
+        return hasApproveRole(window.appSession) && can('approveGR');
     }
 
     function canViewOrderedQuantity() {
