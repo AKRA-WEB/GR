@@ -182,7 +182,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260703.01";
+    const CURRENT_VERSION = "20260703.02";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -869,20 +869,42 @@
         lucide.createIcons({ root: btn });
     }
 
+    function isReadApiAction(action) {
+        return action === 'getInitialData' || action === 'getProducts';
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     async function apiCall(action, payload = null) {
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      try {
-        const res = await fetch(DATA_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, data: payload, token: getSessionToken() }), signal: controller.signal });
-        clearTimeout(timeoutId);
-        return await res.json();
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') return { success: false, error: 'หมดเวลาเชื่อมต่อ (timeout 30s) กรุณาลองใหม่' };
-        return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' };
+      const maxAttempts = isReadApiAction(action) ? 2 : 1;
+      const timeoutMs = isReadApiAction(action) ? 60000 : 30000;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const res = await fetch(DATA_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, data: payload, token: getSessionToken() }), signal: controller.signal });
+          clearTimeout(timeoutId);
+          const text = await res.text();
+          try {
+            return JSON.parse(text);
+          } catch (parseError) {
+            console.warn('GR API returned non-JSON response:', { action, attempt, status: res.status, preview: text.slice(0, 180) });
+            if (attempt < maxAttempts) { await delay(1200); continue; }
+            return { success: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง กรุณาลองใหม่' };
+          }
+        } catch (error) {
+          clearTimeout(timeoutId);
+          console.warn('GR API request failed:', { action, attempt, error });
+          if (attempt < maxAttempts) { await delay(1200); continue; }
+          if (error.name === 'AbortError') return { success: false, error: `หมดเวลาเชื่อมต่อ (timeout ${Math.round(timeoutMs / 1000)}s) กรุณาลองใหม่` };
+          return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' };
+        }
       }
+      return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' };
     }
 
     async function openReceiving(isManualRefresh = false) {
@@ -923,7 +945,7 @@
             if (!cachedData && !isManualRefresh) showView('receiving-list-view');
             if (!grProductsLoaded) loadGRProductsBackground();
         } else if (!cachedData) {
-            showNotification('ดึงข้อมูลไม่สำเร็จ', 'error');
+            showNotification('ดึงข้อมูลไม่สำเร็จ: ' + (response.message || response.error || 'กรุณาลองใหม่'), 'error');
         }
     }
 
