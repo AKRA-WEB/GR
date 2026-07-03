@@ -16,6 +16,14 @@
   <style>
     body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; letter-spacing: 0.2px; }
     .glass-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.3); }
+    .glass-card.status-card { background: var(--status-bg, rgba(255, 255, 255, 0.95)); border: 1px solid var(--status-border, #e5e7eb); border-left: 6px solid var(--status-accent, #9ca3af); box-shadow: 0 8px 24px var(--status-shadow, rgba(0, 0, 0, 0.06)); }
+    .glass-card.status-card:hover { box-shadow: 0 12px 30px var(--status-shadow-strong, rgba(0, 0, 0, 0.1)); }
+    .status-card--pending { --status-bg: linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%); --status-border: #fde68a; --status-accent: #f59e0b; --status-shadow: rgba(245, 158, 11, 0.12); --status-shadow-strong: rgba(245, 158, 11, 0.2); }
+    .status-card--overdue { --status-bg: linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%); --status-border: #fecaca; --status-accent: #dc2626; --status-shadow: rgba(220, 38, 38, 0.12); --status-shadow-strong: rgba(220, 38, 38, 0.2); }
+    .status-card--review { --status-bg: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); --status-border: #fed7aa; --status-accent: #E35205; --status-shadow: rgba(227, 82, 5, 0.14); --status-shadow-strong: rgba(227, 82, 5, 0.22); }
+    .status-card--draft { --status-bg: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); --status-border: #bfdbfe; --status-accent: #171C8F; --status-shadow: rgba(23, 28, 143, 0.12); --status-shadow-strong: rgba(23, 28, 143, 0.2); }
+    .status-card--completed { --status-bg: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); --status-border: #a7f3d0; --status-accent: #059669; --status-shadow: rgba(5, 150, 105, 0.12); --status-shadow-strong: rgba(5, 150, 105, 0.2); }
+    .status-badge--pending { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
     .input-field { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid #e5e7eb; background: #f9fafb; margin-top: 4px; outline: none; transition: all 0.2s; }
     .input-field:focus { border-color: #E35205; box-shadow: 0 0 0 2px rgba(227, 82, 5, 0.2); }
     .input-error { border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important; background-color: #fef2f2 !important; }
@@ -183,7 +191,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260703.04";
+    const CURRENT_VERSION = "20260703.05";
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -1115,20 +1123,20 @@
             const isPendingReview = group.status === 'Pending Review';
             const isCompleted = group.status === 'GR Completed';
 
-            let cardClass = "glass-card p-4 cursor-pointer border-l-4 border-l-gray-300 bg-white transition active:scale-95 hover:shadow-md";
-            let statusBadge = `<span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md font-bold border border-gray-200">รอสินค้าเข้า</span>`;
+            let cardClass = "glass-card status-card status-card--pending p-4 cursor-pointer transition active:scale-95";
+            let statusBadge = `<span class="text-xs status-badge--pending px-2.5 py-1 rounded-md font-bold border">รอสินค้าเข้า</span>`;
             
             if (hasOverdue && !isPendingReview) {
-                cardClass = "glass-card p-4 cursor-pointer border-l-4 border-l-red-500 bg-red-50/40 transition active:scale-95 hover:shadow-md";
+                cardClass = "glass-card status-card status-card--overdue p-4 cursor-pointer transition active:scale-95";
                 statusBadge = `<span class="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-md font-bold border border-red-200"><i data-lucide="alert-triangle" class="w-3 h-3 inline"></i> นานผิดปกติ</span>`;
             } else if (isPendingReview) {
-                cardClass = "glass-card p-4 cursor-pointer border-l-4 border-l-brand-orange bg-brand-orangeLight/60 transition active:scale-95 hover:shadow-md";
+                cardClass = "glass-card status-card status-card--review p-4 cursor-pointer transition active:scale-95";
                 statusBadge = `<span class="text-xs bg-brand-orangeLight text-brand-orange px-2.5 py-1 rounded-md font-bold border border-brand-orange/30 shadow-sm"><i data-lucide="clock" class="w-3 h-3 inline"></i> รอตรวจสอบ</span>`;
             } else if (isDraft) {
-                cardClass = "glass-card p-4 cursor-pointer border-l-4 border-l-brand-blue bg-brand-blueLight/40 transition active:scale-95 hover:shadow-md";
+                cardClass = "glass-card status-card status-card--draft p-4 cursor-pointer transition active:scale-95";
                 statusBadge = `<span class="text-xs bg-brand-blueLight text-brand-blue px-2.5 py-1 rounded-md font-bold border border-brand-blue/20 shadow-sm"><i data-lucide="package" class="w-3 h-3 inline"></i> กำลังลงสินค้า</span>`;
             } else if (isCompleted) {
-                cardClass = "glass-card p-4 cursor-pointer border-l-4 border-l-emerald-500 bg-emerald-50/10 transition active:scale-95 hover:shadow-md";
+                cardClass = "glass-card status-card status-card--completed p-4 cursor-pointer transition active:scale-95";
                 statusBadge = `<span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold border border-emerald-200 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> ลงสินค้าสำเร็จ</span>`;
             }
             
