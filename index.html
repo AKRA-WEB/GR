@@ -191,7 +191,9 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260703.07";
+    const CURRENT_VERSION = "20260705.01";
+    const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
+    function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
         try {
             const res = await fetch('version.json?t=' + Date.now());
@@ -335,6 +337,11 @@
     var currentActiveGroup = null;
     var poListRenderTimer = null;
     var grCompletedLoaded = false;
+    var grCompletedLoadedFull = false;
+    var grCompletedHasMore = false;
+    var grCompletedTotal = 0;
+    const GR_COMPLETED_WINDOW_SIZE = 200;
+    const GR_COMPLETED_CACHE_TTL = 30 * 60 * 1000;
     var receivingMutationInFlight = false;
     var deliveryPlanFilter = '';
     var deliveryPlanDayOffset = null;
@@ -390,7 +397,7 @@
 
             // Prefetch data in parallel with token verification so the two slow
             // Apps Script round trips overlap instead of running sequentially.
-            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false, perf: PERF_MODE });
 
             lucide.createIcons();
             UI.showLoading();
@@ -546,8 +553,10 @@
             grProductsLoaded = true;
             return;
         }
+        const fetchStart = Date.now();
         try {
             const response = await apiCall('getProducts', {});
+            perfLog('products background fetch', fetchStart);
             if (response.success) {
                 setCache('CACHE_GR_PRODUCTS_V1', response);
                 appData.products = response.products || [];
@@ -921,9 +930,20 @@
       return { success: false, error: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้' };
     }
 
+    function renderPOListSkeleton() {
+        document.getElementById('pending-count').innerText = 'กำลังโหลด...';
+        const container = document.getElementById('po-list-container');
+        let html = '';
+        for (let i = 0; i < 4; i++) {
+            html += `<div class="glass-card p-4 animate-pulse"><div class="h-3 bg-gray-200 rounded w-1/3 mb-3"></div><div class="h-3 bg-gray-100 rounded w-full mb-2"></div><div class="h-3 bg-gray-100 rounded w-2/3 mb-4"></div><div class="h-3 bg-gray-200 rounded w-1/4"></div></div>`;
+        }
+        container.innerHTML = html;
+    }
+
     async function openReceiving(isManualRefresh = false) {
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
+        const coldStart = !cachedData && !isManualRefresh;
         if (cachedData && !isManualRefresh) {
             try {
                 appData = cachedData;
@@ -933,24 +953,33 @@
                 showView('receiving-list-view');
                 showNotification('กำลังอัปเดตข้อมูลล่าสุด...', 'warning');
             } catch(e) { showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...'); }
-        } else {
+        } else if (isManualRefresh) {
             showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
+        } else {
+            // Cold start: show app chrome/filters + skeleton instead of a full-screen blocking spinner.
+            showView('receiving-list-view');
+            renderPOListSkeleton();
         }
 
+        const fetchStart = Date.now();
         const fetchPromise = (!isManualRefresh && initialDataPrefetch)
             ? initialDataPrefetch
-            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, perf: PERF_MODE });
         initialDataPrefetch = null;
         const response = await fetchPromise;
+        perfLog(coldStart ? 'active fetch (cold start)' : (isManualRefresh ? 'active fetch (manual refresh)' : 'active fetch (warm cache)'), fetchStart);
+        if (response.serverTimings) perfLog('active server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
 
-        if (!cachedData || isManualRefresh) hideDataLoading();
+        if (isManualRefresh) hideDataLoading();
 
         if (response.success) {
             setCache('CACHE_GR_ACTIVE_DATA_V2', response);
             appData = response;
             appData.products = cachedProducts ? (cachedProducts.products || []) : [];
             grCompletedLoaded = false;
-            groupPendingPOs(); 
+            grCompletedLoadedFull = false;
+            grCompletedHasMore = false;
+            groupPendingPOs();
             if (document.getElementById('r-status-filter').value === 'GR Completed') {
                 await ensureCompletedLoaded();
             }
@@ -959,6 +988,7 @@
             if (!cachedData && !isManualRefresh) showView('receiving-list-view');
             if (!grProductsLoaded) loadGRProductsBackground();
         } else if (!cachedData) {
+            if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
             showNotification('ดึงข้อมูลไม่สำเร็จ: ' + (response.message || response.error || 'กรุณาลองใหม่'), 'error');
         }
     }
@@ -1065,21 +1095,47 @@
         renderPOListForReceiving();
     }
 
-    async function ensureCompletedLoaded() {
-        if (grCompletedLoaded) return;
-        showDataLoading('กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
-        const response = await apiCall('getInitialData', { includeCompleted: true, includeProducts: false });
+    async function ensureCompletedLoaded(loadAll = false) {
+        if (grCompletedLoaded && (!loadAll || grCompletedLoadedFull)) return;
+
+        if (!loadAll) {
+            const cached = getCache('CACHE_GR_FULL_DATA_V2', GR_COMPLETED_CACHE_TTL);
+            if (cached) {
+                // Merge only completed fields; keep current pendingPOs/deliveryPlanning/products so a
+                // stale completed-cache snapshot cannot revert freshly refreshed active data.
+                appData.grCompleted = cached.grCompleted || [];
+                grCompletedLoaded = true;
+                grCompletedHasMore = !!cached.grCompletedHasMore;
+                grCompletedTotal = cached.grCompletedTotal || appData.grCompleted.length;
+                grCompletedLoadedFull = !grCompletedHasMore;
+                groupPendingPOs();
+                return;
+            }
+        }
+
+        showDataLoading(loadAll ? 'กำลังโหลดประวัติทั้งหมด...' : 'กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
+        const options = { includeCompleted: true, includeProducts: false, perf: PERF_MODE };
+        if (!loadAll) options.completedLimit = GR_COMPLETED_WINDOW_SIZE;
+        const fetchStart = Date.now();
+        const response = await apiCall('getInitialData', options);
+        perfLog(loadAll ? 'completed fetch (full)' : 'completed fetch (window)', fetchStart);
         hideDataLoading();
         if (response.success) {
-            setCache('CACHE_GR_FULL_DATA_V2', response);
-            const prevProducts = appData.products;
-            appData = response;
-            appData.products = prevProducts || [];
+            if (!loadAll) setCache('CACHE_GR_FULL_DATA_V2', response);
+            appData.grCompleted = response.grCompleted || [];
             grCompletedLoaded = true;
+            grCompletedHasMore = !!response.grCompletedHasMore;
+            grCompletedTotal = response.grCompletedTotal || appData.grCompleted.length;
+            grCompletedLoadedFull = loadAll || !grCompletedHasMore;
             groupPendingPOs();
         } else {
             showNotification('ดึงข้อมูลบิลที่รับเข้าสำเร็จไม่สำเร็จ', 'error');
         }
+    }
+
+    async function loadMoreCompletedGR() {
+        await ensureCompletedLoaded(true);
+        renderPOListForReceiving();
     }
 
     function renderPOListForReceiving() {
@@ -1167,6 +1223,9 @@
                 </div>
             </div>`;
         });
+        if (filterStatus === 'GR Completed' && grCompletedHasMore && !grCompletedLoadedFull) {
+            htmlStr += `<button type="button" onclick="loadMoreCompletedGR()" class="w-full mt-1 py-3 text-sm font-semibold text-brand-blue bg-white border border-brand-blue/30 rounded-lg hover:bg-brand-blueLight transition col-span-full">โหลดประวัติทั้งหมด (${grCompletedTotal} บิล)</button>`;
+        }
         container.innerHTML = htmlStr; lucide.createIcons({ root: container });
         renderDeliveryPlanSummary();
         renderWarehouseChips();
@@ -1658,6 +1717,8 @@
                 appData = response;
                 appData.products = prevProducts || [];
                 grCompletedLoaded = false;
+                grCompletedLoadedFull = false;
+                grCompletedHasMore = false;
                 groupPendingPOs();
                 renderPOListForReceiving();
             }
