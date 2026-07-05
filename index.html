@@ -191,7 +191,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260705.01";
+    const CURRENT_VERSION = "20260705.02";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -343,6 +343,8 @@
     const GR_COMPLETED_WINDOW_SIZE = 200;
     const GR_COMPLETED_CACHE_TTL = 30 * 60 * 1000;
     var receivingMutationInFlight = false;
+    var grDeliveryPlanningLoaded = false;
+    var grDeliveryPlanRenderPending = false;
     var deliveryPlanFilter = '';
     var deliveryPlanDayOffset = null;
     var isDeliveryPlanVisible = true;
@@ -393,11 +395,11 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts'] });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning'] });
 
             // Prefetch data in parallel with token verification so the two slow
             // Apps Script round trips overlap instead of running sequentially.
-            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false, perf: PERF_MODE });
+            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE });
 
             lucide.createIcons();
             UI.showLoading();
@@ -564,6 +566,46 @@
             }
         } catch(e) { console.warn('GR products background load error', e); }
     }
+    function mergeDeliveryPlanningIntoPendingPOs(planByUid) {
+        (appData.pendingPOs || []).forEach(item => {
+            const plan = (planByUid && planByUid[item.uid]) || null;
+            if (!plan) return;
+            item.expectedDate = plan.expectedDate || '';
+            item.plannedDate = plan.plannedDate || '';
+            item.planSource = plan.planSource || 'no_data';
+            item.daysUntil = plan.daysUntil;
+            item.isPlanOverdue = !!plan.isPlanOverdue;
+            item.vendorAvgLeadDays = plan.vendorAvgLeadDays || '';
+            item.vendorP75LeadDays = plan.vendorP75LeadDays || '';
+            item.vendorLeadSampleCount = plan.vendorLeadSampleCount || 0;
+            item.vendorLeadConfidence = plan.vendorLeadConfidence || 'none';
+        });
+    }
+    async function loadGRDeliveryPlanningBackground() {
+        if (grDeliveryPlanningLoaded) return;
+        const fetchStart = Date.now();
+        try {
+            const response = await apiCall('getDeliveryPlanning', { perf: PERF_MODE });
+            perfLog('delivery planning background fetch', fetchStart);
+            if (response.serverTimings) perfLog('delivery planning server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
+            if (response.success) {
+                appData.deliveryPlanning = response.deliveryPlanning;
+                mergeDeliveryPlanningIntoPendingPOs(response.planByUid);
+            }
+        } catch(e) { console.warn('GR delivery planning background load error', e); }
+        // Stop showing "loading" even on failure/timeout so the calendar doesn't hang forever;
+        // it falls back to the normal no-plan-yet state instead of a permanent spinner.
+        grDeliveryPlanningLoaded = true;
+        // Rebuild groupedPOs regardless of which view is visible, so the merged plan data is not
+        // silently dropped if the user navigated to a detail view before this background call resolved.
+        groupPendingPOs();
+        const listView = document.getElementById('receiving-list-view');
+        if (listView && !listView.classList.contains('hidden')) {
+            renderPOListForReceiving();
+        } else {
+            grDeliveryPlanRenderPending = true;
+        }
+    }
     function itemUids(items) {
         const seen = {};
         return (items || []).map(item => String(item.uid || '').trim()).filter(uid => {
@@ -607,11 +649,15 @@
         setTimeout(() => { t.classList.add('closing'); t.addEventListener('animationend', () => t.remove()); }, 4000);
     }
     
-    function showView(viewId) { 
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
-        document.querySelectorAll('main > section').forEach(div => div.classList.add('hidden')); 
-        document.getElementById(viewId).classList.remove('hidden'); 
-        window.scrollTo(0, 0); 
+    function showView(viewId) {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        document.querySelectorAll('main > section').forEach(div => div.classList.add('hidden'));
+        document.getElementById(viewId).classList.remove('hidden');
+        window.scrollTo(0, 0);
+        if (viewId === 'receiving-list-view' && grDeliveryPlanRenderPending) {
+            grDeliveryPlanRenderPending = false;
+            renderPOListForReceiving();
+        }
     }
 
     function getWarehouseBadge(warehouse) {
@@ -796,9 +842,11 @@
                         <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="calendar-days" class="w-4 h-4 text-brand-orange"></i> แผนรับสินค้า</h3>
                         <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีระบบจะแสดงวันที่คาดว่าจะเข้าโดยอิงจากประวัติส่งของ</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                            ${!grDeliveryPlanningLoaded ? `<span class="text-gray-400">กำลังโหลด...</span>` : `
                             <span class="inline-flex items-center gap-1 text-red-700"><span class="w-2 h-2 rounded-full bg-red-600"></span> Vendor ยืนยัน ${esc(confirmed)}</span>
                             <span class="inline-flex items-center gap-1 text-brand-blue"><span class="w-2 h-2 rounded-full bg-brand-blue"></span> คาดการณ์ ${esc(estimated)}</span>
                             <span class="text-gray-400">${esc(summary.sampleCount || 0)} ตัวอย่าง · ${esc(summary.vendorCount || 0)} Vendor</span>
+                            `}
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -809,10 +857,12 @@
                     </div>
                 </div>
                 <div id="delivery-plan-calendar-body" class="${isDeliveryPlanVisible ? '' : 'hidden'} mt-3">
+                    ${!grDeliveryPlanningLoaded ? `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-400">กำลังโหลดแผนรับสินค้า...</div>` : `
                     ${overdue ? `<button type="button" onclick="setDeliveryPlanFilter('overdue')" aria-pressed="${deliveryPlanFilter === 'overdue' ? 'true' : 'false'}" class="mb-3 w-full rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${deliveryPlanFilter === 'overdue' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:border-red-200'}">มีบิลเลยแผน ${overdue} บิล</button>` : ''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                         ${calendarHtml}
                     </div>
+                    `}
                 </div>
             </div>
         `;
@@ -893,7 +943,7 @@
     }
 
     function isReadApiAction(action) {
-        return action === 'getInitialData' || action === 'getProducts';
+        return action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning';
     }
 
     function delay(ms) {
@@ -941,6 +991,9 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
+        // Reset so a stale true from a previous fetch cannot make the loading-state UI skip
+        // straight to "no plan" while cached active data (which never carries plan fields) renders.
+        grDeliveryPlanningLoaded = false;
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
         const coldStart = !cachedData && !isManualRefresh;
@@ -964,7 +1017,7 @@
         const fetchStart = Date.now();
         const fetchPromise = (!isManualRefresh && initialDataPrefetch)
             ? initialDataPrefetch
-            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, perf: PERF_MODE });
+            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE });
         initialDataPrefetch = null;
         const response = await fetchPromise;
         perfLog(coldStart ? 'active fetch (cold start)' : (isManualRefresh ? 'active fetch (manual refresh)' : 'active fetch (warm cache)'), fetchStart);
@@ -991,6 +1044,10 @@
             if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
             showNotification('ดึงข้อมูลไม่สำเร็จ: ' + (response.message || response.error || 'กรุณาลองใหม่'), 'error');
         }
+        // Independent of whether the active fetch succeeded: if cachedData already rendered the
+        // list (or pendingPOs is otherwise populated), still attempt to fill in the plan/calendar
+        // so an active-fetch failure cannot leave "กำลังโหลดแผนรับสินค้า..." stuck forever.
+        loadGRDeliveryPlanningBackground();
     }
 
     function groupPendingPOs() {
@@ -1114,7 +1171,7 @@
         }
 
         showDataLoading(loadAll ? 'กำลังโหลดประวัติทั้งหมด...' : 'กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
-        const options = { includeCompleted: true, includeProducts: false, perf: PERF_MODE };
+        const options = { includeCompleted: true, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE };
         if (!loadAll) options.completedLimit = GR_COMPLETED_WINDOW_SIZE;
         const fetchStart = Date.now();
         const response = await apiCall('getInitialData', options);
@@ -1710,7 +1767,7 @@
 
     async function openReceivingInBackground() {
         try {
-            const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false });
+            const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false });
             if (response.success) {
                 setCache('CACHE_GR_ACTIVE_DATA_V2', response);
                 const prevProducts = appData.products;
@@ -1719,8 +1776,10 @@
                 grCompletedLoaded = false;
                 grCompletedLoadedFull = false;
                 grCompletedHasMore = false;
+                grDeliveryPlanningLoaded = false;
                 groupPendingPOs();
                 renderPOListForReceiving();
+                loadGRDeliveryPlanningBackground();
             }
         } catch(e) {}
     }
