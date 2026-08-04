@@ -191,7 +191,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260722.01";
+    const CURRENT_VERSION = "20260803.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -340,6 +340,8 @@
     var grCompletedLoadedFull = false;
     var grCompletedHasMore = false;
     var grCompletedTotal = 0;
+    var grCompletedNextOffset = 0;
+    var grCompletedLoadedFromCache = false;
     const GR_COMPLETED_WINDOW_SIZE = 200;
     const GR_COMPLETED_CACHE_TTL = 30 * 60 * 1000;
     var receivingMutationInFlight = false;
@@ -1101,6 +1103,8 @@
             grCompletedLoaded = false;
             grCompletedLoadedFull = false;
             grCompletedHasMore = false;
+            grCompletedNextOffset = 0;
+            grCompletedLoadedFromCache = false;
             groupPendingPOs();
             if (document.getElementById('r-status-filter').value === 'GR Completed') {
                 await ensureCompletedLoaded();
@@ -1221,10 +1225,10 @@
         renderPOListForReceiving();
     }
 
-    async function ensureCompletedLoaded(loadAll = false) {
-        if (grCompletedLoaded && (!loadAll || grCompletedLoadedFull)) return;
+    async function ensureCompletedLoaded(loadMore = false) {
+        if (grCompletedLoaded && (!loadMore || grCompletedLoadedFull)) return;
 
-        if (!loadAll) {
+        if (!loadMore) {
             const cached = getCache('CACHE_GR_FULL_DATA_V2', GR_COMPLETED_CACHE_TTL);
             if (cached) {
                 // Merge only completed fields; keep current pendingPOs/deliveryPlanning/products so a
@@ -1233,26 +1237,45 @@
                 grCompletedLoaded = true;
                 grCompletedHasMore = !!cached.grCompletedHasMore;
                 grCompletedTotal = cached.grCompletedTotal || appData.grCompleted.length;
+                grCompletedNextOffset = cached.grCompletedNextOffset != null
+                    ? Number(cached.grCompletedNextOffset)
+                    : (grCompletedHasMore ? GR_COMPLETED_WINDOW_SIZE : grCompletedTotal);
                 grCompletedLoadedFull = !grCompletedHasMore;
+                grCompletedLoadedFromCache = true;
                 groupPendingPOs();
                 return;
             }
         }
 
-        showDataLoading(loadAll ? 'กำลังโหลดประวัติทั้งหมด...' : 'กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
+        showDataLoading(loadMore ? 'กำลังโหลดประวัติเพิ่ม...' : 'กำลังโหลดบิลที่รับเข้าสำเร็จแล้ว...');
         const options = { includeCompleted: true, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE };
-        if (!loadAll) options.completedLimit = GR_COMPLETED_WINDOW_SIZE;
+        const refreshCachedWindow = loadMore && grCompletedLoadedFromCache;
+        options.completedLimit = refreshCachedWindow
+            ? grCompletedNextOffset + GR_COMPLETED_WINDOW_SIZE
+            : GR_COMPLETED_WINDOW_SIZE;
+        if (loadMore && !refreshCachedWindow) options.completedOffset = grCompletedNextOffset;
         const fetchStart = Date.now();
         const response = await apiCall('getInitialData', options);
-        perfLog(loadAll ? 'completed fetch (full)' : 'completed fetch (window)', fetchStart);
+        perfLog(loadMore ? 'completed fetch (next window)' : 'completed fetch (window)', fetchStart);
         hideDataLoading();
         if (response.success) {
-            if (!loadAll) setCache('CACHE_GR_FULL_DATA_V2', response);
-            appData.grCompleted = response.grCompleted || [];
+            if (!loadMore) setCache('CACHE_GR_FULL_DATA_V2', response);
+            const incomingCompleted = response.grCompleted || [];
+            if (loadMore && !refreshCachedWindow) {
+                const completedByUid = new Map((appData.grCompleted || []).map(item => [item.uid, item]));
+                incomingCompleted.forEach(item => completedByUid.set(item.uid, item));
+                appData.grCompleted = Array.from(completedByUid.values());
+            } else {
+                appData.grCompleted = incomingCompleted;
+            }
             grCompletedLoaded = true;
             grCompletedHasMore = !!response.grCompletedHasMore;
             grCompletedTotal = response.grCompletedTotal || appData.grCompleted.length;
-            grCompletedLoadedFull = loadAll || !grCompletedHasMore;
+            grCompletedNextOffset = response.grCompletedNextOffset != null
+                ? Number(response.grCompletedNextOffset)
+                : (loadMore ? grCompletedNextOffset + GR_COMPLETED_WINDOW_SIZE : Math.min(GR_COMPLETED_WINDOW_SIZE, grCompletedTotal));
+            grCompletedLoadedFull = !grCompletedHasMore;
+            grCompletedLoadedFromCache = false;
             groupPendingPOs();
         } else {
             showNotification('ดึงข้อมูลบิลที่รับเข้าสำเร็จไม่สำเร็จ', 'error');
@@ -1357,7 +1380,8 @@
             </div>`;
         });
         if (filterStatus === 'GR Completed' && grCompletedHasMore && !grCompletedLoadedFull) {
-            htmlStr += `<button type="button" onclick="loadMoreCompletedGR()" class="w-full mt-1 py-3 text-sm font-semibold text-brand-blue bg-white border border-brand-blue/30 rounded-lg hover:bg-brand-blueLight transition col-span-full">โหลดประวัติทั้งหมด (${grCompletedTotal} บิล)</button>`;
+            const remainingBills = Math.max(0, grCompletedTotal - grCompletedNextOffset);
+            htmlStr += `<button type="button" onclick="loadMoreCompletedGR()" class="w-full mt-1 py-3 text-sm font-semibold text-brand-blue bg-white border border-brand-blue/30 rounded-lg hover:bg-brand-blueLight transition col-span-full">โหลดประวัติเพิ่ม (${remainingBills} บิลที่เหลือ)</button>`;
         }
         container.innerHTML = htmlStr; lucide.createIcons({ root: container });
         renderDeliveryPlanSummary();
@@ -1852,6 +1876,8 @@
                 grCompletedLoaded = false;
                 grCompletedLoadedFull = false;
                 grCompletedHasMore = false;
+                grCompletedNextOffset = 0;
+                grCompletedLoadedFromCache = false;
                 grDeliveryPlanningLoaded = false;
                 groupPendingPOs();
                 renderPOListForReceiving();
