@@ -67,13 +67,16 @@
               <i data-lucide="box" class="w-6 h-6 mr-2"></i>
               <h1 class="text-lg font-semibold tracking-wide">ระบบรับสินค้า (GR)</h1>
             </div>
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2 sm:space-x-4">
               <p class="text-sm text-white/90 font-light hidden sm:block">ผู้รับของ: <span id="display-username" class="font-medium text-white">-</span></p>
-              <button onclick="openReceiving(true)" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
-                <i data-lucide="refresh-cw" class="w-4 h-4"></i> รีเฟรช
+              <button type="button" onclick="openProductHistory()" aria-label="เปิดประวัติสินค้า" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
+                <i data-lucide="history" class="w-4 h-4"></i> <span class="hidden sm:inline">ประวัติสินค้า</span>
               </button>
-              <button id="logout-btn" class="flex items-center gap-1.5 bg-red-500/80 hover:bg-red-500 px-3 py-1.5 rounded-lg text-sm transition shadow-sm border border-red-400/50">
-                <i data-lucide="log-out" class="w-4 h-4"></i> ออก
+              <button type="button" onclick="openReceiving(true)" aria-label="รีเฟรชข้อมูลรับสินค้า" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> <span class="hidden sm:inline">รีเฟรช</span>
+              </button>
+              <button type="button" id="logout-btn" aria-label="ออกจากระบบ" class="flex items-center gap-1.5 bg-red-500/80 hover:bg-red-500 px-3 py-1.5 rounded-lg text-sm transition shadow-sm border border-red-400/50">
+                <i data-lucide="log-out" class="w-4 h-4"></i> <span class="hidden sm:inline">ออก</span>
               </button>
             </div>
           </div>
@@ -110,6 +113,34 @@
           <div id="wh-chips" class="flex flex-wrap gap-2 mb-5 px-1"></div>
 
           <div id="po-list-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </section>
+
+        <section id="product-history-view" class="hidden" aria-labelledby="product-history-title">
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
+              <div>
+                <button type="button" onclick="showView('receiving-list-view')" class="text-sm font-medium text-gray-500 flex items-center mb-2 hover:text-brand-orange transition"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารับสินค้า</button>
+                <h2 id="product-history-title" class="text-xl font-semibold text-brand-orange">ประวัติการรับสินค้า</h2>
+                <p class="text-sm text-gray-500 mt-1">เลือก SKU หรือชื่อสินค้า เพื่อดูรายการรับเข้าสำเร็จล่าสุดและย้อนหลัง</p>
+              </div>
+            </div>
+
+            <form id="product-history-form" class="glass-card p-4 sm:p-5" novalidate>
+              <label for="product-history-input" class="block text-sm font-medium text-gray-700">สินค้า <span class="text-red-500">*</span></label>
+              <p id="product-history-hint" class="text-xs text-gray-500 mt-1">พิมพ์ SKU หรือชื่อสินค้า แล้วเลือกรายการที่ตรงกัน</p>
+              <div class="mt-3 flex flex-col sm:flex-row gap-3">
+                <input type="search" id="product-history-input" list="product-history-options" aria-describedby="product-history-hint" required autocomplete="off" placeholder="เช่น SKU-001 หรือ ชื่อสินค้า" class="input-field m-0 text-base bg-white border-gray-200">
+                <datalist id="product-history-options"></datalist>
+                <button type="submit" id="product-history-submit" class="btn sm:w-auto sm:min-w-[140px] bg-brand-orange hover:bg-[#CC4904] text-white font-bold shadow-md">ค้นหาประวัติ</button>
+              </div>
+              <p id="product-history-status" class="mt-3 min-h-5 text-sm text-gray-500" aria-live="polite"></p>
+            </form>
+
+            <div id="product-history-results">
+              <div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-5 py-10 text-center text-sm text-gray-500">เลือกสินค้าเพื่อเริ่มค้นหาประวัติการรับเข้า</div>
+            </div>
+            <button type="button" id="product-history-load-more" class="hidden mx-auto px-5 py-3 rounded-xl border border-brand-orange/30 bg-white text-brand-orange text-sm font-bold hover:bg-brand-orangeLight">โหลดประวัติเพิ่ม</button>
+          </div>
         </section>
 
         <section id="receiving-detail-view" class="hidden">
@@ -191,7 +222,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260803.01";
+    const CURRENT_VERSION = "20260806.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -351,6 +382,9 @@
     var deliveryPlanDayOffset = null;
     var isDeliveryPlanVisible = true;
     var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
+    const PRODUCT_HISTORY_PAGE_SIZE = 50;
+    var productHistoryRequestGeneration = 0;
+    var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
 
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -397,7 +431,7 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning'] });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory'] });
 
             // Prefetch data in parallel with token verification so the two slow
             // Apps Script round trips overlap instead of running sequentially.
@@ -1014,7 +1048,7 @@
     }
 
     function isReadApiAction(action) {
-        return action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning';
+        return action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning' || action === 'getProductReceiptHistory';
     }
 
     function delay(ms) {
@@ -1097,9 +1131,11 @@
         if (isManualRefresh) hideDataLoading();
 
         if (response.success) {
+            const productsAlreadyLoaded = (appData && appData.products) || [];
+            const productHistoryIsOpen = !document.getElementById('product-history-view').classList.contains('hidden');
             setCache('CACHE_GR_ACTIVE_DATA_V2', response);
             appData = response;
-            appData.products = cachedProducts ? (cachedProducts.products || []) : [];
+            appData.products = grProductsLoaded ? productsAlreadyLoaded : (cachedProducts ? (cachedProducts.products || []) : []);
             grCompletedLoaded = false;
             grCompletedLoadedFull = false;
             grCompletedHasMore = false;
@@ -1111,7 +1147,7 @@
             }
             renderPOListForReceiving();
 
-            if (!cachedData && !isManualRefresh) showView('receiving-list-view');
+            if (!cachedData && !isManualRefresh && !productHistoryIsOpen) showView('receiving-list-view');
             if (!grProductsLoaded) loadGRProductsBackground();
         } else if (!cachedData) {
             if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
@@ -1122,6 +1158,186 @@
         // so an active-fetch failure cannot leave "กำลังโหลดแผนรับสินค้า..." stuck forever.
         loadGRDeliveryPlanningBackground();
     }
+
+    function productHistoryOptionValue(product) {
+        const sku = String((product && product.sku) || '').trim();
+        const name = String((product && product.name) || '').trim();
+        return sku ? `${sku} — ${name}` : name;
+    }
+
+    function renderProductHistoryOptions() {
+        const options = document.getElementById('product-history-options');
+        options.replaceChildren();
+        (appData.products || []).forEach(product => {
+            const option = document.createElement('option');
+            option.value = productHistoryOptionValue(product);
+            options.appendChild(option);
+        });
+    }
+
+    function selectedProductHistoryProduct() {
+        const input = document.getElementById('product-history-input').value.trim();
+        const normalized = input.toLowerCase().replace(/\s+/g, ' ');
+        return (appData.products || []).find(product => {
+            const sku = String(product.sku || '').trim().toLowerCase();
+            const name = String(product.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            return normalized === productHistoryOptionValue(product).toLowerCase().replace(/\s+/g, ' ')
+                || (sku && normalized === sku)
+                || normalized === name;
+        }) || null;
+    }
+
+    async function openProductHistory() {
+        showView('product-history-view');
+        const status = document.getElementById('product-history-status');
+        if (!grProductsLoaded) {
+            status.textContent = 'กำลังโหลดรายชื่อสินค้า...';
+            await loadGRProductsBackground();
+        }
+        renderProductHistoryOptions();
+        status.textContent = grProductsLoaded ? '' : 'โหลดรายชื่อสินค้าไม่สำเร็จ กรุณากลับไปรีเฟรชแล้วลองใหม่';
+        document.getElementById('product-history-input').focus();
+        lucide.createIcons({ root: document.getElementById('product-history-view') });
+    }
+
+    async function searchProductReceiptHistory(reset = true) {
+        const product = reset ? selectedProductHistoryProduct() : productHistoryState.product;
+        const status = document.getElementById('product-history-status');
+        if (!product) {
+            status.textContent = 'กรุณาเลือกสินค้าจากรายการ SKU หรือชื่อสินค้าที่ตรงกัน';
+            document.getElementById('product-history-input').focus();
+            return;
+        }
+
+        const generation = ++productHistoryRequestGeneration;
+        const submit = document.getElementById('product-history-submit');
+        const loadMore = document.getElementById('product-history-load-more');
+        submit.disabled = true;
+        loadMore.disabled = true;
+        status.textContent = reset ? 'กำลังค้นหาประวัติการรับสินค้า...' : 'กำลังโหลดประวัติเพิ่ม...';
+        if (reset) {
+            productHistoryState = { product, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
+            document.getElementById('product-history-results').innerHTML = '<div class="glass-card p-5 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/3 mb-4"></div><div class="h-3 bg-gray-100 rounded w-full mb-2"></div><div class="h-3 bg-gray-100 rounded w-2/3"></div></div>';
+            loadMore.classList.add('hidden');
+        }
+
+        const response = await apiCall('getProductReceiptHistory', {
+            sku: product.sku || '',
+            productName: product.name || '',
+            offset: reset ? 0 : productHistoryState.nextOffset,
+            limit: PRODUCT_HISTORY_PAGE_SIZE
+        });
+        if (generation !== productHistoryRequestGeneration) return;
+
+        submit.disabled = false;
+        loadMore.disabled = false;
+        if (!response.success) {
+            productHistoryState.error = response.message || response.error || 'ดึงประวัติสินค้าไม่สำเร็จ';
+            status.textContent = productHistoryState.error;
+            renderProductReceiptHistory();
+            return;
+        }
+
+        productHistoryState.product = product;
+        if (reset || !productHistoryState.latest) productHistoryState.latest = response.latest || null;
+        const incomingHistory = response.history || [];
+        if (reset) {
+            productHistoryState.history = incomingHistory;
+        } else {
+            const historyUids = new Set(productHistoryState.history.map(row => String(row.grUid || '').trim()).filter(Boolean));
+            incomingHistory.forEach(row => {
+                const uid = String(row.grUid || '').trim();
+                if (uid && historyUids.has(uid)) return;
+                if (uid) historyUids.add(uid);
+                productHistoryState.history.push(row);
+            });
+        }
+        productHistoryState.total = Number(response.total || 0);
+        productHistoryState.nextOffset = Number(response.nextOffset || productHistoryState.history.length);
+        productHistoryState.hasMore = !!response.hasMore;
+        productHistoryState.error = '';
+        status.textContent = productHistoryState.total
+            ? `พบประวัติ ${productHistoryState.total} รายการ แสดงแล้ว ${productHistoryState.history.length} รายการ`
+            : 'ไม่พบประวัติการรับเข้าสำเร็จของสินค้านี้';
+        renderProductReceiptHistory();
+    }
+
+    async function loadMoreProductReceiptHistory() {
+        if (!productHistoryState.product || !productHistoryState.hasMore) return;
+        await searchProductReceiptHistory(false);
+    }
+
+    function productHistoryDisplay(value) {
+        return value === null || value === undefined || value === '' ? 'ไม่ได้บันทึก' : esc(value);
+    }
+
+    function renderProductReceiptHistory() {
+        const container = document.getElementById('product-history-results');
+        const loadMore = document.getElementById('product-history-load-more');
+        if (productHistoryState.error) {
+            container.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-6 text-center"><p class="text-sm font-medium text-red-700">${esc(productHistoryState.error)}</p><button type="button" onclick="searchProductReceiptHistory(true)" class="mt-3 px-4 py-2 rounded-lg bg-white border border-red-200 text-sm font-bold text-red-700">ลองใหม่</button></div>`;
+            loadMore.classList.add('hidden');
+            return;
+        }
+        if (!productHistoryState.latest) {
+            container.innerHTML = '<div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-5 py-10 text-center text-sm text-gray-500">ไม่พบประวัติการรับเข้าสำเร็จของสินค้านี้</div>';
+            loadMore.classList.add('hidden');
+            return;
+        }
+
+        const latest = productHistoryState.latest;
+        const rows = productHistoryState.history.map((row, index) => `
+            <li class="glass-card p-4 sm:p-5">
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 border-b border-gray-100 pb-3 mb-3">
+                <div>
+                  <p class="text-xs font-medium text-gray-500">ครั้งที่ ${index + 1}</p>
+                  <h4 class="font-bold text-gray-800 mt-0.5">${productHistoryDisplay(row.receiptDate)}</h4>
+                </div>
+                <span class="self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">รับเข้าสำเร็จ</span>
+              </div>
+              <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+                <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">สินค้า / SKU</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.product)} / ${productHistoryDisplay(row.sku)}</dd></div>
+                <div><dt class="text-xs text-gray-500">วันหมดอายุที่บันทึก</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.expDate)}</dd></div>
+                <div><dt class="text-xs text-gray-500">ผู้รับสินค้า</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.receiver)}</dd></div>
+                <div><dt class="text-xs text-gray-500">จำนวนรับ</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.quantity)} ${row.unit ? esc(row.unit) : ''}</dd></div>
+                <div><dt class="text-xs text-gray-500">คลัง / ตำแหน่ง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
+                <div><dt class="text-xs text-gray-500">Vendor</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.vendor)}</dd></div>
+                <div><dt class="text-xs text-gray-500">เลข PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poNumber)}</dd></div>
+                <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poDate)}</dd></div>
+                <div><dt class="text-xs text-gray-500">สต็อกเดิม</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.oldStock)}</dd></div>
+                <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">หมายเหตุ</dt><dd class="font-medium text-gray-800 mt-0.5 whitespace-pre-wrap">${productHistoryDisplay(row.remark)}</dd></div>
+              </dl>
+            </li>`).join('');
+
+        container.innerHTML = `
+          <article class="glass-card p-4 sm:p-6 border-l-4 border-l-brand-orange">
+            <p class="text-xs font-bold uppercase tracking-wide text-brand-orange">รับเข้าล่าสุด</p>
+            <div class="mt-2 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-gray-900">${productHistoryDisplay(productHistoryState.product && productHistoryState.product.name)}</h3>
+                <p class="text-sm text-gray-500 mt-1">SKU: ${productHistoryDisplay(productHistoryState.product && productHistoryState.product.sku)}</p>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 lg:max-w-3xl">
+                <div class="rounded-xl bg-brand-orangeLight px-3 py-3"><p class="text-xs text-brand-orange">วันที่รับล่าสุด</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiptDate)}</p></div>
+                <div class="rounded-xl bg-emerald-50 px-3 py-3"><p class="text-xs text-emerald-700">วันหมดอายุที่บันทึก</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.expDate)}</p></div>
+                <div class="rounded-xl bg-blue-50 px-3 py-3"><p class="text-xs text-brand-blue">จำนวนรับ</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.quantity)} ${latest.unit ? esc(latest.unit) : ''}</p></div>
+                <div class="rounded-xl bg-gray-50 px-3 py-3"><p class="text-xs text-gray-500">ผู้รับสินค้า</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiver)}</p></div>
+              </div>
+            </div>
+          </article>
+          <section class="mt-4" aria-labelledby="product-history-list-title">
+            <div class="flex items-center justify-between gap-3 mb-3 px-1"><h3 id="product-history-list-title" class="font-bold text-gray-800">รายการย้อนหลัง</h3><span class="text-xs text-gray-500">${esc(productHistoryState.history.length)} / ${esc(productHistoryState.total)} รายการ</span></div>
+            <ol class="space-y-3">${rows}</ol>
+          </section>`;
+        loadMore.classList.toggle('hidden', !productHistoryState.hasMore);
+        lucide.createIcons({ root: container });
+    }
+
+    document.getElementById('product-history-form').addEventListener('submit', event => {
+        event.preventDefault();
+        searchProductReceiptHistory(true);
+    });
+    document.getElementById('product-history-load-more').addEventListener('click', loadMoreProductReceiptHistory);
 
     function groupPendingPOs() {
       const groups = {};
