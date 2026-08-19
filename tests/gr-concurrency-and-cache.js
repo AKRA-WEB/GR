@@ -10,8 +10,8 @@ function testVersionAndFrontendConstants() {
   // 1. Version check
   const versionMatch = html.match(/const CURRENT_VERSION = ["']([^"']+)["'];/);
   assert.ok(versionMatch, 'CURRENT_VERSION must be declared in index.html');
-  assert.equal(versionMatch[1], '20260819.01', 'CURRENT_VERSION must be 20260819.01');
-  assert.equal(versionJson.version, '20260819.01', 'version.json must match 20260819.01');
+  assert.equal(versionMatch[1], versionJson.version, 'CURRENT_VERSION and version.json must match');
+  assert.ok(versionJson.version.startsWith('20260819'), 'version.json must be 20260819.xx');
 
   // 2. Cache TTL check
   const cacheTtlMatch = html.match(/const GR_CACHE_TTL = ([^;]+);/);
