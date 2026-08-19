@@ -222,7 +222,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script>
-    const CURRENT_VERSION = "20260806.01";
+    const CURRENT_VERSION = "20260819.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -566,7 +566,7 @@
 
     function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
     function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
-    const GR_CACHE_TTL = 30 * 60 * 1000;
+    const GR_CACHE_TTL = 60 * 1000;
     const GR_PRODUCTS_CACHE_TTL = 2 * 60 * 60 * 1000;
     var grProductsLoaded = false;
     function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
@@ -617,11 +617,11 @@
             item.vendorLeadConfidence = plan.vendorLeadConfidence || 'none';
         });
     }
-    async function loadGRDeliveryPlanningBackground() {
-        if (grDeliveryPlanningLoaded) return;
+    async function loadGRDeliveryPlanningBackground(bypassCache = false) {
+        if (grDeliveryPlanningLoaded && !bypassCache) return;
         const fetchStart = Date.now();
         try {
-            const response = await apiCall('getDeliveryPlanning', { perf: PERF_MODE });
+            const response = await apiCall('getDeliveryPlanning', { bypassCache: bypassCache, perf: PERF_MODE });
             perfLog('delivery planning background fetch', fetchStart);
             if (response.serverTimings) perfLog('delivery planning server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
             if (response.success) {
@@ -1059,7 +1059,7 @@
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
       const maxAttempts = isReadApiAction(action) ? 2 : 1;
-      const timeoutMs = isReadApiAction(action) ? 60000 : 30000;
+      const timeoutMs = isReadApiAction(action) ? 60000 : 50000;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1122,7 +1122,7 @@
         const fetchStart = Date.now();
         const fetchPromise = (!isManualRefresh && initialDataPrefetch)
             ? initialDataPrefetch
-            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE });
+            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, bypassCache: isManualRefresh, perf: PERF_MODE });
         initialDataPrefetch = null;
         const response = await fetchPromise;
         perfLog(coldStart ? 'active fetch (cold start)' : (isManualRefresh ? 'active fetch (manual refresh)' : 'active fetch (warm cache)'), fetchStart);
@@ -1156,7 +1156,7 @@
         // Independent of whether the active fetch succeeded: if cachedData already rendered the
         // list (or pendingPOs is otherwise populated), still attempt to fill in the plan/calendar
         // so an active-fetch failure cannot leave "กำลังโหลดแผนรับสินค้า..." stuck forever.
-        loadGRDeliveryPlanningBackground();
+        loadGRDeliveryPlanningBackground(isManualRefresh);
     }
 
     function productHistoryOptionValue(product) {
@@ -1944,6 +1944,7 @@
 
     async function submitReceiving(e, targetStatus) {
       e.preventDefault();
+      if (receivingMutationInFlight) return;
       const isApprovalAction = targetStatus === 'GR Completed';
       if (isApprovalAction ? !canApproveGR() : !canReceiveGR()) {
           return showNotification("ไม่มีสิทธิ์ดำเนินการนี้", "error");
@@ -2055,30 +2056,35 @@
           items: poItemsData, extraItems: extraItemsData
       };
 
-      let btnId = 'btn-draft';
-      if(targetStatus === 'Pending Review') btnId = 'btn-review';
-      else if(targetStatus === 'GR Completed') btnId = 'btn-confirm-receive';
+      const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
+          .map(id => document.getElementById(id))
+          .filter(Boolean);
+      actionButtons.forEach(btn => { btn.disabled = true; });
+      showDataLoading(`กำลังบันทึกข้อมูลเข้าคลัง...`);
+      receivingMutationInFlight = true;
 
-      document.getElementById(btnId).disabled = true; showDataLoading(`กำลังบันทึกข้อมูลเข้าคลัง...`);
-
-      const res = await apiCall('bulkReceivePO', bulkPayload);
-      
-      document.getElementById(btnId).disabled = false; 
-      hideDataLoading();
-      
-      if(res.success) { 
-          let msg = "บันทึกสำเร็จ!";
-          if(targetStatus === 'Draft GR') msg = "พักบิล (Draft) เรียบร้อย";
-          else if(targetStatus === 'Pending Review') msg = "ส่งให้ตรวจสอบเรียบร้อยแล้ว!";
-          else msg = "ยืนยันรับสินค้าเข้าคลังสมบูรณ์!";
+      try {
+          const res = await apiCall('bulkReceivePO', bulkPayload);
+          hideDataLoading();
           
-          showNotification(msg, "success"); 
-          showView('receiving-list-view');
-          clearReceivingCaches();
-          
-          openReceivingInBackground(); 
-      } 
-      else { showNotification("เกิดข้อผิดพลาด: " + res.message, "error"); }
+          if(res.success) { 
+              let msg = "บันทึกสำเร็จ!";
+              if(targetStatus === 'Draft GR') msg = "พักบิล (Draft) เรียบร้อย";
+              else if(targetStatus === 'Pending Review') msg = "ส่งให้ตรวจสอบเรียบร้อยแล้ว!";
+              else msg = "ยืนยันรับสินค้าเข้าคลังสมบูรณ์!";
+              
+              showNotification(msg, "success"); 
+              showView('receiving-list-view');
+              clearReceivingCaches();
+              
+              openReceivingInBackground(); 
+          } 
+          else { showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error"); }
+      } finally {
+          receivingMutationInFlight = false;
+          hideDataLoading();
+          actionButtons.forEach(btn => { btn.disabled = false; });
+      }
     }
 
     async function openReceivingInBackground() {
