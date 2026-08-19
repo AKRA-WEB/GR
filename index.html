@@ -1863,6 +1863,10 @@
         const poUids = itemUids(loadedBillItems(group));
         if (poUids.length === 0) return showNotification("ไม่พบ UID ของรายการในบิลนี้ กรุณารีเฟรชข้อมูล", "error");
 
+        const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
+            .map(id => document.getElementById(id))
+            .filter(Boolean);
+        actionButtons.forEach(btn => { btn.disabled = true; });
         receivingMutationInFlight = true;
         try {
             showDataLoading(`กำลังดำเนินการ...`);
@@ -1881,6 +1885,7 @@
         } finally {
             receivingMutationInFlight = false;
             hideDataLoading();
+            actionButtons.forEach(btn => { btn.disabled = false; });
         }
     }
 
