@@ -456,7 +456,17 @@
                     const fixedSsoToken = ssoToken.replace(/ /g, '+');
                     window.history.replaceState({}, document.title, window.location.pathname);
 
-                    const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(fixedSsoToken)}`;
+                    const jwtUser = decodeJwtPayload(fixedSsoToken);
+        if (jwtUser) {
+            session = { user: { id: jwtUser.id, name: jwtUser.name || jwtUser.id, roles: jwtUser.roles || [] }, token: fixedSsoToken };
+            try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
+            currentUser = session.user.name;
+            window.currentUser = currentUser;
+            UI.showApp(currentUser);
+            loadInitialData();
+            return;
+        }
+        const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(fixedSsoToken)}`;
                     
                     const response  = await fetch(verifyURL);
                     if (!response.ok) throw new Error("API_ERROR");
