@@ -427,101 +427,103 @@
         return allowedRoles.length === 0 || normalizeRoles(session.roles).some(role => allowedRoles.includes(role));
     }
 
+    
+    function decodeJwtPayload(token) {
+        try {
+            if (!token || typeof token !== 'string') return null;
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const json = typeof Buffer !== 'undefined'
+                ? Buffer.from(payloadBase64, 'base64').toString('utf8')
+                : decodeURIComponent(escape(atob(payloadBase64)));
+            const parsed = JSON.parse(json);
+            if (parsed && parsed.exp && parsed.exp * 1000 < Date.now()) return null;
+            return parsed;
+        } catch (e) { return null; }
+    }
+
     var AuthGuard = {
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory'] });
-
-            // Prefetch data in parallel with token verification so the two slow
-            // Apps Script round trips overlap instead of running sequentially.
-            initialDataPrefetch = apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, perf: PERF_MODE });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getVendorDeliveryInsights', 'getProductReceiptHistory'] });
+            initialDataPrefetch = readApiCall('getInitialData', { includeProducts: false, includeCompleted: false });
 
             lucide.createIcons();
             UI.showLoading();
             try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const ssoToken  = urlParams.get('sso');
+                const cachedRaw = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
+                let cachedSession = null;
+                try { if (cachedRaw) cachedSession = JSON.parse(cachedRaw); } catch(e) {}
+
+                const tokenToVerify = ssoToken || (cachedSession && cachedSession.token) || (cachedSession && cachedSession.user && cachedSession.user.token);
+
+                if (ssoToken) {
+                    try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
+                }
+
+                // 1. Instant JWT Verification (<1ms)
+                if (tokenToVerify) {
+                    const jwtUser = decodeJwtPayload(tokenToVerify);
+                    if (jwtUser) {
+                        const roles = jwtUser.roles || [];
+                        const session = {
+                            id: jwtUser.id,
+                            name: jwtUser.name || jwtUser.id,
+                            roles: roles,
+                            perms: jwtUser.perms || {},
+                            token: tokenToVerify
+                        };
+                        try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
+                        window.appSession = session;
+                        window.currentUser = session.name;
+                        UI.showApp(session.name);
+                        AuthGuard.bindEvents();
+                        await openReceiving();
+                        return;
+                    }
+                }
+
+                // 2. Preview mode
                 const isPreviewEnv = window.self !== window.top || window.location.hostname === "" || window.location.hostname === "localhost" || window.location.hostname.includes("googleusercontent");
                 if (isPreviewEnv) {
                     window.currentUser = "พนักงานคลังสินค้า (Preview)";
                     UI.showApp(window.currentUser);
                     AuthGuard.bindEvents();
                     await openReceiving();
-                    return; 
+                    return;
                 }
 
-                const urlParams = new URLSearchParams(window.location.search);
-                const ssoToken  = urlParams.get('sso');
-
-                if (ssoToken) {
-                    const fixedSsoToken = ssoToken.replace(/ /g, '+');
-                    window.history.replaceState({}, document.title, window.location.pathname);
-
-                    const jwtUser = decodeJwtPayload(fixedSsoToken);
-        if (jwtUser) {
-            session = { user: { id: jwtUser.id, name: jwtUser.name || jwtUser.id, roles: jwtUser.roles || [] }, token: fixedSsoToken };
-            try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
-            currentUser = session.user.name;
-            window.currentUser = currentUser;
-            UI.showApp(currentUser);
-            loadInitialData();
-            return;
-        }
-        const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(fixedSsoToken)}`;
-                    
-                    const response  = await fetch(verifyURL);
-                    if (!response.ok) throw new Error("API_ERROR");
-                    const result = await response.json();
-
-                    if (!result.valid) {
-                        localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                        UI.showError('เกิดข้อผิดพลาดในการยืนยันตัวตน');
-                        return;
-                    }
-
-                    const session = buildAppSession(result.user, fixedSsoToken);
-                    if (!hasGrAccess(session)) {
-                        localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                        UI.showError("คุณไม่มีสิทธิ์เข้าถึง");
-                        return;
-                    }
-
-                    try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) { console.warn("Session cache skipped:", e); }
-                    window.appSession = session;
-                    window.currentUser = session.name;
-                    UI.showApp(session.name);
-                    AuthGuard.bindEvents();
-                    await openReceiving();
-                } else {
-                    const cached = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
-                    if (!cached) { UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal"); return; }
-                    let session;
-                    try { session = JSON.parse(cached); } catch(e) { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); UI.showError("Session ไม่ถูกต้อง"); return; }
-                    session = buildAppSession(session, session.token);
-                    if (!session.token) {
-                        localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                        UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal อีกครั้ง");
-                        return;
-                    }
-                    const cachedToken = session.token.replace(/ /g, '+');
-                    const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(cachedToken)}`;
-                    const response = await fetch(verifyURL);
-                    if (!response.ok) throw new Error("API_ERROR");
-                    const result = await response.json();
-                    if (!result.valid) {
-                        localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                        UI.showError('เกิดข้อผิดพลาดในการยืนยันตัวตน');
-                        return;
-                    }
-                    session = buildAppSession(result.user, cachedToken);
-                    window.appSession = session;
-                    if (!hasGrAccess(session)) { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); UI.showError("คุณไม่มีสิทธิ์เข้าถึง"); return; }
-                    try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) { console.warn("Session cache skipped:", e); }
-
-                    window.currentUser = session.name;
-                    UI.showApp(session.name);
-                    AuthGuard.bindEvents();
-                    await openReceiving();
+                if (!tokenToVerify) {
+                    UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal");
+                    return;
                 }
+
+                // 3. Fallback to GAS verifyToken
+                const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(tokenToVerify)}`;
+                const response = await fetch(verifyURL);
+                if (!response.ok) throw new Error("API_ERROR");
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
+                    UI.showError('เกิดข้อผิดพลาดในการยืนยันตัวตน');
+                    return;
+                }
+                const session = buildAppSession(result.user, tokenToVerify);
+                if (!hasGrAccess(session)) {
+                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
+                    UI.showError("คุณไม่มีสิทธิ์เข้าถึง");
+                    return;
+                }
+                try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
+                window.appSession = session;
+                window.currentUser = session.name;
+                UI.showApp(session.name);
+                AuthGuard.bindEvents();
+                await openReceiving();
             } catch (error) {
                 console.error("Auth Error:", error);
                 const isPreviewEnv = window.self !== window.top || window.location.hostname === "";
