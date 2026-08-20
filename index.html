@@ -1136,6 +1136,16 @@
     async function apiCall(action, payload = null) {
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
+
+      if (typeof window !== 'undefined' && window.AkraSupabaseGR && (action === 'getInitialData' || action === 'getProductReceiptHistory')) {
+          try {
+              const supaRes = await readApiCall(action, payload);
+              if (supaRes && supaRes.success) return supaRes;
+          } catch (supaErr) {
+              console.warn('Supabase GR apiCall fallback to GAS:', supaErr);
+          }
+      }
+
       const maxAttempts = isReadApiAction(action) ? 2 : 1;
       const timeoutMs = isReadApiAction(action) ? 60000 : 50000;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {

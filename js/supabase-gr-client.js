@@ -54,17 +54,22 @@
             billId: po.legacy_uid || po.id,
             poNumber: po.po_number,
             poDate: po.po_date,
+            refPrUid: po.ref_pr_uid || '',
+            expectedDate: po.expected_date || '',
             vendor: po.vendor_name,
             warehouse: po.warehouse,
             status: po.status,
             remark: po.remark,
             items: (po.items || []).map(item => ({
                 itemId: item.id,
+                id: item.id,
                 uid: item.legacy_uid || item.id,
                 sku: item.sku,
                 productName: item.product_name,
+                product: item.product_name,
                 poQty: Number(item.po_qty),
                 unit: item.unit,
+                expectedDate: item.expected_date || po.expected_date || '',
                 status: item.status
             })),
             receipts: po.receipts || []
@@ -78,10 +83,23 @@
                 billId: po.legacy_uid || po.id,
                 poNumber: po.po_number,
                 poDate: po.po_date,
+                refPrUid: po.ref_pr_uid || '',
+                expectedDate: po.expected_date || '',
                 vendor: po.vendor_name,
                 warehouse: po.warehouse,
                 status: po.status,
-                items: po.items || [],
+                items: (po.items || []).map(item => ({
+                    itemId: item.id,
+                    id: item.id,
+                    uid: item.legacy_uid || item.id,
+                    sku: item.sku,
+                    productName: item.product_name,
+                    product: item.product_name,
+                    poQty: Number(item.po_qty),
+                    unit: item.unit,
+                    expectedDate: item.expected_date || po.expected_date || '',
+                    status: item.status
+                })),
                 receipts: po.receipts || []
             }));
         }
