@@ -223,7 +223,7 @@
 
   <script src="js/supabase-gr-client.js"></script>
   <script>
-    const CURRENT_VERSION = "20260820.02";
+    const CURRENT_VERSION = "20260820.03";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -472,7 +472,7 @@
                             amount: Number(item.amount || 0),
                             status: item.status || bill.status || 'Pending GR',
                             displayStatus: item.displayStatus || bill.status || 'Pending GR',
-                            remark: bill.remark || '',
+                            remark: cleanDirectPoRemark(bill.remark),
                             expectedDate: item.expectedDate || bill.expectedDate || '',
                             grQty: item.grQty || '',
                             locIn: item.locIn || '',
@@ -505,7 +505,7 @@
                             amount: Number(item.amount || 0),
                             status: 'GR Completed',
                             displayStatus: 'GR Completed',
-                            remark: bill.remark || '',
+                            remark: cleanDirectPoRemark(bill.remark),
                             expectedDate: item.expectedDate || bill.expectedDate || '',
                             grQty: item.grQty || '',
                             locIn: item.locIn || '',
@@ -1109,6 +1109,14 @@
         }
         return '';
     }
+    function cleanDirectPoRemark(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/(?:^|\b)(?:Direct\s*PO\s*Web\s*App|Direct\s*PO\s*\(Edited\)|Direct\s*PO|DirectPO|Ref\s*PR)(?:\b|$)/gi, '')
+            .replace(/^[\s:\-|/()]+|[\s:\-|/()]+$/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
     function parseReceivingRemark(remark) {
         var text = String(remark || '');
         var parsed = { note: text.trim(), liftRounds: '', liftPayment: '' };
@@ -1116,14 +1124,16 @@
         if (matchNew) {
             parsed.liftRounds = matchNew[1] || '';
             parsed.liftPayment = matchNew[2] || '';
-            parsed.note = text.replace(matchNew[0], '').trim();
+            parsed.note = cleanDirectPoRemark(text.replace(matchNew[0], ''));
             return parsed;
         }
         var matchOld = text.match(/\[ค่าลิฟท์:\s*(จ่ายสด|เชื่อ)\]\s*/);
         if (matchOld) {
             parsed.liftPayment = matchOld[1] || '';
-            parsed.note = text.replace(matchOld[0], '').trim();
+            parsed.note = cleanDirectPoRemark(text.replace(matchOld[0], ''));
+            return parsed;
         }
+        parsed.note = cleanDirectPoRemark(parsed.note);
         return parsed;
     }
     function toggleItemSplit(btn) {
@@ -1428,7 +1438,7 @@
                 <div><dt class="text-xs text-gray-500">เลข PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poNumber)}</dd></div>
                 <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poDate)}</dd></div>
                 <div><dt class="text-xs text-gray-500">สต็อกเดิม</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.oldStock)}</dd></div>
-                <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">หมายเหตุ</dt><dd class="font-medium text-gray-800 mt-0.5 whitespace-pre-wrap">${productHistoryDisplay(row.remark)}</dd></div>
+                <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">หมายเหตุ</dt><dd class="font-medium text-gray-800 mt-0.5 whitespace-pre-wrap">${productHistoryDisplay(cleanDirectPoRemark(row.remark))}</dd></div>
               </dl>
             </li>`).join('');
 
