@@ -223,7 +223,7 @@
 
   <script src="js/supabase-gr-client.js"></script>
   <script>
-    const CURRENT_VERSION = "20260820.01";
+    const CURRENT_VERSION = "20260820.02";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1153,12 +1153,26 @@
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
 
-      if (typeof window !== 'undefined' && window.AkraSupabaseGR && (action === 'getInitialData' || action === 'getProductReceiptHistory')) {
-          try {
-              const supaRes = await readApiCall(action, payload);
-              if (supaRes && supaRes.success) return supaRes;
-          } catch (supaErr) {
-              console.warn('Supabase GR apiCall fallback to GAS:', supaErr);
+      if (typeof window !== 'undefined' && window.AkraSupabaseGR) {
+          if (action === 'getInitialData' || action === 'getProductReceiptHistory') {
+              try {
+                  const supaRes = await readApiCall(action, payload);
+                  if (supaRes && supaRes.success) return supaRes;
+              } catch (supaErr) {
+                  console.warn('Supabase GR apiCall fallback to GAS:', supaErr);
+              }
+          } else if (action === 'bulkReceivePO') {
+              try {
+                  const supaRes = await AkraSupabaseGR.bulkReceivePO(payload);
+                  fetch(DATA_SCRIPT_URL, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                      body: JSON.stringify({ action, data: payload, token: getSessionToken() })
+                  }).catch(() => {});
+                  if (supaRes && supaRes.success) return supaRes;
+              } catch (supaErr) {
+                  console.warn('Supabase GR bulkReceivePO fallback to GAS:', supaErr);
+              }
           }
       }
 
@@ -2181,7 +2195,7 @@
               let msg = "บันทึกสำเร็จ!";
               if(targetStatus === 'Draft GR') msg = "พักบิล (Draft) เรียบร้อย";
               else if(targetStatus === 'Pending Review') msg = "ส่งให้ตรวจสอบเรียบร้อยแล้ว!";
-              else msg = "ยืนยันรับสินค้าเข้าคลังสมบูรณ์!";
+              else msg = "ยืนยันรับเข้าคลังเรียบร้อย! (บิลย้ายไปที่แท็บ 'รับแล้ว')";
               
               showNotification(msg, "success"); 
               showView('receiving-list-view');

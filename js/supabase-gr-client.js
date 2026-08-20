@@ -140,63 +140,207 @@
         };
     }
 
+    function formatToIsoDate(dateStr) {
+        if (!dateStr) return null;
+        const str = String(dateStr).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        const parts = str.replace(/[-.]/g, '/').split('/');
+        if (parts.length === 3) {
+            let p1 = parseInt(parts[0], 10);
+            let p2 = parseInt(parts[1], 10);
+            let p3 = parseInt(parts[2], 10);
+            if (isNaN(p1) || isNaN(p2) || isNaN(p3)) return null;
+            let day, month, year;
+            if (p1 > 1000) { year = p1; month = p2; day = p3; }
+            else { day = p1; month = p2; year = p3; }
+            if (year > 2400) year -= 543;
+            else if (year < 100) year = year >= 60 ? 2500 + year - 543 : 2000 + year;
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+        return null;
+    }
+
     /**
-     * Receive Goods Mutation (Save GR Record + Items + Update PO Status)
+     * Bulk Receive PO Mutation (Save GR Record + Items + Update PO Status)
      */
-    async function receiveGoods(receiptData) {
-        const { poId, poNumber, grNumber, grDate, ataDate, receiver, warehouse, status, items } = receiptData;
+    async function bulkReceivePO(bulkPayload) {
+        const { ata, receiverName, remark, targetStatus, groupInfo, groupPoUids, items, extraItems } = bulkPayload;
 
-        // 1. Insert into goods_receipts
-        const grPayload = {
-            po_id: poId || null,
-            po_number: poNumber,
-            gr_number: grNumber || ('GR-' + Date.now()),
-            gr_date: grDate || new Date().toISOString().split('T')[0],
-            ata_date: ataDate || grDate || new Date().toISOString().split('T')[0],
-            receiver: receiver || 'Warehouse Staff',
-            warehouse: warehouse || 'W1',
-            status: status || 'Pending Review'
-        };
+        const ataIso = formatToIsoDate(ata) || new Date().toISOString().split('T')[0];
+        const status = targetStatus === 'GR Completed' ? 'GR Completed' : (targetStatus === 'Draft GR' ? 'Pending Review' : 'Pending Review');
+        const poStatus = targetStatus === 'GR Completed' ? 'GR Completed' : (targetStatus === 'Pending Review' ? 'Pending Review' : 'Pending GR');
 
-        const createdReceipts = await supabaseRest('goods_receipts', {
-            method: 'POST',
-            body: grPayload
-        });
-        const gr = createdReceipts[0];
-
-        // 2. Insert into goods_receipt_items
-        if (Array.isArray(items) && items.length > 0) {
-            const itemPayloads = items.map(item => ({
-                gr_id: gr.id,
-                po_item_id: item.poItemId || null,
-                sku: item.sku,
-                product_name: item.productName || item.product_name,
-                gr_qty: Number(item.receivedQty || item.received_qty || item.gr_qty || 0),
-                unit: item.unit || 'ชิ้น',
-                is_extra: item.isExtra === true,
-                exp_date: item.expiryDate || item.exp_date || null,
-                location_in: item.location || item.location_in || warehouse || 'W1'
-            }));
-
-            await supabaseRest('goods_receipt_items', {
-                method: 'POST',
-                body: itemPayloads
-            });
+        // 1. Locate the Purchase Order
+        let po = null;
+        if (Array.isArray(groupPoUids) && groupPoUids.length > 0) {
+            const uids = groupPoUids.map(u => encodeURIComponent(u)).join(',');
+            const foundPOs = await supabaseRest(`purchase_orders?legacy_uid=in.(${uids})&select=*,items:purchase_order_items(*)`);
+            if (foundPOs && foundPOs.length > 0) po = foundPOs[0];
+            else {
+                const foundById = await supabaseRest(`purchase_orders?id=in.(${uids})&select=*,items:purchase_order_items(*)`);
+                if (foundById && foundById.length > 0) po = foundById[0];
+            }
         }
 
-        // 3. Update PO status
+        if (!po && groupInfo && groupInfo.poNumber) {
+            const foundByPoNum = await supabaseRest(`purchase_orders?po_number=eq.${encodeURIComponent(groupInfo.poNumber)}&select=*,items:purchase_order_items(*)`);
+            if (foundByPoNum && foundByPoNum.length > 0) po = foundByPoNum[0];
+        }
+
+        const poId = po ? po.id : null;
+        const poNumber = po ? po.po_number : (groupInfo?.poNumber || '');
+        const warehouse = groupInfo?.warehouse || po?.warehouse || 'W1';
+
+        // 2. Find or Create goods_receipts record
+        let gr = null;
+        if (poId) {
+            const existingGRs = await supabaseRest(`goods_receipts?po_id=eq.${encodeURIComponent(poId)}&select=*`);
+            if (existingGRs && existingGRs.length > 0) gr = existingGRs[0];
+        }
+
+        if (gr) {
+            const updatedGRs = await supabaseRest(`goods_receipts?id=eq.${encodeURIComponent(gr.id)}`, {
+                method: 'PATCH',
+                body: {
+                    ata_date: ataIso,
+                    receiver: receiverName || 'WAREHOUSE',
+                    warehouse: warehouse,
+                    status: status,
+                    remark: remark || ''
+                }
+            });
+            if (updatedGRs && updatedGRs.length > 0) gr = updatedGRs[0];
+        } else {
+            const newGrPayload = {
+                po_id: poId,
+                po_number: poNumber,
+                ref_po_uid: (groupPoUids && groupPoUids[0]) || po?.legacy_uid || null,
+                gr_number: `GR-${ataIso.replace(/-/g, '')}-${Date.now().toString(36)}`,
+                gr_date: ataIso,
+                ata_date: ataIso,
+                receiver: receiverName || 'WAREHOUSE',
+                warehouse: warehouse,
+                status: status,
+                remark: remark || ''
+            };
+            const createdReceipts = await supabaseRest('goods_receipts', {
+                method: 'POST',
+                body: newGrPayload
+            });
+            gr = createdReceipts[0];
+        }
+
+        // 3. Upsert Goods Receipt Items
+        if (gr && Array.isArray(items) && items.length > 0) {
+            const existingGrItems = await supabaseRest(`goods_receipt_items?gr_id=eq.${encodeURIComponent(gr.id)}&select=*`);
+            const existingMapByRef = new Map();
+            (existingGrItems || []).forEach(it => {
+                if (it.ref_po_item_uid) existingMapByRef.set(it.ref_po_item_uid, it);
+                if (it.po_item_id) existingMapByRef.set(it.po_item_id, it);
+            });
+
+            const poItemsList = po?.items || [];
+            const poItemMap = new Map();
+            poItemsList.forEach(pi => {
+                if (pi.legacy_uid) poItemMap.set(pi.legacy_uid, pi);
+                if (pi.id) poItemMap.set(pi.id, pi);
+            });
+
+            for (const item of items) {
+                const matchedPoItem = poItemMap.get(item.uid);
+                const existingGrItem = existingMapByRef.get(item.uid) || (matchedPoItem ? existingMapByRef.get(matchedPoItem.id) : null);
+                const expDateIso = item.exp ? formatToIsoDate(item.exp) : null;
+                const grQtyNum = parseFloat(item.grQty) || 0;
+                const oldStockNum = parseFloat(item.oldStock) || 0;
+
+                if (existingGrItem) {
+                    await supabaseRest(`goods_receipt_items?id=eq.${encodeURIComponent(existingGrItem.id)}`, {
+                        method: 'PATCH',
+                        body: {
+                            gr_qty: grQtyNum,
+                            unit: item.unit || existingGrItem.unit,
+                            location_in: item.locIn || existingGrItem.location_in,
+                            exp_date: expDateIso,
+                            old_stock: oldStockNum
+                        }
+                    });
+                } else {
+                    await supabaseRest('goods_receipt_items', {
+                        method: 'POST',
+                        body: {
+                            gr_id: gr.id,
+                            po_item_id: matchedPoItem ? matchedPoItem.id : null,
+                            ref_po_item_uid: item.uid,
+                            sku: matchedPoItem?.sku || '',
+                            product_name: matchedPoItem?.product_name || 'Unknown Product',
+                            gr_qty: grQtyNum,
+                            unit: item.unit || matchedPoItem?.unit || 'ชิ้น',
+                            location_in: item.locIn || warehouse || 'W1',
+                            exp_date: expDateIso,
+                            old_stock: oldStockNum,
+                            is_extra: false,
+                            remark: remark || ''
+                        }
+                    });
+                }
+            }
+        }
+
+        // 4. Handle extra items
+        if (gr && Array.isArray(extraItems) && extraItems.length > 0) {
+            for (const ex of extraItems) {
+                const expDateIso = ex.exp ? formatToIsoDate(ex.exp) : null;
+                await supabaseRest('goods_receipt_items', {
+                    method: 'POST',
+                    body: {
+                        gr_id: gr.id,
+                        sku: ex.sku || '',
+                        product_name: ex.product || 'ของแถม',
+                        gr_qty: parseFloat(ex.grQty) || 0,
+                        unit: ex.unit || 'ชิ้น',
+                        location_in: ex.locIn || warehouse || 'W1',
+                        exp_date: expDateIso,
+                        old_stock: parseFloat(ex.oldStock) || 0,
+                        is_extra: true,
+                        remark: remark || ''
+                    }
+                });
+            }
+        }
+
+        // 5. Update PO and PO Item Status
         if (poId) {
             await supabaseRest(`purchase_orders?id=eq.${encodeURIComponent(poId)}`, {
                 method: 'PATCH',
-                body: { status: status === 'GR Completed' ? 'GR Completed' : 'Pending Review' }
+                body: { status: poStatus, updated_at: new Date().toISOString() }
+            });
+            await supabaseRest(`purchase_order_items?po_id=eq.${encodeURIComponent(poId)}`, {
+                method: 'PATCH',
+                body: { status: poStatus }
             });
         }
 
         return {
+            success: true,
             status: 'success',
-            grId: gr.id,
-            grNumber: gr.gr_number
+            message: targetStatus === 'GR Completed' ? 'ยืนยันรับเข้าคลังเรียบร้อย' : 'บันทึกสำเร็จ',
+            grId: gr?.id
         };
+    }
+
+    /**
+     * Receive Goods Mutation (Save GR Record + Items + Update PO Status)
+     */
+    async function receiveGoods(receiptData) {
+        return bulkReceivePO({
+            ata: receiptData.ataDate || receiptData.grDate,
+            receiverName: receiptData.receiver,
+            remark: receiptData.remark,
+            targetStatus: receiptData.status,
+            groupInfo: { poNumber: receiptData.poNumber, warehouse: receiptData.warehouse },
+            groupPoUids: [receiptData.poId],
+            items: receiptData.items || []
+        });
     }
 
     /**
@@ -217,6 +361,7 @@
     return {
         getInitialData,
         receiveGoods,
+        bulkReceivePO,
         getProductReceiptHistory,
         SUPABASE_CONFIG
     };
