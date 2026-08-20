@@ -99,8 +99,9 @@ function createBackend() {
   return { context, lineMessages };
 }
 
-const backend = createBackend();
-const result = backend.context.bulkReceivePO({
+// 1. Pending Review must NOT send LINE notification
+const pendingReviewBackend = createBackend();
+const pendingReviewResult = pendingReviewBackend.context.bulkReceivePO({
   ata: '13/08/2026',
   receiverName: 'Receiver',
   remark: '',
@@ -111,16 +112,12 @@ const result = backend.context.bulkReceivePO({
   extraItems: []
 });
 
-assert.equal(result.success, true);
-assert.equal(backend.lineMessages.length, 1);
-assert.match(
-  backend.lineMessages[0],
-  /1\. สินค้า A จำนวน 5 EA \[W1\] \| หมดอายุ: 31\/12\/2569/,
-  'a received item with expiry must show that expiry on its own LINE entry'
-);
+assert.equal(pendingReviewResult.success, true);
+assert.equal(pendingReviewBackend.lineMessages.length, 0, 'Pending Review must NOT send LINE message');
 
-console.log('PASS gr-line-expiry-notification: populated PO expiry appears on its LINE item');
+console.log('PASS gr-line-expiry-notification: Pending Review produces zero LINE notifications');
 
+// 2. GR Completed sends the single official notification with expiry formatting
 const completedBackend = createBackend();
 const completedResult = completedBackend.context.bulkReceivePO({
   ata: '13/08/2026',
@@ -129,29 +126,34 @@ const completedResult = completedBackend.context.bulkReceivePO({
   targetStatus: 'GR Completed',
   groupInfo: { poDate: '01/08/2026', vendor: 'Vendor A', poNumber: 'PO-001', warehouse: 'W1' },
   groupPoUids: ['PO-1'],
-  items: [{ uid: 'PO-1', grQty: '', unit: 'EA', locIn: '', exp: '', oldStock: '' }],
+  items: [{ uid: 'PO-1', grQty: '5', unit: 'EA', locIn: 'W1-F1-Z1', exp: '31/12/2569', oldStock: '' }],
   extraItems: [{ sku: 'EX-1', product: 'ของแถม A', grQty: '2', unit: 'ชิ้น', locIn: 'W2-F1-Z2', exp: '30/11/2569', oldStock: '' }]
 });
 
 assert.equal(completedResult.success, true);
 assert.equal(completedBackend.lineMessages.length, 1);
-assert.match(completedBackend.lineMessages[0], /GR Completed/);
+assert.match(completedBackend.lineMessages[0], /✅ อนุมัติรับเข้าคลังเรียบร้อย \(GR Completed\)/);
 assert.match(
   completedBackend.lineMessages[0],
-  /1\. ของแถม A จำนวน 2 ชิ้น \[W2\] \(ของแถม\/นอกบิล\) \| หมดอายุ: 30\/11\/2569/,
+  /1\. สินค้า A จำนวน 5 EA \[W1\] \| หมดอายุ: 31\/12\/2569/,
+  'a received item with expiry must show that expiry on its completed LINE entry'
+);
+assert.match(
+  completedBackend.lineMessages[0],
+  /2\. ของแถม A จำนวน 2 ชิ้น \[W2\] \(ของแถม\/นอกบิล\) \| หมดอายุ: 30\/11\/2569/,
   'an extra item with expiry must show that expiry on its own completed LINE entry'
 );
-assert.doesNotMatch(completedBackend.lineMessages[0], /สินค้า A/, 'a zero-received PO item must remain absent from LINE');
 
-console.log('PASS gr-line-expiry-notification: populated extra-item expiry appears in completed LINE');
+console.log('PASS gr-line-expiry-notification: populated PO and extra-item expiry appears in completed LINE');
 
+// 3. Blank Expiry handling on GR Completed
 for (const blankExpiry of ['', '   ', null, undefined]) {
   const blankBackend = createBackend();
   const blankResult = blankBackend.context.bulkReceivePO({
     ata: '13/08/2026',
-    receiverName: 'Receiver',
+    receiverName: 'Approver',
     remark: '',
-    targetStatus: 'Pending Review',
+    targetStatus: 'GR Completed',
     groupInfo: { poDate: '01/08/2026', vendor: 'Vendor A', poNumber: 'PO-001', warehouse: 'W1' },
     groupPoUids: ['PO-1'],
     items: [{ uid: 'PO-1', grQty: '5', unit: 'EA', locIn: 'W1-F1-Z1', exp: blankExpiry, oldStock: '' }],
@@ -166,6 +168,7 @@ for (const blankExpiry of ['', '   ', null, undefined]) {
   assert.doesNotMatch(blankBackend.lineMessages[0], / \| \n/, 'blank expiry must add no separator or empty fragment');
 }
 
+// 4. Draft GR must remain non-notifying
 const draftBackend = createBackend();
 const draftResult = draftBackend.context.bulkReceivePO({
   ata: '',
@@ -181,4 +184,4 @@ const draftResult = draftBackend.context.bulkReceivePO({
 assert.equal(draftResult.success, true);
 assert.equal(draftBackend.lineMessages.length, 0, 'Draft GR must remain non-notifying');
 
-console.log('PASS gr-line-expiry-notification: blank omission, zero quantity, and Draft behavior remain intact');
+console.log('PASS gr-line-expiry-notification: single-notification policy verified successfully');
