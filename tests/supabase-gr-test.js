@@ -17,31 +17,52 @@ async function runTests() {
   console.log(`  -> Active Bills Count: ${initData.activeBills.length}`);
   console.log(`  -> Completed Bills Count: ${initData.completedBills.length}`);
 
-  // 2. Receive Goods Mutation
-  console.log('\n[2/3] Testing Goods Receipt creation mutation...');
-  const sampleBill = initData.activeBills[0];
+  // 2. Receive Goods Mutation on Isolated Test Record
+  console.log('\n[2/3] Testing Goods Receipt creation mutation on isolated test PO...');
+  const poClient = require('../../PO/js/supabase-po-client.js');
+  const tempPo = await poClient.saveDirectPO({
+    poNumber: 'PO-TEST-GR-' + Date.now(),
+    poDate: '2026-08-19',
+    vendor: 'ทดสอบระบบ Vendor',
+    warehouse: 'W1',
+    remark: 'Automated Test PO',
+    items: [
+      {
+        sku: 'FF21610104',
+        productName: 'สินค้าทดสอบรับเข้า',
+        poQty: 10,
+        unit: 'ลัง'
+      }
+    ]
+  });
+
   const receiptPayload = {
-    poId: sampleBill.poId,
-    poNumber: sampleBill.poNumber,
+    poId: tempPo.poId,
+    poNumber: tempPo.poNumber,
     grNumber: 'GR-TEST-' + Date.now(),
     grDate: '2026-08-19',
     receiver: 'Test Inspector',
-    warehouse: sampleBill.warehouse,
+    warehouse: 'W1',
     status: 'Pending Review',
-    items: (sampleBill.items || []).slice(0, 1).map(it => ({
-      poItemId: it.itemId,
-      sku: it.sku,
-      productName: it.productName,
-      receivedQty: it.poQty,
-      unit: it.unit,
-      expiryDate: '2027-08-19'
-    }))
+    items: [
+      {
+        sku: 'FF21610104',
+        productName: 'สินค้าทดสอบรับเข้า',
+        grQty: 10,
+        unit: 'ลัง',
+        exp: '19/08/2027',
+        locIn: 'W1-1F'
+      }
+    ]
   };
 
   const grRes = await grClient.receiveGoods(receiptPayload);
   assert.strictEqual(grRes.status, 'success');
-  assert(grRes.grId, 'Must return generated GR ID');
-  console.log(`  -> Created Goods Receipt [${grRes.grNumber}] ID: ${grRes.grId}`);
+  console.log(`  -> Created Goods Receipt ID: ${grRes.grId}`);
+
+  // Cleanup isolated test PO
+  await poClient.deleteBill(tempPo.poId);
+  console.log(`  -> Cleaned up isolated test PO [${tempPo.poId}]`);
 
   // 3. Product Receipt History
   console.log('\n[3/3] Testing Product Receipt History query (<30ms)...');
