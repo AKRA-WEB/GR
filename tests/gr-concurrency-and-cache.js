@@ -100,9 +100,9 @@ function testBackendBypassCache() {
 
   // 3. Backend revision
   const revision = vm.runInContext('GR_BACKEND_REVISION', context);
-  assert.equal(revision, '20260819.01-perf-concurrency', 'GR_BACKEND_REVISION must match 20260819.01-perf-concurrency');
+  assert.equal(revision, '20260820.05-auth-archive', 'GR_BACKEND_REVISION must identify the auth/archive release');
 }
 
 testVersionAndFrontendConstants();
 testBackendBypassCache();
-console.log('PASS gr-concurrency-and-cache: version 20260819.01, 60s TTL, 50s timeout, in-flight mutex, and bypassCache verified');
+console.log('PASS gr-concurrency-and-cache: backend 20260820.05, 60s TTL, 50s timeout, in-flight mutex, and bypassCache verified');

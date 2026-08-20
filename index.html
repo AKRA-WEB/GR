@@ -5,11 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <title>ระบบรับสินค้า (GR)</title>
 
   <link rel="stylesheet" href="tailwind.css">
+  <script src="js/supabase-gr-client.js" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -220,10 +222,8 @@
       <p class="text-brand-orange font-medium" id="data-loader-text">กำลังประมวลผล...</p>
   </div>
   <div id="toast-container" class="toast-container"></div>
-
-  <script src="js/supabase-gr-client.js"></script>
   <script>
-    const CURRENT_VERSION = "20260820.03";
+    const CURRENT_VERSION = "20260820.06";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -354,7 +354,6 @@
     })();
 
     var APP_CONFIG = {
-        API_URL: "https://script.google.com/macros/s/AKfycbyQJLwb5HTexG6gxqTehGWlAxfSXVT--CpWnnp2JTcP4xCcMA1vUjSY_eWqPjUKwzq7/exec",
         PORTAL_URL: "https://akra-web.github.io/Main/", 
         REQUIRED_ROLES: ["ADMIN", "SUPERVISOR", "AKRA", "WAREHOUSE"],
         APP_NAME: "ระบบรับสินค้า (GR)",
@@ -367,6 +366,7 @@
     var initialDataPrefetch = null;
     var groupedPOs = [];
     var currentActiveGroup = null;
+    var currentBillHadLoadedExtras = false;
     var poListRenderTimer = null;
     var grCompletedLoaded = false;
     var grCompletedLoadedFull = false;
@@ -429,99 +429,7 @@
     }
 
     
-    function decodeJwtPayload(token) {
-        try {
-            if (!token || typeof token !== 'string') return null;
-            const parts = token.split('.');
-            if (parts.length !== 3) return null;
-            const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const json = typeof Buffer !== 'undefined'
-                ? Buffer.from(payloadBase64, 'base64').toString('utf8')
-                : decodeURIComponent(escape(atob(payloadBase64)));
-            const parsed = JSON.parse(json);
-            if (parsed && parsed.exp && parsed.exp * 1000 < Date.now()) return null;
-            return parsed;
-        } catch (e) { return null; }
-    }
-
-    
     async function readApiCall(action, payload = null) {
-        if (typeof window !== 'undefined' && window.AkraSupabaseGR && action === 'getInitialData') {
-            try {
-                const supa = await AkraSupabaseGR.getInitialData(payload || {});
-                const flatPending = [];
-                const flatCompleted = [];
-                (supa.activeBills || []).forEach(bill => {
-                    (bill.items || []).forEach((item, itemIdx) => {
-                        flatPending.push({
-                            id: item.id || bill.id,
-                            rowNumber: item.rowNumber || itemIdx + 1,
-                            uid: item.uid || item.id,
-                            poNumber: bill.poNumber,
-                            poDate: bill.poDate,
-                            refPrUid: bill.refPrUid || '',
-                            vendor: bill.vendor,
-                            warehouse: bill.warehouse,
-                            sku: item.sku || '',
-                            product: item.productName || item.product || '',
-                            productName: item.productName || item.product || '',
-                            quantity: Number(item.poQty || item.quantity || 0),
-                            poQty: Number(item.poQty || item.quantity || 0),
-                            unit: item.unit || 'ชิ้น',
-                            price: Number(item.price || 0),
-                            amount: Number(item.amount || 0),
-                            status: item.status || bill.status || 'Pending GR',
-                            displayStatus: item.displayStatus || bill.status || 'Pending GR',
-                            remark: cleanDirectPoRemark(bill.remark),
-                            expectedDate: item.expectedDate || bill.expectedDate || '',
-                            grQty: item.grQty || '',
-                            locIn: item.locIn || '',
-                            exp: item.exp || '',
-                            oldStock: item.oldStock || '',
-                            ata: item.ata || bill.ata || '',
-                            receiverName: item.receiverName || bill.receiverName || '',
-                            leadtime: item.leadtime || ''
-                        });
-                    });
-                });
-                (supa.completedBills || []).forEach(bill => {
-                    (bill.items || []).forEach((item, itemIdx) => {
-                        flatCompleted.push({
-                            id: item.id || bill.id,
-                            rowNumber: item.rowNumber || itemIdx + 1,
-                            uid: item.uid || item.id,
-                            poNumber: bill.poNumber,
-                            poDate: bill.poDate,
-                            refPrUid: bill.refPrUid || '',
-                            vendor: bill.vendor,
-                            warehouse: bill.warehouse,
-                            sku: item.sku || '',
-                            product: item.productName || item.product || '',
-                            productName: item.productName || item.product || '',
-                            quantity: Number(item.poQty || item.quantity || 0),
-                            poQty: Number(item.poQty || item.quantity || 0),
-                            unit: item.unit || 'ชิ้น',
-                            price: Number(item.price || 0),
-                            amount: Number(item.amount || 0),
-                            status: 'GR Completed',
-                            displayStatus: 'GR Completed',
-                            remark: cleanDirectPoRemark(bill.remark),
-                            expectedDate: item.expectedDate || bill.expectedDate || '',
-                            grQty: item.grQty || '',
-                            locIn: item.locIn || '',
-                            exp: item.exp || '',
-                            oldStock: item.oldStock || '',
-                            ata: item.ata || bill.ata || '',
-                            receiverName: item.receiverName || bill.receiverName || '',
-                            leadtime: item.leadtime || ''
-                        });
-                    });
-                });
-                return { success: true, pendingPOs: flatPending, grCompleted: flatCompleted, vendors: supa.vendors || [] };
-            } catch (err) {
-                console.warn('Supabase GR error, falling back to GAS:', err);
-            }
-        }
         return apiCall(action, payload);
     }
 
@@ -530,7 +438,6 @@
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
             AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getVendorDeliveryInsights', 'getProductReceiptHistory'] });
-            initialDataPrefetch = readApiCall('getInitialData', { includeProducts: false, includeCompleted: false });
 
             lucide.createIcons();
             UI.showLoading();
@@ -547,51 +454,32 @@
                     try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
                 }
 
-                // 1. Instant JWT Verification (<1ms)
-                if (tokenToVerify) {
-                    const jwtUser = decodeJwtPayload(tokenToVerify);
-                    if (jwtUser) {
-                        const roles = jwtUser.roles || [];
-                        const session = {
-                            id: jwtUser.id,
-                            name: jwtUser.name || jwtUser.id,
-                            roles: roles,
-                            perms: jwtUser.perms || {},
-                            token: tokenToVerify
-                        };
-                        try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
-                        window.appSession = session;
-                        window.currentUser = session.name;
-                        UI.showApp(session.name);
-                        AuthGuard.bindEvents();
-                        await openReceiving();
-                        return;
-                    }
-                }
-
-                // 2. Preview mode
-                const isPreviewEnv = window.self !== window.top || window.location.hostname === "" || window.location.hostname === "localhost" || window.location.hostname.includes("googleusercontent");
-                if (isPreviewEnv) {
-                    window.currentUser = "พนักงานคลังสินค้า (Preview)";
-                    UI.showApp(window.currentUser);
-                    AuthGuard.bindEvents();
-                    await openReceiving();
-                    return;
-                }
-
                 if (!tokenToVerify) {
                     UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal");
                     return;
                 }
 
-                // 3. Fallback to GAS verifyToken
-                const verifyURL = `${APP_CONFIG.API_URL}?action=verifyToken&token=${encodeURIComponent(tokenToVerify)}`;
-                const response = await fetch(verifyURL);
-                if (!response.ok) throw new Error("API_ERROR");
-                const result = await response.json();
+                // The Edge bootstrap verifies Main SSO and loads the lean Supabase
+                // projection in one round trip. Its short verification cache also
+                // avoids repeating the Main call for the next GR request.
+                if (typeof window.AkraSupabaseGR === 'undefined') throw new Error('GR_CLIENT_MISSING');
+                const result = await AkraSupabaseGR.request('bootstrap', {
+                    includeProducts: false,
+                    includeCompleted: false,
+                    includeDeliveryPlanning: false
+                }, tokenToVerify);
                 if (!result.valid) {
                     localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                    UI.showError('เกิดข้อผิดพลาดในการยืนยันตัวตน');
+                    const authMessage = result.reason === 'mandatory_password_change_required'
+                        ? 'กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน'
+                        : 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
+                    UI.showError(authMessage);
+                    return;
+                }
+                if (result.user && result.user.mustChangePassword === true) {
+                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
+                    UI.showError('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน');
+                    console.warn('mandatory_password_change_required');
                     return;
                 }
                 const session = buildAppSession(result.user, tokenToVerify);
@@ -603,14 +491,18 @@
                 try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
                 window.appSession = session;
                 window.currentUser = session.name;
+                initialDataPrefetch = Promise.resolve(result.initialData);
                 UI.showApp(session.name);
                 AuthGuard.bindEvents();
                 await openReceiving();
             } catch (error) {
                 console.error("Auth Error:", error);
-                const isPreviewEnv = window.self !== window.top || window.location.hostname === "";
-                if (isPreviewEnv) { window.currentUser = "พนักงานคลัง (API Error)"; UI.showApp(window.currentUser); AuthGuard.bindEvents(); await openReceiving(); } 
-                else { UI.showError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบสิทธิ์ได้"); }
+                if (error && error.reason === 'mandatory_password_change_required') {
+                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
+                    UI.showError('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน');
+                    return;
+                }
+                UI.showError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบสิทธิ์ได้");
             }
         },
         bindEvents: () => {
@@ -816,8 +708,17 @@
         return Object.values(buckets).map(bucket => ({
             ...bucket.group,
             ...summarizeReceivingBillPlan(bucket.groups),
+            extraItems: mergeBillExtras(bucket.groups.map(group => group.extraItems || [])),
             listStatusCounts: bucket.statusCounts
         }));
+    }
+    function mergeBillExtras(extraLists) {
+        const extras = new Map();
+        (extraLists || []).flat().forEach(item => {
+            const key = String(item.id || [item.sku, item.product, item.locIn, item.exp].join('|'));
+            extras.set(key, item);
+        });
+        return Array.from(extras.values());
     }
     function isSameBillItem(item, group) {
         const itemRef = usableBillRefUid(item && item.refPrUid);
@@ -1163,32 +1064,17 @@
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
 
-      if (typeof window !== 'undefined' && window.AkraSupabaseGR) {
-          if (action === 'getInitialData' || action === 'getProductReceiptHistory') {
-              try {
-                  const supaRes = await readApiCall(action, payload);
-                  if (supaRes && supaRes.success) return supaRes;
-              } catch (supaErr) {
-                  console.warn('Supabase GR apiCall fallback to GAS:', supaErr);
-              }
-          } else if (action === 'bulkReceivePO') {
-              try {
-                  const supaRes = await AkraSupabaseGR.bulkReceivePO(payload);
-                  try {
-                      fetch(DATA_SCRIPT_URL, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                          body: JSON.stringify({ action, data: payload, token: getSessionToken() }),
-                          keepalive: true
-                      }).catch(e => console.warn('GAS sync/LINE notify warning:', e));
-                  } catch (fetchErr) {
-                      console.warn('GAS sync dispatch error:', fetchErr);
-                  }
-                  if (supaRes && supaRes.success) return supaRes;
-              } catch (supaErr) {
-                  console.warn('Supabase GR bulkReceivePO fallback to GAS:', supaErr);
-              }
-          }
+      const supabaseGrActions = ['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'bulkReceivePO', 'recallGR'];
+      if (supabaseGrActions.includes(action)) {
+        if (typeof window === 'undefined' || !window.AkraSupabaseGR) {
+          return { success: false, message: 'ไม่พบตัวเชื่อมต่อฐานข้อมูล GR กรุณารีโหลดหน้า' };
+        }
+        try {
+          return await AkraSupabaseGR.request(action, payload, getSessionToken());
+        } catch (error) {
+          console.error('Supabase GR request failed:', { action, reason: error && error.reason });
+          return { success: false, message: error && error.message ? error.message : 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
+        }
       }
 
       const maxAttempts = isReadApiAction(action) ? 2 : 1;
@@ -1502,6 +1388,7 @@
                 confirmedDaysUntil: null,
                 estimatedDate: '',
                 estimatedDaysUntil: null,
+                extraItems: [],
                 items: []
             };
         }
@@ -1519,6 +1406,7 @@
             }
         }
         if (po.isPlanOverdue) groups[key].isPlanOverdue = true;
+        groups[key].extraItems = mergeBillExtras([groups[key].extraItems, po.extraItems || []]);
         groups[key].items.push(po);
       });
       // Finalize bill-level plan: a single confirmed item must not paint the whole bill confirmed.
@@ -1892,7 +1780,10 @@
         });
         container.innerHTML = htmlStr;
 
+        const loadedExtras = mergeBillExtras([group.extraItems || [], ...group.items.map(item => item.extraItems || [])]);
         document.getElementById('r-extra-items-container').innerHTML = '';
+        currentBillHadLoadedExtras = loadedExtras.length > 0;
+        loadedExtras.forEach(item => addExtraItemRow(item));
         
         // ผูก Event ให้กับ 3 ปุ่มใหม่
         document.getElementById('btn-draft').onclick = (e) => submitReceiving(e, 'Draft GR');
@@ -2005,7 +1896,17 @@
         try {
             showDataLoading(`กำลังดำเนินการ...`);
 
-            const res = await apiCall('recallGR', { poUids, actionType });
+            const res = await apiCall('recallGR', {
+                poUids,
+                actionType,
+                billRef: usableBillRefUid(group.refPrUid),
+                groupInfo: {
+                    poNumber: group.poNumber || '',
+                    vendor: group.vendor || '',
+                    poDate: group.poDate || '',
+                    warehouse: group.warehouse || ''
+                }
+            });
             hideDataLoading();
 
             if (res.success) {
@@ -2023,31 +1924,32 @@
         }
     }
 
-    function addExtraItemRow() {
+    function addExtraItemRow(initial = {}) {
         const container = document.getElementById('r-extra-items-container'); const div = document.createElement('div');
         const defWh = (currentActiveGroup && currentActiveGroup.warehouse) || '';
+        const parsedLoc = parseLoc(initial.locIn || '');
         div.className = "extra-item-row bg-white p-4 rounded-xl border border-orange-200 shadow-sm relative";
         div.innerHTML = `
             <button type="button" onclick="this.closest('.extra-item-row').remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition"><i data-lucide="x" class="w-4 h-4"></i></button>
             <div class="pr-8 mb-3 relative">
                 <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อสินค้า (พิมพ์ค้นหา หรือ พิมพ์ชื่อใหม่) <span class="text-red-500">*</span></label>
-                <input type="text" class="input-field ex-product py-2.5 font-medium border-orange-300 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="เช่น แลกฟรี กล่องเขียว..." autocomplete="off">
-                <input type="hidden" class="ex-sku">
+                <input type="text" class="input-field ex-product py-2.5 font-medium border-orange-300 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="เช่น แลกฟรี กล่องเขียว..." autocomplete="off" value="${esc(initial.product || '')}">
+                <input type="hidden" class="ex-sku" value="${esc(initial.sku || '')}">
                 <ul class="suggestion-box absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto hidden mt-1 divide-y divide-gray-50"></ul>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับ <span class="text-red-500">*</span></label>
-                <input type="number" class="input-field ex-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข"></div>
+                <input type="number" class="input-field ex-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${esc(initial.grQty ?? '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
-                <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1"></div>
+                <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1" value="${esc(initial.unit || '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ</label>
-                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="วว/ดด/ปป"></div>
+                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="วว/ดด/ปป" value="${esc(initial.exp || '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อคเก่า</label>
-                <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ไม่บังคับ"></div>
+                <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ไม่บังคับ" value="${esc(initial.oldStock ?? '')}"></div>
             </div>
             <div class="mt-3">
                 <label class="block text-[10px] text-gray-500 mb-1 font-medium">ตำแหน่งเก็บ (Loc.IN) <span class="text-red-500">*</span></label>
-                ${locInputsHtml('ex', defWh, null)}
+                ${locInputsHtml('ex', defWh, parsedLoc)}
             </div>
         `;
         container.appendChild(div);
@@ -2123,6 +2025,7 @@
       document.querySelectorAll('.po-item-row').forEach(row => {
           const rowNum = row.dataset.rownum;
           const uid = row.dataset.uid;
+          const itemMeta = group.items.find(it => String(it.uid) === String(uid)) || {};
           const qtyInput = row.querySelector('.po-qty');
           const whSel = row.querySelector('.po-loc-wh'); const floorSel = row.querySelector('.po-loc-floor'); const zoneInp = row.querySelector('.po-loc-zone');
           qtyInput.classList.remove('input-error'); floorSel.classList.remove('input-error');
@@ -2147,17 +2050,16 @@
                   const q1 = parseFloat(grQty) || 0;
                   grQty = String(q1 + q2);
                   locIn = locIn + ' | ' + serializeLoc(wh2.value, floor2El.value, zone2.value);
-                  const meta = group.items.find(it => String(it.uid) === String(uid)) || {};
-                  splitNotes.push(`[${meta.product || ''}] ลง ${whSel.value}-${q1} ${unit} / ${wh2.value}-${q2} ${unit}`);
+                  splitNotes.push(`[${itemMeta.product || ''}] ลง ${whSel.value}-${q1} ${unit} / ${wh2.value}-${q2} ${unit}`);
               }
           }
 
           if (grQty && parseFloat(grQty) > 0) {
               if (!isDraft && !floorSel.value) { floorSel.classList.add('input-error'); formHasError = true; }
               if (!isDraft && splitActive && !floor2El.value) { floor2El.classList.add('input-error'); formHasError = true; }
-              poItemsData.push({ rowNumber: rowNum, uid: uid, grQty, unit, locIn, exp, oldStock });
+              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty, unit, locIn, exp, oldStock });
           } else if (isDraft) {
-              poItemsData.push({ rowNumber: rowNum, uid: uid, grQty: "", unit, locIn, exp, oldStock });
+              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty: "", unit, locIn, exp, oldStock });
           }
       });
 
@@ -2190,9 +2092,10 @@
 
       const bulkPayload = {
           ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: finalRemark, targetStatus: targetStatus,
-          groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: group.warehouse },
+          groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: group.warehouse, billRef: usableBillRefUid(group.refPrUid) },
           groupPoUids: itemUids(group.items),
-          items: poItemsData, extraItems: extraItemsData
+          items: poItemsData, extraItems: extraItemsData,
+          replaceExtras: currentBillHadLoadedExtras || extraItemsData.length > 0
       };
 
       const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']

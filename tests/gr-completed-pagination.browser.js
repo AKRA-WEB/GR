@@ -4,7 +4,7 @@ async (page) => {
   page.on('console', message => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
-  await page.route('https://script.google.com/**', async route => {
+  await page.route('https://hgxrrskztbpejirrdpbq.supabase.co/functions/v1/gr-api', async route => {
     const request = route.request();
     if (request.method() !== 'POST') {
       await route.continue();

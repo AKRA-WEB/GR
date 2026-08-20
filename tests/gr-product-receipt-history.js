@@ -88,6 +88,7 @@ function createBackend(options = {}) {
         const token = new URL(url).searchParams.get('token');
         const perms = token === 'receive' ? ['receiveGR'] : token === 'approve' ? ['approveGR'] : ['viewGR'];
         return {
+          getResponseCode() { return 200; },
           getContentText() {
             return JSON.stringify({ valid: true, user: { roles: ['WAREHOUSE'], perms: { 'app-gr': perms } } });
           }
