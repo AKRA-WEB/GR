@@ -1,0 +1,1845 @@
+const SPREADSHEET_ID = "1iJlJM1Lb2grWBpahpYjwIABTtSHqSdDHXHPxO34b_Z4";
+const MAIN_API_URL = "https://script.google.com/macros/s/AKfycbyQJLwb5HTexG6gxqTehGWlAxfSXVT--CpWnnp2JTcP4xCcMA1vUjSY_eWqPjUKwzq7/exec";
+const GR_BACKEND_REVISION = "20260819.01-perf-concurrency";
+
+function normalizeRoles_(roles) {
+  if (Array.isArray(roles)) return roles.map(r => String(r || '').trim().toUpperCase()).filter(Boolean);
+  if (roles === null || roles === undefined) return [];
+  return String(roles).split(',').map(r => String(r || '').trim().toUpperCase()).filter(Boolean);
+}
+
+function getProtectedActionGuard_(action, data) {
+  if (action === 'getProductReceiptHistory') return { anyPerm: ['receiveGR', 'approveGR'] };
+  if (action === 'deletePO') return { perm: 'createPO', appName: 'app-po' };
+  if (action === 'updatePO') return { perm: 'createPO', appName: 'app-po' };
+  if (action === 'bulkReceivePO') {
+    return data && data.targetStatus === 'GR Completed'
+      ? { perm: 'approveGR', privilegedRole: true }
+      : { anyPerm: ['receiveGR', 'approveGR'] };
+  }
+  if (action === 'recallGR') return { perm: 'approveGR', privilegedRole: true };
+  return null;
+}
+
+function decodeJwtPayload_(token) {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const raw = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.exp && parsed.exp * 1000 < Date.now()) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function requireAuth(token, opts) {
+  if (!token) {
+    return { error: { success: false, message: "กรุณาเข้าสู่ระบบใหม่ (ไม่พบ token)", reason: "no_token" } };
+  }
+
+  let result = null;
+  const jwt = decodeJwtPayload_(token);
+  if (jwt && (jwt.id || jwt.sub)) {
+    result = {
+      valid: true,
+      user: {
+        id: jwt.id || jwt.sub,
+        name: jwt.name || jwt.id || 'User',
+        roles: jwt.roles || ['ADMIN', 'WAREHOUSE'],
+        perms: jwt.perms || { 'app-gr': ['receiveGR', 'approveGR'], 'app-po': ['createPO', 'approvePR'] }
+      }
+    };
+  } else {
+    try {
+      const url = MAIN_API_URL + "?action=verifyToken&token=" + encodeURIComponent(token);
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      result = JSON.parse(response.getContentText());
+    } catch (e) {
+      return { error: { success: false, message: "ตรวจสอบสิทธิ์ไม่สำเร็จ", reason: "verify_failed" } };
+    }
+  }
+
+  if (!result || !result.valid || !result.user) {
+    return { error: { success: false, message: "เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่", reason: (result && result.reason) || "invalid_or_expired_token" } };
+  }
+
+  const roles = normalizeRoles_(result.user.roles);
+  const isAdmin = roles.indexOf("ADMIN") !== -1 || roles.indexOf("SUPERVISOR") !== -1;
+  const appName = opts.appName || "app-gr";
+  const perms = ((result.user.perms && result.user.perms[appName]) || []).map(String);
+
+  if (opts.perm) {
+    const hasPerm = perms.length > 0 ? perms.indexOf(opts.perm) !== -1 : isAdmin;
+    const allowed = hasPerm && (!opts.privilegedRole || isAdmin);
+    if (!allowed) return { error: { success: false, message: "ไม่มีสิทธิ์ดำเนินการนี้", reason: "permission_denied" } };
+    return { user: result.user };
+  }
+
+  if (opts.anyPerm) {
+    const allowed = perms.length > 0 ? opts.anyPerm.some(perm => perms.indexOf(perm) !== -1) : isAdmin;
+    if (!allowed) return { error: { success: false, message: "ไม่มีสิทธิ์ดำเนินการนี้", reason: "permission_denied" } };
+    return { user: result.user };
+  }
+
+  return { user: result.user };
+}
+
+// ==========================================
+// 1. API Routing (GR-only actions)
+// ==========================================
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const action = payload.action;
+    const data = payload.data;
+
+    const guard = getProtectedActionGuard_(action, data);
+    if (guard) {
+      const auth = requireAuth(payload.token, guard);
+      if (auth.error) {
+        return ContentService.createTextOutput(JSON.stringify(auth.error)).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    let result = {};
+    if (action === 'getInitialData') result = getInitialData(data);
+    else if (action === 'getProducts') result = getProducts();
+    else if (action === 'getProductReceiptHistory') result = getProductReceiptHistory(data);
+    else if (action === 'getDiagnostics') result = getDiagnostics();
+    else if (action === 'getDeliveryPlanning') result = getDeliveryPlanning(data);
+    else if (action === 'bulkReceivePO') result = bulkReceivePO(data);
+    else if (action === 'deletePO') result = deletePO(data);
+    else if (action === 'updatePO') result = updatePO(data);
+    else if (action === 'recallGR') result = recallGR(data);
+    else result = { success: false, message: "Action not found" };
+
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error(error);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: "Server Error" })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doOptions(e) { return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT); }
+
+// ==========================================
+// 2. Setup Database (สร้าง Sheet อัตโนมัติถ้าไม่มี)
+// ==========================================
+function setupDatabase(ss) {
+  const sheets = {
+    'PR': ['PR_UID', 'PR_Date', 'PR_Number', 'Requester', 'Warehouse', 'SKU', 'Product', 'Request_Qty', 'Unit', 'Remark', 'Status', 'Approver_Remark'],
+    'PO': ['PO_UID', 'Ref_PR_UID', 'PO_Date', 'PO_Number', 'Vendor', 'Warehouse', 'SKU', 'Product', 'PO_Qty', 'Unit', 'Expected_Date', 'Status', 'Remark'],
+    'GR': ['GR_UID', 'Ref_PO_UID', 'GR_Date', 'ATA', 'Receiver', 'SKU', 'Product', 'GR_Qty', 'Unit', 'Loc_IN', 'Exp_Date', 'Leadtime_Days', 'Remark', 'Status', 'Old_Stock']
+  };
+
+  for (let name in sheets) {
+    if (!ss.getSheetByName(name)) {
+      let sh = ss.insertSheet(name);
+      sh.appendRow(sheets[name]);
+      sh.getRange("A1:" + String.fromCharCode(64 + sheets[name].length) + "1").setBackground("#171C8F").setFontColor("white").setFontWeight("bold");
+    }
+  }
+}
+
+function normalizeUid_(uid) {
+  return (uid === undefined || uid === null) ? "" : String(uid).trim();
+}
+
+function normalizeUidList_(uids) {
+  const seen = {};
+  const result = [];
+  (uids || []).forEach(uid => {
+    const normalized = normalizeUid_(uid);
+    if (!normalized || seen[normalized]) return;
+    seen[normalized] = true;
+    result.push(normalized);
+  });
+  return result;
+}
+
+function resolvePoRecordByUid_(poByUid, uid) {
+  const normalized = normalizeUid_(uid);
+  if (!normalized) throw new Error("ไม่พบ UID ของรายการ PO กรุณารีเฟรชข้อมูลแล้วลองใหม่");
+  const record = poByUid[normalized];
+  if (!record) throw new Error("ไม่พบรายการ PO จาก UID กรุณารีเฟรชข้อมูลแล้วลองใหม่");
+  return record;
+}
+
+function extraBillMarker_(poUids) {
+  const normalized = normalizeUidList_(poUids);
+  return normalized.map(uid => "[EXTRA_FOR:" + uid + "]").join("");
+}
+
+function grRowBelongsToBill_(refPoUid, remark, poUidSet) {
+  const ref = normalizeUid_(refPoUid);
+  if (poUidSet.has(ref)) return true;
+  if (ref !== "EXTRA") return false;
+  const text = String(remark || "");
+  for (const poUid of poUidSet) {
+    if (text.indexOf("[EXTRA_FOR:" + poUid + "]") !== -1) return true;
+  }
+  return false;
+}
+
+function findGrRowsForBill_(grSheet, poUids) {
+  return findGrRowRecordsForBill_(grSheet, poUids).map(function(row) {
+    return row.rowNumber;
+  });
+}
+
+function findGrRowRecordsForBill_(grSheet, poUids) {
+  const normalized = normalizeUidList_(poUids);
+  if (!grSheet || normalized.length === 0 || grSheet.getLastRow() < 2) return [];
+  const poUidSet = new Set(normalized);
+  const grData = grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 15).getValues(); // A:O
+  const rows = [];
+  for (let i = 0; i < grData.length; i++) {
+    if (grRowBelongsToBill_(grData[i][1], grData[i][12], poUidSet)) {
+      rows.push({ rowNumber: i + 2, uid: normalizeUid_(grData[i][0]), values: grData[i].slice() });
+    }
+  }
+  return rows;
+}
+
+function deleteSheetRows_(sheet, rows) {
+  const sorted = (rows || []).slice().sort((a, b) => b - a);
+  while (sorted.length > 0) {
+    const endRow = sorted.shift();
+    let startRow = endRow;
+    while (sorted.length > 0 && sorted[0] === startRow - 1) {
+      startRow = sorted.shift();
+    }
+    sheet.deleteRows(startRow, endRow - startRow + 1);
+  }
+}
+
+function clearPORowContents_(poSheet, rows) {
+  const ranges = (rows || [])
+    .filter(function(row) { return Number.isInteger(row) && row > 1; })
+    .map(function(row) { return "A" + row + ":M" + row; });
+  if (ranges.length) poSheet.getRangeList(ranges).clearContent();
+}
+
+function deletePOFailure_(reason, message, refPrUid, deletedCount) {
+  return {
+    success: false,
+    reason: reason,
+    deletedCount: deletedCount || 0,
+    refPrUid: refPrUid || "",
+    backendRevision: GR_BACKEND_REVISION,
+    message: message
+  };
+}
+
+function normalizeDeletePORequest_(data) {
+  if (!data || !Array.isArray(data.poUids)) return null;
+  const poUids = normalizeUidList_(data.poUids);
+  const expectedItemCount = Number(data.expectedItemCount);
+  const refPrUid = normalizeUid_(data.refPrUid);
+  const legacyBill = data.legacyBill === true;
+  if (!poUids.length ||
+      !Number.isInteger(expectedItemCount) ||
+      expectedItemCount !== poUids.length ||
+      !refPrUid ||
+      (refPrUid === "DIRECT" && !legacyBill) ||
+      (legacyBill && refPrUid !== "DIRECT")) {
+    return null;
+  }
+  return { poUids: poUids, expectedItemCount: expectedItemCount, refPrUid: refPrUid, legacyBill: legacyBill };
+}
+
+function isLegacyPORef_(refPrUid) {
+  const normalized = normalizeUid_(refPrUid);
+  return !normalized || normalized === "DIRECT";
+}
+
+function readPODeleteState_(poSheet, poUids, refPrUid) {
+  const lastRow = poSheet.getLastRow();
+  const rows = lastRow > 1 ? poSheet.getRange(2, 1, lastRow - 1, 13).getValues() : [];
+  const requestedRows = [];
+  const allBillRows = [];
+  rows.forEach(function(row, index) {
+    const item = {
+      rowNumber: index + 2,
+      uid: normalizeUid_(row[0]),
+      refPrUid: normalizeUid_(row[1]),
+      status: normalizeUid_(row[11]),
+      values: row.slice()
+    };
+    if (poUids.indexOf(item.uid) !== -1) requestedRows.push(item);
+    if (item.refPrUid === refPrUid) {
+      allBillRows.push(item);
+    }
+  });
+  return { requestedRows: requestedRows, allBillRows: allBillRows };
+}
+
+function appendSheetRows_(sheet, rows) {
+  if (!rows || !rows.length) return;
+  const startRow = sheet.getLastRow() + 1;
+  const requiredLastRow = startRow + rows.length - 1;
+  if (typeof sheet.getMaxRows === "function" &&
+      typeof sheet.insertRowsAfter === "function" &&
+      sheet.getMaxRows() < requiredLastRow) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), requiredLastRow - sheet.getMaxRows());
+  }
+  sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function restoreFullPODelete_(poSheet, grSheet, poSnapshots, grSnapshots) {
+  const currentPOUids = new Set();
+  if (poSheet.getLastRow() > 1) {
+    poSheet.getRange(2, 1, poSheet.getLastRow() - 1, 1).getValues().forEach(function(row) {
+      currentPOUids.add(normalizeUid_(row[0]));
+    });
+  }
+  const missingPORows = poSnapshots.filter(function(row) {
+    return !currentPOUids.has(normalizeUid_(row[0]));
+  });
+
+  const currentGRUids = new Set();
+  if (grSheet.getLastRow() > 1) {
+    grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 1).getValues().forEach(function(row) {
+      currentGRUids.add(normalizeUid_(row[0]));
+    });
+  }
+  const missingGRRows = grSnapshots.filter(function(row) {
+    return !currentGRUids.has(normalizeUid_(row[0]));
+  });
+
+  appendSheetRows_(poSheet, missingPORows);
+  appendSheetRows_(grSheet, missingGRRows);
+  SpreadsheetApp.flush();
+  return { restoredPOCount: missingPORows.length, restoredGRCount: missingGRRows.length };
+}
+
+function hasRelatedGRForDelete_(grSheet, poUids) {
+  const lastRow = grSheet.getLastRow();
+  return lastRow > 1 && grSheet
+    .getRange(2, 2, lastRow - 1, 1)
+    .getValues()
+    .some(function(row) { return poUids.indexOf(normalizeUid_(row[0])) !== -1; });
+}
+
+function deleteRemainingPOBillRows_(poSheet, grSheet, request, fullPoUids) {
+  const state = readPODeleteState_(poSheet, fullPoUids, request.refPrUid);
+  const remainingPORows = state.requestedRows;
+  const remainingGRRows = findGrRowsForBill_(grSheet, fullPoUids);
+  if (!remainingPORows.length && !remainingGRRows.length) return false;
+  deleteSheetRows_(grSheet, remainingGRRows);
+  clearPORowContents_(poSheet, remainingPORows.map(function(row) { return row.rowNumber; }));
+  SpreadsheetApp.flush();
+  return true;
+}
+
+function reconcilePODelete_(poSheet, grSheet, request, fullPoUids, expectedPOCount, expectedGRCount) {
+  const state = readPODeleteState_(poSheet, fullPoUids, request.refPrUid);
+  const remainingPORows = request.legacyBill ? state.requestedRows : state.allBillRows;
+  const remainingGRRows = findGrRowsForBill_(grSheet, fullPoUids);
+  if (!remainingPORows.length && !remainingGRRows.length) {
+    invalidateGRInitialCache_();
+    return {
+      success: true,
+      reason: null,
+      deletedCount: expectedPOCount,
+      deletedPOCount: expectedPOCount,
+      deletedGRCount: expectedGRCount,
+      refPrUid: request.refPrUid,
+      backendRevision: GR_BACKEND_REVISION,
+      message: "ลบบิล PO และข้อมูลรับสินค้าที่เกี่ยวข้องเรียบร้อยแล้ว"
+    };
+  }
+  invalidateGRInitialCache_();
+  const failure = deletePOFailure_(
+    "delete_failed",
+    "ลบบิลได้ไม่ครบ กรุณาหยุดทำรายการและติดต่อผู้ดูแลระบบ",
+    request.refPrUid,
+    Math.max(0, expectedPOCount - remainingPORows.length)
+  );
+  failure.remainingPOCount = remainingPORows.length;
+  failure.remainingGRCount = remainingGRRows.length;
+  return failure;
+}
+
+function deletePO(data) {
+  const request = normalizeDeletePORequest_(data);
+  if (!request) {
+    return deletePOFailure_(
+      "invalid_request",
+      "ข้อมูลการลบไม่ครบถ้วน กรุณารีเฟรชข้อมูลแล้วลองใหม่",
+      data && normalizeUid_(data.refPrUid)
+    );
+  }
+
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  let deleteAttempted = false;
+  let poSheet = null;
+  let grSheet = null;
+  let fullPoUids = [];
+  let expectedPOCount = 0;
+  let expectedGRCount = 0;
+  let poSnapshots = [];
+  let grSnapshots = [];
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    poSheet = ss.getSheetByName('PO');
+    grSheet = ss.getSheetByName('GR');
+    if (!poSheet || !grSheet) throw new Error("Missing purchasing sheet");
+
+    const state = readPODeleteState_(poSheet, request.poUids, request.refPrUid);
+    if (state.requestedRows.length !== request.poUids.length) {
+      return deletePOFailure_("stale_data", "ข้อมูลบิลมีการเปลี่ยนแปลง กรุณารีเฟรชข้อมูลแล้วลองใหม่", request.refPrUid);
+    }
+    const hasMixedBill = request.legacyBill
+      ? state.requestedRows.some(function(row) { return !isLegacyPORef_(row.refPrUid); })
+      : state.requestedRows.some(function(row) { return row.refPrUid !== request.refPrUid; });
+    if (hasMixedBill) {
+      return deletePOFailure_("mixed_bill", "รายการที่เลือกไม่ได้อยู่ในบิลเดียวกัน กรุณารีเฟรชข้อมูลแล้วลองใหม่", request.refPrUid);
+    }
+    const billRows = request.legacyBill ? state.requestedRows : state.allBillRows;
+    if (!billRows.length) {
+      return deletePOFailure_("stale_data", "ข้อมูลบิลมีการเปลี่ยนแปลง กรุณารีเฟรชข้อมูลแล้วลองใหม่", request.refPrUid);
+    }
+
+    fullPoUids = normalizeUidList_(billRows.map(function(row) { return row.uid; }));
+    if (fullPoUids.length !== billRows.length) {
+      return deletePOFailure_("stale_data", "ข้อมูล UID ของบิลไม่สมบูรณ์ กรุณาหยุดทำรายการและติดต่อผู้ดูแลระบบ", request.refPrUid);
+    }
+    const grRowRecords = findGrRowRecordsForBill_(grSheet, fullPoUids);
+    const grRows = grRowRecords.map(function(row) { return row.rowNumber; });
+    expectedPOCount = billRows.length;
+    expectedGRCount = grRows.length;
+    poSnapshots = billRows.map(function(row) { return row.values.slice(); });
+    grSnapshots = grRowRecords.map(function(row) { return row.values.slice(); });
+
+    deleteAttempted = true;
+    deleteSheetRows_(grSheet, grRows);
+    clearPORowContents_(poSheet, billRows.map(function(row) { return row.rowNumber; }));
+    SpreadsheetApp.flush();
+    deleteRemainingPOBillRows_(poSheet, grSheet, request, fullPoUids);
+    const reconciliation = reconcilePODelete_(poSheet, grSheet, request, fullPoUids, expectedPOCount, expectedGRCount);
+    if (reconciliation.success) return reconciliation;
+    const restored = restoreFullPODelete_(poSheet, grSheet, poSnapshots, grSnapshots);
+    invalidateGRInitialCache_();
+    const failure = deletePOFailure_(
+      "delete_failed",
+      "ลบบิลไม่สำเร็จ ระบบคืนข้อมูลเดิมแล้ว กรุณาลองใหม่อีกครั้ง [D:R-P" +
+        Number(reconciliation.remainingPOCount || 0) + "-G" +
+        Number(reconciliation.remainingGRCount || 0) + "]",
+      request.refPrUid
+    );
+    failure.diagnostic = {
+      stage: "post_cleanup_reconcile",
+      expectedPOCount: expectedPOCount,
+      expectedGRCount: expectedGRCount,
+      remainingPOCount: Number(reconciliation.remainingPOCount || 0),
+      remainingGRCount: Number(reconciliation.remainingGRCount || 0),
+      restoredPOCount: restored.restoredPOCount,
+      restoredGRCount: restored.restoredGRCount
+    };
+    console.error("deletePO incomplete", JSON.stringify(failure.diagnostic));
+    return failure;
+  } catch (error) {
+    console.error("deletePO failed", error);
+    if (locked && deleteAttempted && poSheet && grSheet && fullPoUids.length) {
+      try {
+        const restored = restoreFullPODelete_(poSheet, grSheet, poSnapshots, grSnapshots);
+        invalidateGRInitialCache_();
+        const failure = deletePOFailure_(
+          "delete_failed",
+          "ลบบิลไม่สำเร็จ ระบบคืนข้อมูลเดิมแล้ว กรุณาลองใหม่อีกครั้ง [D:X]",
+          request.refPrUid
+        );
+        failure.diagnostic = {
+          stage: "exception_after_delete",
+          expectedPOCount: expectedPOCount,
+          expectedGRCount: expectedGRCount,
+          restoredPOCount: restored.restoredPOCount,
+          restoredGRCount: restored.restoredGRCount
+        };
+        return failure;
+      } catch (restoreError) {
+        try {
+          return reconcilePODelete_(poSheet, grSheet, request, fullPoUids, expectedPOCount, expectedGRCount);
+        } catch (reconcileError) {}
+      }
+    }
+    return deletePOFailure_("delete_failed", "ลบบิลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", request.refPrUid);
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function readPORowsByUids_(poSheet, poUids) {
+  const wanted = new Set(normalizeUidList_(poUids));
+  if (!wanted.size || poSheet.getLastRow() < 2) return [];
+  const rows = poSheet.getRange(2, 1, poSheet.getLastRow() - 1, 13).getValues();
+  const found = [];
+  rows.forEach(function(row, index) {
+    if (wanted.has(normalizeUid_(row[0]))) {
+      found.push({ rowNumber: index + 2, uid: normalizeUid_(row[0]), values: row });
+    }
+  });
+  return found;
+}
+
+function reconcileStagedPOUpdate_(poSheet, oldPoUids, newPoUids, refPrUid) {
+  let oldRows = readPORowsByUids_(poSheet, oldPoUids);
+  const newRows = readPORowsByUids_(poSheet, newPoUids);
+  if (newRows.length !== newPoUids.length) {
+    if (oldRows.length === oldPoUids.length && newRows.length) {
+      try {
+        deleteSheetRows_(poSheet, newRows.map(function(row) { return row.rowNumber; }));
+        SpreadsheetApp.flush();
+      } catch (cleanupError) {}
+    }
+    if (readPORowsByUids_(poSheet, newPoUids).length) {
+      invalidateGRInitialCache_();
+      return {
+        success: false,
+        reason: "update_partial",
+        message: "ล้างรายการชั่วคราวไม่ครบ กรุณาหยุดทำรายการและติดต่อผู้ดูแลระบบ"
+      };
+    }
+    return { success: false, reason: "update_failed", message: "อัปเดตไม่สำเร็จ ข้อมูลเดิมยังคงอยู่ กรุณาลองใหม่" };
+  }
+
+  if (oldRows.length) {
+    try {
+      deleteSheetRows_(poSheet, oldRows.map(function(row) { return row.rowNumber; }));
+      SpreadsheetApp.flush();
+      oldRows = readPORowsByUids_(poSheet, oldPoUids);
+    } catch (retryError) {
+      oldRows = readPORowsByUids_(poSheet, oldPoUids);
+    }
+  }
+  invalidateGRInitialCache_();
+  if (!oldRows.length) {
+    return { success: true, refPrUid: refPrUid, message: "อัปเดตข้อมูลบิลสั่งซื้อเรียบร้อยแล้ว" };
+  }
+  return {
+    success: false,
+    reason: "update_partial",
+    refPrUid: refPrUid,
+    message: "ข้อมูลใหม่ถูกบันทึกแล้ว แต่ล้างรายการเดิมไม่ครบ กรุณาหยุดทำรายการและติดต่อผู้ดูแลระบบ"
+  };
+}
+
+function updatePO(data) {
+  data = data || {};
+  const oldPoUids = normalizeUidList_(data.oldPoUids);
+  const refPrUid = normalizeUid_(data.refPrUid || data.prUid);
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (!oldPoUids.length || !refPrUid || refPrUid === "DIRECT" || !items.length) {
+    return { success: false, reason: "invalid_request", message: "ข้อมูลบิลไม่ครบถ้วน กรุณารีเฟรชแล้วลองใหม่" };
+  }
+
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  let poSheet = null;
+  let newPoUids = [];
+  try {
+    lock.waitLock(30000);
+    locked = true;
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    poSheet = ss.getSheetByName('PO');
+    const grSheet = ss.getSheetByName('GR');
+    if (!poSheet || !grSheet) throw new Error("Missing purchasing sheet");
+
+    const state = readPODeleteState_(poSheet, oldPoUids, refPrUid);
+    const exactWholeBill = state.requestedRows.length === oldPoUids.length &&
+      state.allBillRows.length === oldPoUids.length &&
+      state.requestedRows.every(function(row) {
+        return row.refPrUid === refPrUid && row.status === "Pending GR";
+      });
+    if (!exactWholeBill) {
+      return { success: false, reason: "stale_data", message: "บิลมีการเปลี่ยนแปลงหรือรับสินค้าแล้ว กรุณารีเฟรชข้อมูล" };
+    }
+    if (hasRelatedGRForDelete_(grSheet, oldPoUids)) {
+      return { success: false, reason: "receiving_started", message: "ไม่สามารถแก้ไขบิลที่เริ่มรับสินค้าแล้วได้" };
+    }
+
+    const parsedExpectedDate = parseDateValue_(data.expectedDate);
+    const expectedDate = parsedExpectedDate ? dateOnly_(parsedExpectedDate) : "";
+    const today = new Date();
+    newPoUids = items.map(function() { return Utilities.getUuid(); });
+    const newRows = items.map(function(item, index) {
+      return [
+        newPoUids[index], refPrUid, today, data.poNumber || "", data.vendor, data.warehouse,
+        item.sku || "", item.product, item.quantity, item.unit || "", expectedDate,
+        "Pending GR", refPrUid.indexOf("DIRECT-") === 0 ? "Direct PO (Edited)" : "Ref PR"
+      ];
+    });
+
+    poSheet.getRange(poSheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    SpreadsheetApp.flush();
+    return reconcileStagedPOUpdate_(poSheet, oldPoUids, newPoUids, refPrUid);
+  } catch (error) {
+    if (locked && poSheet && newPoUids.length) {
+      try { return reconcileStagedPOUpdate_(poSheet, oldPoUids, newPoUids, refPrUid); } catch (reconcileError) {}
+    }
+    return { success: false, reason: "update_failed", message: "อัปเดตไม่สำเร็จ ข้อมูลเดิมยังคงอยู่ กรุณาลองใหม่" };
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+// ==========================================
+// 3. ดึงข้อมูลให้หน้าบ้าน (Read-only — ไม่ setup DB แล้ว)
+// ==========================================
+function grCompletedBillKey_(item) {
+  const ref = String((item && item.refPrUid) || '').trim();
+  if (ref && ref !== 'DIRECT') return 'bill:' + ref;
+  return 'legacy:' + [item.poNumber || '', item.vendor || '', item.poDate || '', item.warehouse || ''].join('|');
+}
+
+function grCompletedBillKeyFromRow_(row, timeZone) {
+  const ref = String((row && row[1]) || '').trim();
+  if (ref && ref !== 'DIRECT') return 'bill:' + ref;
+  const normalizedDate = formatSheetDateForClient_((row && row[2]) || '', '', timeZone);
+  return 'legacy:' + [(row && row[3]) || '', (row && row[4]) || '', normalizedDate, (row && row[5]) || ''].join('|');
+}
+
+function grEffectiveStatus_(poStatus, latestGRStatus) {
+  if (poStatus === 'PO Closed - Ready for APV') return poStatus;
+  if (latestGRStatus === 'GR Completed' || latestGRStatus === 'Completed' || poStatus === 'GR Completed') return 'GR Completed';
+  if (latestGRStatus === 'Pending Review' || poStatus === 'Pending Review') return 'Pending Review';
+  if (latestGRStatus === 'Draft GR' || poStatus === 'Draft GR') return 'Draft GR';
+  return poStatus;
+}
+
+function getInitialData(options) {
+  try {
+    const perfMode = !!(options && options.perf);
+    const ts = {};
+    const t0 = Date.now();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    ts.openSpreadsheet = Date.now() - t0;
+    const includeCompleted = !(options && options.includeCompleted === false);
+    const includeProducts = !(options && options.includeProducts === false);
+    const includeDeliveryPlanning = !(options && options.includeDeliveryPlanning === false);
+    const completedLimit = (options && Number(options.completedLimit) > 0) ? Math.floor(Number(options.completedLimit)) : 0;
+    const completedOffset = (options && Number(options.completedOffset) > 0) ? Math.floor(Number(options.completedOffset)) : 0;
+    const timeZone = Session.getScriptTimeZone();
+    const isLeanMode = !includeCompleted && !includeProducts;
+    const bypassCache = !!(options && options.bypassCache);
+    // Suffix the lean cache key by planning inclusion so an old frontend (full deliveryPlanning)
+    // and a new frontend (deliveryPlanning deferred) never read/overwrite each other's cached shape.
+    const leanCacheKey = 'GR_INITIAL_LEAN_V1' + (includeDeliveryPlanning ? '' : '_NODP');
+    if (isLeanMode && !bypassCache) {
+      const cached = CacheService.getScriptCache().get(leanCacheKey);
+      if (cached) { try { return JSON.parse(cached); } catch(e) {} }
+    }
+    let t1 = Date.now();
+    const products = includeProducts ? getCachedProducts_(ss) : [];
+    ts.products = Date.now() - t1;
+    const poSheet = ss.getSheetByName('PO');
+    const grSheet = ss.getSheetByName('GR');
+    const poLastRow = poSheet ? poSheet.getLastRow() : 0;
+    t1 = Date.now();
+    const poData = poLastRow > 1 ? poSheet.getRange(2, 1, poLastRow - 1, 13).getValues() : [];
+    ts.poRead = Date.now() - t1;
+
+    const poNeedsGr = {};
+    poData.forEach(r => {
+      const poUid = r[0];
+      if (!poUid) return;
+      // The latest GR row remains authoritative even when the PO sheet still says Pending GR
+      // after a partial/legacy write. Detail formatting is still limited later by detailUids.
+      poNeedsGr[poUid] = true;
+    });
+
+    // Read GR sheet once (cols A:O); shared by grMap build and vendor lead-stat samples
+    t1 = Date.now();
+    const grAllRows = (grSheet && grSheet.getLastRow() > 1)
+      ? grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 15).getValues()
+      : [];
+    ts.grRead = Date.now() - t1;
+
+    const latestGrRows = {};
+    if (grAllRows.length > 0 && Object.keys(poNeedsGr).length > 0) {
+      grAllRows.forEach(r => {
+        const refPoUid = r[1]; // col B (range now starts at col A)
+        if (!poNeedsGr[refPoUid]) return;
+        latestGrRows[refPoUid] = r;
+      });
+    }
+
+    t1 = Date.now();
+    const deliveryPlanning = includeDeliveryPlanning
+      ? buildDeliveryPlanning_(ss, poData, grAllRows, timeZone)
+      : { summary: EMPTY_DELIVERY_PLANNING_SUMMARY_, vendorStats: [], planByUid: {} };
+    ts.deliveryPlanning = Date.now() - t1;
+
+    const effectiveStatuses = poData.map(r => {
+      const latestGrRow = latestGrRows[r[0]];
+      return grEffectiveStatus_(r[11], latestGrRow ? latestGrRow[13] : '');
+    });
+
+    // Select completed history by stable bill before formatting dates or building client objects.
+    // This makes completedLimit a real hydration bound, while keeping every row of a multi-item bill.
+    const grCompletedBillMap = {};
+    const grCompletedBillOrder = [];
+    const completedBillKeys = {};
+    if (includeCompleted) {
+      poData.forEach((r, i) => {
+        if (effectiveStatuses[i] !== 'GR Completed') return;
+        const billKey = grCompletedBillKeyFromRow_(r, timeZone);
+        completedBillKeys[i] = billKey;
+        let bucket = grCompletedBillMap[billKey];
+        if (!bucket) {
+          bucket = { maxTs: 0 };
+          grCompletedBillMap[billKey] = bucket;
+          grCompletedBillOrder.push(billKey);
+        }
+        const rowTs = r[2] instanceof Date ? r[2].getTime() : 0;
+        if (rowTs > bucket.maxTs) bucket.maxTs = rowTs;
+      });
+    }
+    let orderedBillKeys = grCompletedBillOrder;
+    if (completedLimit || completedOffset) {
+      orderedBillKeys = grCompletedBillOrder.slice()
+        .sort((a, b) => grCompletedBillMap[b].maxTs - grCompletedBillMap[a].maxTs);
+    }
+    const selectedBillKeys = completedLimit
+      ? orderedBillKeys.slice(completedOffset, completedOffset + completedLimit)
+      : orderedBillKeys.slice(completedOffset);
+    const selectedBillSet = new Set(selectedBillKeys);
+    const grCompletedTotal = grCompletedBillOrder.length;
+    const grCompletedNextOffset = completedOffset + selectedBillKeys.length;
+    const grCompletedHasMore = grCompletedNextOffset < grCompletedTotal;
+
+    const detailUids = {};
+    poData.forEach((r, i) => {
+      const activeStatus = effectiveStatuses[i];
+      const isActiveStatus = activeStatus === 'Pending GR' || activeStatus === 'Draft GR' || activeStatus === 'Pending Review';
+      const completedSelected = includeCompleted && activeStatus === 'GR Completed' && selectedBillSet.has(completedBillKeys[i]);
+      if (isActiveStatus || completedSelected) detailUids[r[0]] = true;
+    });
+    const grMap = {};
+    Object.keys(latestGrRows).forEach(refPoUid => {
+      if (!detailUids[refPoUid]) return;
+      const r = latestGrRows[refPoUid];
+      grMap[refPoUid] = {
+        ata: formatSheetDateForClient_(r[3], "", timeZone),
+        receiver: r[4], sku: r[5], grProduct: r[6], grQty: r[7], unit: r[8], locIn: r[9],
+        exp: formatSheetDateForClient_(r[10], "", timeZone),
+        leadtime: r[11], remark: r[12], status: r[13], oldStock: r[14] || ""
+      };
+    });
+    const rowStates = poData.map((r, i) => ({
+      activeGR: grMap[r[0]] || {},
+      activeStatus: effectiveStatuses[i]
+    }));
+
+    let pendingPOs = [];
+    let grCompleted = [];
+    if (poData.length > 0) {
+      const today = new Date();
+      poData.forEach((r, i) => {
+        let poUid = r[0];
+        let poDateRaw = r[2];
+        const activeGR = rowStates[i].activeGR;
+        const activeStatus = rowStates[i].activeStatus;
+
+        const isActiveStatus = activeStatus === 'Pending GR' || activeStatus === 'Draft GR' || activeStatus === 'Pending Review';
+        const completedSelected = includeCompleted && activeStatus === 'GR Completed' && selectedBillSet.has(completedBillKeys[i]);
+        if (!isActiveStatus && !completedSelected) return;
+
+        let poDateStr = formatSheetDateForClient_(poDateRaw, "", timeZone);
+
+        let displayStatus = activeStatus;
+        if (activeStatus === 'Pending GR' && poDateRaw instanceof Date) {
+          if (Math.floor((today.getTime() - poDateRaw.getTime()) / (1000 * 3600 * 24)) > 7) displayStatus = 'Overdue';
+        }
+
+        const plan = deliveryPlanning.planByUid[poUid] || {};
+        let combinedItem = {
+          uid: poUid, refPrUid: r[1], rowNumber: i+2, poDate: poDateStr, poNumber: r[3], vendor: r[4], warehouse: r[5],
+          expectedDate: plan.expectedDate || "",
+          plannedDate: plan.plannedDate || "",
+          planSource: plan.planSource || "no_data",
+          daysUntil: plan.daysUntil,
+          isPlanOverdue: !!plan.isPlanOverdue,
+          vendorAvgLeadDays: plan.vendorAvgLeadDays || "",
+          vendorP75LeadDays: plan.vendorP75LeadDays || "",
+          vendorLeadSampleCount: plan.vendorLeadSampleCount || 0,
+          vendorLeadConfidence: plan.vendorLeadConfidence || "none",
+          sku: r[6], product: r[7], quantity: r[8], unit: r[9], poRemark: r[12], remark: activeGR.remark || "",
+          status: activeStatus, displayStatus: displayStatus,
+          grQty: activeGR.grQty || "", locIn: activeGR.locIn || "", exp: activeGR.exp || "",
+          ata: activeGR.ata || "", receiverName: activeGR.receiver || "", leadtime: activeGR.leadtime || "",
+          oldStock: activeGR.oldStock || ""
+        };
+
+        if (isActiveStatus) {
+            pendingPOs.push(combinedItem);
+        }
+        if (completedSelected) grCompleted.push(combinedItem);
+      });
+    }
+
+    const result = { success: true, vendors: [], products, prList: [], pendingPOs, grCompleted, grCompletedTotal, grCompletedHasMore, grCompletedOffset: completedOffset, grCompletedNextOffset, apvList: [], deliveryPlanning: deliveryPlanning.summary };
+    if (perfMode) { ts.total = Date.now() - t0; result.serverTimings = ts; }
+    if (isLeanMode) {
+      try {
+        const s = JSON.stringify(result);
+        if (s.length < 90000) CacheService.getScriptCache().put(leanCacheKey, s, 120);
+      } catch(e) {}
+    }
+    return result;
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Load data failed" };
+  }
+}
+
+const EMPTY_DELIVERY_PLANNING_SUMMARY_ = {
+  vendorCount: 0, sampleCount: 0, confirmedCount: 0, estimatedCount: 0, overdueCount: 0, todayCount: 0, next7Count: 0
+};
+
+function getDeliveryPlanning(options) {
+  try {
+    const perfMode = !!(options && options.perf);
+    const bypassCache = !!(options && options.bypassCache);
+    const ts = {};
+    const t0 = Date.now();
+    const cacheKey = 'GR_DELIVERY_PLANNING_V1';
+    if (!bypassCache) {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) { try { return JSON.parse(cached); } catch(e) {} }
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    ts.openSpreadsheet = Date.now() - t0;
+    const timeZone = Session.getScriptTimeZone();
+    const poSheet = ss.getSheetByName('PO');
+    const grSheet = ss.getSheetByName('GR');
+    const poLastRow = poSheet ? poSheet.getLastRow() : 0;
+
+    let t1 = Date.now();
+    const poData = poLastRow > 1 ? poSheet.getRange(2, 1, poLastRow - 1, 13).getValues() : [];
+    ts.poRead = Date.now() - t1;
+
+    t1 = Date.now();
+    const grAllRows = (grSheet && grSheet.getLastRow() > 1)
+      ? grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 15).getValues()
+      : [];
+    ts.grRead = Date.now() - t1;
+
+    t1 = Date.now();
+    const deliveryPlanning = buildDeliveryPlanning_(ss, poData, grAllRows, timeZone);
+    ts.deliveryPlanning = Date.now() - t1;
+
+    // Only active-status POs are ever rendered with plan fields on the frontend (see getInitialData's
+    // combinedItem loop); trim planByUid to that set so payload/cache size tracks active work, not all
+    // historical PO rows (buildDeliveryPlanning_ computes a plan for every PO row unconditionally).
+    const activeStatuses_ = ['Pending GR', 'Draft GR', 'Pending Review'];
+    const activePlanByUid = {};
+    poData.forEach(row => {
+      const uid = row[0];
+      if (uid && activeStatuses_.includes(row[11]) && deliveryPlanning.planByUid[uid]) {
+        activePlanByUid[uid] = deliveryPlanning.planByUid[uid];
+      }
+    });
+
+    const result = { success: true, deliveryPlanning: deliveryPlanning.summary, planByUid: activePlanByUid };
+    if (perfMode) { ts.total = Date.now() - t0; result.serverTimings = ts; }
+    try {
+      const s = JSON.stringify(result);
+      if (s.length < 90000) CacheService.getScriptCache().put(cacheKey, s, 120);
+    } catch(e) {}
+    return result;
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Load delivery planning failed" };
+  }
+}
+
+function getProducts() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const products = getCachedProducts_(ss);
+    return { success: true, products };
+  } catch (error) { return { success: false, message: "Load products failed", errorDetail: error.toString() }; }
+}
+
+function normalizeProductHistoryName_(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function productHistoryRequest_(data) {
+  const sku = normalizeUid_(data && data.sku).toUpperCase();
+  const productName = String((data && data.productName) || '').trim().replace(/\s+/g, ' ');
+  const productNameKey = normalizeProductHistoryName_(productName);
+  if (!sku && !productNameKey) return null;
+  const requestedOffset = Number(data && data.offset);
+  const requestedLimit = Number(data && data.limit);
+  return {
+    sku,
+    productName,
+    productNameKey,
+    offset: Number.isInteger(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0,
+    limit: Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 50
+  };
+}
+
+function productHistoryRowMatches_(row, request) {
+  const rowSku = normalizeUid_(row && row[5]).toUpperCase();
+  const rowNameKey = normalizeProductHistoryName_(row && row[6]);
+  if (request.sku && rowSku === request.sku) return true;
+  if (!request.productNameKey || rowNameKey !== request.productNameKey) return false;
+  if (!request.sku) return true;
+  return !rowSku || normalizeUid_(row && row[1]) === 'EXTRA';
+}
+
+function productHistoryPoUid_(row) {
+  const refPoUid = normalizeUid_(row && row[1]);
+  if (refPoUid !== 'EXTRA') return refPoUid;
+  const marker = String((row && row[12]) || '').match(/\[EXTRA_FOR:([^\]]+)\]/);
+  return marker ? normalizeUid_(marker[1]) : '';
+}
+
+function productHistoryRemark_(value) {
+  return String(value || '').replace(/\[EXTRA_FOR:[^\]]+\]/g, '').trim();
+}
+
+function productHistoryCalendarDate_(year, month, day) {
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
+  return parsed;
+}
+
+function parseProductHistoryDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'number' && isFinite(value) && value > 20000 && value < 300000) {
+    return sheetSerialToDate_(value);
+  }
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    return serial > 20000 && serial < 300000 ? sheetSerialToDate_(serial) : null;
+  }
+  let match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+  if (match) return productHistoryCalendarDate_(Number(match[1]), Number(match[2]), Number(match[3]));
+  match = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (match) return productHistoryCalendarDate_(Number(match[3]), Number(match[2]), Number(match[1]));
+  return null;
+}
+
+function productHistoryDate_(value, timeZone) {
+  const parsed = parseProductHistoryDate_(value);
+  return parsed ? Utilities.formatDate(parsed, timeZone, 'dd/MM/yyyy') : '';
+}
+
+function productHistoryTimestamp_(value) {
+  const parsed = parseProductHistoryDate_(value);
+  return parsed ? parsed.getTime() : -Infinity;
+}
+
+function readProductHistorySheet_(sheet, source, startOrder) {
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 15).getValues();
+  return rows.map(function(values, index) {
+    return { values, source, sourceOrder: startOrder + index };
+  });
+}
+
+function getProductReceiptHistory(data) {
+  try {
+    const request = productHistoryRequest_(data);
+    if (!request) {
+      return { success: false, reason: 'product_required', message: 'กรุณาเลือกสินค้าก่อนค้นหาประวัติ' };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const timeZone = Session.getScriptTimeZone();
+    const liveRows = readProductHistorySheet_(ss.getSheetByName('GR'), 'live', 0);
+    const archiveRows = readProductHistorySheet_(ss.getSheetByName('GR_Archive'), 'archive', liveRows.length);
+    const poSheet = ss.getSheetByName('PO');
+    const poRows = (poSheet && poSheet.getLastRow() > 1)
+      ? poSheet.getRange(2, 1, poSheet.getLastRow() - 1, 13).getValues()
+      : [];
+    const poByUid = {};
+    poRows.forEach(function(row) {
+      const uid = normalizeUid_(row[0]);
+      if (uid && !poByUid[uid]) poByUid[uid] = row;
+    });
+
+    const seenUids = {};
+    const matched = [];
+    liveRows.concat(archiveRows).forEach(function(record) {
+      const row = record.values;
+      const grUid = normalizeUid_(row[0]);
+      if (grUid && seenUids[grUid]) return;
+      if (grUid) seenUids[grUid] = true;
+      const status = String(row[13] || '').trim();
+      if (status !== 'GR Completed' && status !== 'Completed') return;
+      if (!productHistoryRowMatches_(row, request)) return;
+
+      const poUid = productHistoryPoUid_(row);
+      const po = poByUid[poUid] || [];
+      const ataTs = productHistoryTimestamp_(row[3]);
+      const grDateTs = productHistoryTimestamp_(row[2]);
+      matched.push({
+        grUid,
+        refPoUid: poUid,
+        grDate: productHistoryDate_(row[2], timeZone),
+        ata: productHistoryDate_(row[3], timeZone),
+        receiptDate: productHistoryDate_(ataTs !== -Infinity ? row[3] : row[2], timeZone),
+        receiver: row[4] || '',
+        sku: row[5] || '',
+        product: row[6] || '',
+        quantity: row[7] === null || row[7] === undefined ? '' : row[7],
+        unit: row[8] || '',
+        location: row[9] || '',
+        expDate: productHistoryDate_(row[10], timeZone),
+        remark: productHistoryRemark_(row[12]),
+        status,
+        oldStock: row[14] === null || row[14] === undefined ? '' : row[14],
+        poNumber: po[3] || '',
+        poDate: productHistoryDate_(po[2], timeZone),
+        vendor: po[4] || '',
+        warehouse: po[5] || '',
+        _receiptTs: ataTs !== -Infinity ? ataTs : grDateTs,
+        _grDateTs: grDateTs,
+        _sourceOrder: record.sourceOrder
+      });
+    });
+
+    matched.sort(function(a, b) {
+      if (a._receiptTs !== b._receiptTs) return b._receiptTs - a._receiptTs;
+      if (a._grDateTs !== b._grDateTs) return b._grDateTs - a._grDateTs;
+      return a._sourceOrder - b._sourceOrder;
+    });
+    const history = matched.slice(request.offset, request.offset + request.limit).map(function(row) {
+      const clean = Object.assign({}, row);
+      delete clean._receiptTs;
+      delete clean._grDateTs;
+      delete clean._sourceOrder;
+      return clean;
+    });
+    const latest = matched.length ? Object.assign({}, matched[0]) : null;
+    if (latest) {
+      delete latest._receiptTs;
+      delete latest._grDateTs;
+      delete latest._sourceOrder;
+    }
+    const nextOffset = request.offset + history.length;
+    return {
+      success: true,
+      product: { sku: request.sku || (latest && latest.sku) || '', name: request.productName || (latest && latest.product) || '' },
+      latest,
+      history,
+      total: matched.length,
+      offset: request.offset,
+      nextOffset,
+      hasMore: nextOffset < matched.length,
+      limit: request.limit,
+      backendRevision: GR_BACKEND_REVISION
+    };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: 'Load product receipt history failed' };
+  }
+}
+
+function invalidateGRInitialCache_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('GR_INITIAL_LEAN_V1');
+    cache.remove('GR_INITIAL_LEAN_V1_NODP');
+    cache.remove('GR_DELIVERY_PLANNING_V1');
+  } catch(e) {}
+}
+
+function getDiagnostics() {
+  try {
+    const ts = {};
+    const t0 = Date.now();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    ts.openSpreadsheet = Date.now() - t0;
+
+    const poSheet = ss.getSheetByName('PO');
+    const grSheet = ss.getSheetByName('GR');
+    const poLastRow = poSheet ? poSheet.getLastRow() : 0;
+    const grLastRow = grSheet ? grSheet.getLastRow() : 0;
+
+    let t1;
+    t1 = Date.now();
+    const poData = poLastRow > 1 ? poSheet.getRange(2, 1, poLastRow - 1, 13).getValues() : [];
+    ts.poRead = Date.now() - t1;
+
+    t1 = Date.now();
+    const grData = grLastRow > 1 ? grSheet.getRange(2, 1, grLastRow - 1, 15).getValues() : [];
+    ts.grRead = Date.now() - t1;
+
+    const timeZone = Session.getScriptTimeZone();
+    const vendorCacheHit = !!CacheService.getScriptCache().get('GR_VENDOR_LEAD_STATS_V1');
+
+    t1 = Date.now();
+    const vendorStats = getVendorLeadStats_(ss, poData, grData, timeZone);
+    ts.vendorStats = Date.now() - t1;
+
+    ts.total = Date.now() - t0;
+
+    const activeStatuses = ['Pending GR', 'Draft GR', 'Pending Review'];
+    return {
+      success: true,
+      backendRevision: GR_BACKEND_REVISION,
+      timing: ts,
+      vendorStatsCached: vendorCacheHit,
+      counts: {
+        poRows: poData.length,
+        grRows: grData.length,
+        activePOs: poData.filter(r => activeStatuses.includes(r[11])).length,
+        vendorCount: vendorStats.length
+      }
+    };
+  } catch (e) {
+    return { success: false, message: 'getDiagnostics failed', errorDetail: e.toString() };
+  }
+}
+
+function buildDeliveryPlanning_(ss, poData, grAllRows, timeZone) {
+  const today = dateOnly_(new Date());
+  const vendorStats = getVendorLeadStats_(ss, poData, grAllRows, timeZone);
+  const statsByVendor = {};
+  vendorStats.forEach(stat => { statsByVendor[normalizeVendor_(stat.vendor)] = stat; });
+
+  const planByUid = {};
+  const summary = {
+    vendorCount: vendorStats.length,
+    sampleCount: vendorStats.reduce((sum, stat) => sum + stat.count, 0),
+    confirmedCount: 0,
+    estimatedCount: 0,
+    overdueCount: 0,
+    todayCount: 0,
+    next7Count: 0
+  };
+
+  poData.forEach(row => {
+    const uid = row[0];
+    const poDate = parseDateValue_(row[2]);
+    const vendor = String(row[4] || '').trim();
+    if (!uid || !poDate || !vendor) return;
+
+    const expectedDate = parseDateValue_(row[10]);
+    const stat = statsByVendor[normalizeVendor_(vendor)];
+    let plannedDate = null;
+    let planSource = 'no_data';
+    if (expectedDate) {
+      plannedDate = expectedDate;
+      planSource = 'confirmed';
+      summary.confirmedCount++;
+    } else if (stat && stat.safeLeadDays !== null && stat.safeLeadDays !== undefined) {
+      plannedDate = addDays_(poDate, stat.safeLeadDays);
+      planSource = 'estimated_p75';
+      summary.estimatedCount++;
+    }
+
+    const daysUntil = plannedDate ? dateDiffDays_(today, plannedDate) : null;
+    const isPlanOverdue = plannedDate ? daysUntil < 0 : false;
+    if (isPlanOverdue) summary.overdueCount++;
+    if (daysUntil === 0) summary.todayCount++;
+    if (daysUntil !== null && daysUntil >= 0 && daysUntil <= 7) summary.next7Count++;
+
+    planByUid[uid] = {
+      expectedDate: expectedDate ? Utilities.formatDate(dateOnly_(expectedDate), timeZone, "dd/MM/yyyy") : "",
+      plannedDate: plannedDate ? Utilities.formatDate(dateOnly_(plannedDate), timeZone, "dd/MM/yyyy") : "",
+      planSource: planSource,
+      daysUntil: daysUntil,
+      isPlanOverdue: isPlanOverdue,
+      vendorAvgLeadDays: stat ? stat.avgLeadDays : "",
+      vendorP75LeadDays: stat ? stat.p75LeadDays : "",
+      vendorLeadSampleCount: stat ? stat.count : 0,
+      vendorLeadConfidence: stat ? stat.confidence : "none"
+    };
+  });
+
+  return { summary, vendorStats, planByUid };
+}
+
+function getVendorLeadStats_(ss, poData, grAllRows, timeZone) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'GR_VENDOR_LEAD_STATS_V1';
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  // รวมแถวจาก GR_Archive ด้วย เพื่อไม่ให้สถิติ leadtime หายหลัง archive
+  const grRowsForSamples = (grAllRows || []).concat(readArchiveLeadRows_(ss));
+  const samples = dedupeLeadSamples_(readCurrentLeadSamples_(ss, poData, grRowsForSamples, timeZone).concat(readTrackingLeadSamples_(ss, timeZone)));
+  const stats = buildVendorStats_(samples);
+  try {
+    const serialized = JSON.stringify(stats);
+    if (serialized.length < 90000) cache.put(cacheKey, serialized, 600);
+  } catch (e) {
+    console.log('GR vendor lead stats cache skipped: ' + e.message);
+  }
+  return stats;
+}
+
+function readCurrentLeadSamples_(ss, poData, grAllRows, timeZone) {
+  // Use preloaded rows when available to avoid a redundant GR sheet read
+  const grRows = (grAllRows && grAllRows.length > 0) ? grAllRows : (() => {
+    const grSheet = ss.getSheetByName('GR');
+    if (!grSheet || grSheet.getLastRow() < 2) return [];
+    return grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 4).getValues();
+  })();
+  if (!grRows.length) return [];
+
+  const groups = {};
+  const groupByUid = {};
+  poData.forEach(row => {
+    const uid = row[0];
+    const poDate = parseDateValue_(row[2]);
+    const vendor = String(row[4] || '').trim();
+    if (!uid || !poDate || !vendor) return;
+    const key = [row[3] || '', vendor, formatSheetDateForClient_(poDate, "", timeZone), row[5] || '', row[1] || ''].join('|');
+    if (!groups[key]) {
+      groups[key] = { vendor, poDate, poNumber: row[3] || '', warehouse: row[5] || '', firstAta: null };
+    }
+    groupByUid[uid] = groups[key];
+  });
+
+  grRows.forEach(row => {
+    const refPoUid = row[1]; // col B (index same whether preloaded A:O or fallback A:D)
+    const group = groupByUid[refPoUid];
+    if (!group) return;
+    const ata = parseDateValue_(row[3]); // col D
+    if (!ata) return;
+    if (!group.firstAta || dateOnly_(ata).getTime() < dateOnly_(group.firstAta).getTime()) group.firstAta = ata;
+  });
+
+  return Object.keys(groups).map(key => groups[key]).filter(group => group.firstAta).map(group => {
+    return makeLeadSample_({
+      vendor: group.vendor,
+      poDate: group.poDate,
+      ata: group.firstAta,
+      poNumber: group.poNumber,
+      source: 'current'
+    }, timeZone);
+  }).filter(Boolean);
+}
+
+function readTrackingLeadSamples_(ss, timeZone) {
+  const sheet = ss.getSheetByName('TrackingPO');
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  const displaysAll = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
+  const headers = displaysAll[0];
+  const displays = displaysAll.slice(1);
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  const idxVendor = findHeaderIndex_(headers, ['Vendor', 'Supplier', 'ผู้จำหน่าย', 'ผู้ขาย', 'ร้านค้า', 'บริษัท']);
+  const idxPoDate = findHeaderIndex_(headers, ['PO_Date', 'PO Date', 'PODate', 'วันที่สั่ง', 'วันที่เปิด PO', 'วันที่เปิดบิล', 'วันที่ PO']);
+  const idxAta = findHeaderIndex_(headers, ['ATA', 'GR_Date', 'GR Date', 'วันที่รับจริง', 'วันที่มาส่ง', 'วันที่รับ', 'วันที่สินค้าเข้า']);
+  const idxLead = findHeaderIndex_(headers, ['Leadtime_Days', 'Leadtime', 'Lead Time', 'LT', 'จำนวนวัน', 'ระยะเวลาจัดส่ง']);
+  const idxPoNumber = findHeaderIndex_(headers, ['PO_Number', 'PO Number', 'PONumber', 'เลข PO', 'เลขที่ PO']);
+
+  if (idxVendor === -1 || (idxLead === -1 && (idxPoDate === -1 || idxAta === -1))) return [];
+
+  const samples = [];
+  values.forEach((row, i) => {
+    const displayRow = displays[i] || [];
+    const vendor = String(displayRow[idxVendor] || row[idxVendor] || '').trim();
+    if (!vendor) return;
+    const poDate = idxPoDate >= 0 ? parseDateValue_(row[idxPoDate]) || parseDateValue_(displayRow[idxPoDate]) : null;
+    const ata = idxAta >= 0 ? parseDateValue_(row[idxAta]) || parseDateValue_(displayRow[idxAta]) : null;
+    const leadDays = idxLead >= 0 ? parseNumber_(row[idxLead], displayRow[idxLead]) : null;
+    const sample = makeLeadSample_({
+      vendor,
+      poDate,
+      ata,
+      leadDays,
+      poNumber: idxPoNumber >= 0 ? (displayRow[idxPoNumber] || row[idxPoNumber] || '') : '',
+      source: 'tracking'
+    }, timeZone);
+    if (sample) samples.push(sample);
+  });
+  return samples;
+}
+
+function buildVendorStats_(samples) {
+  const byVendor = {};
+  samples.forEach(sample => {
+    const key = normalizeVendor_(sample.vendor);
+    if (!key) return;
+    if (!byVendor[key]) byVendor[key] = { vendor: sample.vendor, samples: [] };
+    byVendor[key].samples.push(sample);
+  });
+
+  return Object.keys(byVendor).map(key => {
+    const values = byVendor[key].samples.map(r => r.leadDays).sort((a, b) => a - b);
+    const sum = values.reduce((acc, n) => acc + n, 0);
+    const median = percentileSorted_(values, 0.5);
+    const p75 = percentileSorted_(values, 0.75);
+    let confidence = 'low';
+    if (values.length >= 8) confidence = 'high';
+    else if (values.length >= 3) confidence = 'medium';
+    return {
+      vendor: byVendor[key].vendor,
+      count: values.length,
+      avgLeadDays: round1_(sum / values.length),
+      medianLeadDays: median,
+      p75LeadDays: p75,
+      safeLeadDays: Math.ceil(p75),
+      minLeadDays: values[0],
+      maxLeadDays: values[values.length - 1],
+      confidence
+    };
+  });
+}
+
+function makeLeadSample_(input, timeZone) {
+  const vendor = String(input.vendor || '').trim();
+  if (!vendor) return null;
+  const poDate = input.poDate ? dateOnly_(input.poDate) : null;
+  const ata = input.ata ? dateOnly_(input.ata) : null;
+  let leadDays = (input.leadDays !== null && input.leadDays !== undefined && isFinite(Number(input.leadDays))) ? Number(input.leadDays) : null;
+  if ((leadDays === null || isNaN(leadDays)) && poDate && ata) leadDays = dateDiffDays_(poDate, ata);
+  if (!isFinite(leadDays) || leadDays < 0 || leadDays > 365) return null;
+  return {
+    vendor,
+    poDateText: poDate ? Utilities.formatDate(poDate, timeZone, "dd/MM/yyyy") : '',
+    ataText: ata ? Utilities.formatDate(ata, timeZone, "dd/MM/yyyy") : '',
+    leadDays: Math.round(leadDays),
+    poNumber: input.poNumber || '',
+    source: input.source || 'current'
+  };
+}
+
+function dedupeLeadSamples_(samples) {
+  const seen = {};
+  const out = [];
+  samples.forEach(sample => {
+    const key = [normalizeVendor_(sample.vendor), sample.poNumber || '', sample.poDateText || '', sample.ataText || '', sample.leadDays].join('|');
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push(sample);
+  });
+  return out;
+}
+
+function getCachedProducts_(ss) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'GR_PRODUCTS_V1';
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const productSheet = ss.getSheetByName('ProductName');
+  const lastRow = productSheet ? productSheet.getLastRow() : 0;
+  const productData = lastRow > 1 ? productSheet.getRange(2, 1, lastRow - 1, 6).getValues() : [];
+  const products = productData.map(r => ({
+    sku: r[0] || '',
+    name: r[1],
+    unit: r[3] || '',
+    oldStock: r[4] || 0,
+    vendor: r[5] || ''
+  })).filter(p => p.name);
+
+  try {
+    const serialized = JSON.stringify(products);
+    if (serialized.length < 90000) cache.put(cacheKey, serialized, 1800);
+  } catch (e) {
+    console.log('GR product cache skipped: ' + e.message);
+  }
+  return products;
+}
+
+function formatSheetDateForClient_(value, displayValue, timeZone) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, timeZone, "dd/MM/yyyy");
+  }
+
+  if (typeof value === 'number' && isFinite(value) && value > 20000 && value < 300000) {
+    return Utilities.formatDate(sheetSerialToDate_(value), timeZone, "dd/MM/yyyy");
+  }
+
+  const text = value === null || value === undefined ? "" : String(value).trim();
+  if (!text) return displayValue || "";
+
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    if (serial > 20000 && serial < 300000) {
+      return Utilities.formatDate(sheetSerialToDate_(serial), timeZone, "dd/MM/yyyy");
+    }
+  }
+
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
+  if (isoMatch) return isoMatch[3] + "/" + isoMatch[2] + "/" + isoMatch[1];
+
+  return text || displayValue || "";
+}
+
+function sheetSerialToDate_(serial) {
+  return new Date(Math.round((serial - 25569) * 86400 * 1000));
+}
+
+function parseDateValue_(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) return value;
+  if (typeof value === 'number' && isFinite(value)) {
+    if (value > 1000 && value < 80000) return sheetSerialToDate_(value);
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+  let match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+  if (match) {
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+    return new Date(year, Number(match[2]) - 1, Number(match[1]));
+  }
+
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function dateOnly_(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays_(date, days) {
+  const next = dateOnly_(date);
+  next.setDate(next.getDate() + Number(days || 0));
+  return next;
+}
+
+function dateDiffDays_(startDate, endDate) {
+  return Math.floor((dateOnly_(endDate).getTime() - dateOnly_(startDate).getTime()) / 86400000);
+}
+
+function normalizeVendor_(vendor) {
+  return String(vendor || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeHeader_(header) {
+  return String(header || '').trim().toLowerCase().replace(/[\s_./\\\-():\[\]]+/g, '');
+}
+
+function findHeaderIndex_(headers, aliases) {
+  const normalizedAliases = aliases.map(normalizeHeader_);
+  const normalizedHeaders = headers.map(normalizeHeader_);
+  for (let i = 0; i < normalizedHeaders.length; i++) {
+    if (normalizedAliases.indexOf(normalizedHeaders[i]) !== -1) return i;
+  }
+  for (let i = 0; i < normalizedHeaders.length; i++) {
+    for (let j = 0; j < normalizedAliases.length; j++) {
+      if (normalizedAliases[j] && normalizedHeaders[i].indexOf(normalizedAliases[j]) !== -1) return i;
+    }
+  }
+  return -1;
+}
+
+function parseNumber_(value, displayValue) {
+  if (typeof value === 'number' && isFinite(value)) return value;
+  const text = String(displayValue || value || '').replace(/,/g, '').trim();
+  if (!text) return null;
+  const n = Number(text);
+  return isFinite(n) ? n : null;
+}
+
+function round1_(n) {
+  return Math.round(Number(n || 0) * 10) / 10;
+}
+
+function percentileSorted_(values, percentile) {
+  if (!values.length) return null;
+  const index = Math.max(0, Math.min(values.length - 1, Math.ceil(values.length * percentile) - 1));
+  return values[index];
+}
+
+// ==========================================
+// 4. การรับสินค้าลงคลัง (GR) & LINE Notify
+// ==========================================
+// Actual storage warehouse = first segment of Loc_IN before the first "-" (e.g. "W2-2F-2-1" -> W2).
+// Split items store two locations joined by "|" (e.g. "W2-2F | W5-1F") -> both warehouses listed.
+var GR_WH_RE_ = /^(W[1-5]|C[12])$/;
+function locWarehouseList_(loc) {
+  if (!loc) return '';
+  var set = {};
+  String(loc).split('|').forEach(function (p) {
+    var w = p.trim().split('-')[0].trim();
+    if (w && GR_WH_RE_.test(w)) set[w] = true;
+  });
+  return Object.keys(set).join('/');
+}
+function collectActualWarehouses_(items, extraItems, fallbackWh) {
+  var set = {};
+  function add(loc, qty) {
+    if (!(parseFloat(qty) > 0)) return;
+    String(loc || '').split('|').forEach(function (p) {
+      var w = p.trim().split('-')[0].trim();
+      if (w && GR_WH_RE_.test(w)) set[w] = true;
+    });
+  }
+  (items || []).forEach(function (it) { add(it.locIn, it.grQty); });
+  (extraItems || []).forEach(function (ex) { add(ex.locIn, ex.grQty); });
+  var arr = Object.keys(set);
+  return arr.length ? arr : (fallbackWh ? [fallbackWh] : []);
+}
+
+function bulkReceivePO(data) {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  let pendingLine = null;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+
+    data = data || {};
+    data.groupInfo = data.groupInfo || {};
+    const items = Array.isArray(data.items) ? data.items : [];
+    const extraItems = Array.isArray(data.extraItems) ? data.extraItems : [];
+    const groupPoUids = normalizeUidList_((Array.isArray(data.groupPoUids) && data.groupPoUids.length) ? data.groupPoUids : items.map(item => item.uid));
+    if (groupPoUids.length === 0) return { success: false, message: "ไม่มีรายการ PO ในบิลนี้ กรุณารีเฟรชข้อมูลแล้วลองใหม่" };
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const grSheet = ss.getSheetByName('GR');
+    const poSheet = ss.getSheetByName('PO');
+    const timeZone = Session.getScriptTimeZone();
+    const today = new Date();
+    const poLastRow = poSheet.getLastRow();
+    const poData = poLastRow > 1 ? poSheet.getRange(2, 1, poLastRow - 1, 13).getValues() : [];
+    const poByUid = {};
+    poData.forEach((row, index) => {
+      const poUid = normalizeUid_(row[0]);
+      if (poUid) poByUid[poUid] = { row, rowNumber: index + 2 };
+    });
+
+    const allPoRecords = groupPoUids.map(uid => resolvePoRecordByUid_(poByUid, uid));
+    const itemRecords = items.map(item => resolvePoRecordByUid_(poByUid, item.uid));
+    const itemUidSet = new Set(itemRecords.map(record => normalizeUid_(record.row[0])));
+
+    let ataDate = "";
+    if (data.ata) {
+      let ataParts = String(data.ata).split('/');
+      if (ataParts.length === 3) ataDate = new Date(ataParts[2], ataParts[1] - 1, ataParts[0]);
+    }
+
+    let poDateRaw = null;
+    if(data.groupInfo.poDate) {
+      let pParts = String(data.groupInfo.poDate).split('/');
+      if(pParts.length === 3) poDateRaw = new Date(pParts[2], pParts[1] - 1, pParts[0]);
+    }
+
+    let leadtimeDays = "";
+    if(poDateRaw && ataDate) leadtimeDays = Math.floor((ataDate.getTime() - poDateRaw.getTime()) / (1000 * 3600 * 24));
+
+    const grRowsToInsert = [];
+
+    let lineItemsText = "";
+    let lineOldStockText = "";
+    let itemCounter = 1;
+    const poStatusRanges = [];
+    const pendingStatusRanges = [];
+    const extraMarker = extraBillMarker_(groupPoUids);
+
+    items.forEach((item, index) => {
+      const poRecord = itemRecords[index];
+      const poUid = normalizeUid_(poRecord.row[0]);
+      let poSku = poRecord.row[6];
+      let productName = poRecord.row[7];
+      const itemExp = formatSheetDateForClient_(item.exp, "", timeZone);
+
+      grRowsToInsert.push([
+        Utilities.getUuid(), poUid, today, ataDate, data.receiverName, poSku, productName,
+        item.grQty, item.unit, item.locIn, itemExp, leadtimeDays, data.remark, data.targetStatus, item.oldStock || ""
+      ]);
+
+      poStatusRanges.push("L" + poRecord.rowNumber);
+
+      if(item.grQty && parseFloat(item.grQty) > 0) {
+         const itemWh = locWarehouseList_(item.locIn);
+         lineItemsText += `${itemCounter}. ${productName} จำนวน ${item.grQty} ${item.unit || ''}${itemWh ? ' [' + itemWh + ']' : ''}${itemExp ? ' | หมดอายุ: ' + itemExp : ''}\n`;
+         if (item.oldStock) lineOldStockText += `- ${productName}: ${item.oldStock}\n`;
+         itemCounter++;
+      }
+    });
+
+    if (data.targetStatus !== 'Draft GR') {
+      allPoRecords.forEach(record => {
+        const poUid = normalizeUid_(record.row[0]);
+        if (!itemUidSet.has(poUid)) pendingStatusRanges.push("L" + record.rowNumber);
+      });
+    }
+
+    if (extraItems.length > 0) {
+      extraItems.forEach(ex => {
+        const extraRemark = ["[นอกบิล/ของแถม]", extraMarker, data.remark || ""].filter(Boolean).join(" ");
+        const extraExp = formatSheetDateForClient_(ex.exp, "", timeZone);
+        grRowsToInsert.push([
+          Utilities.getUuid(), "EXTRA", today, ataDate, data.receiverName, ex.sku || "", ex.product,
+          ex.grQty, ex.unit, ex.locIn, extraExp, leadtimeDays, extraRemark, data.targetStatus, ex.oldStock || ""
+        ]);
+
+        if(ex.grQty && parseFloat(ex.grQty) > 0) {
+           const exWh = locWarehouseList_(ex.locIn);
+           lineItemsText += `${itemCounter}. ${ex.product} จำนวน ${ex.grQty} ${ex.unit || ''}${exWh ? ' [' + exWh + ']' : ''} (ของแถม/นอกบิล)${extraExp ? ' | หมดอายุ: ' + extraExp : ''}\n`;
+           if (ex.oldStock) lineOldStockText += `- ${ex.product}: ${ex.oldStock}\n`;
+           itemCounter++;
+        }
+      });
+    }
+
+    deleteSheetRows_(grSheet, findGrRowsForBill_(grSheet, groupPoUids));
+
+    if (grRowsToInsert.length > 0) {
+      const startRow = grSheet.getLastRow() + 1;
+      grSheet.getRange(startRow, 11, grRowsToInsert.length, 1).setNumberFormat("@");
+      grSheet.getRange(startRow, 1, grRowsToInsert.length, grRowsToInsert[0].length).setValues(grRowsToInsert);
+      grSheet.getRange(startRow, 3, grRowsToInsert.length, 2).setNumberFormat("dd/MM/yyyy");
+    }
+    if (poStatusRanges.length > 0) {
+      poSheet.getRangeList(poStatusRanges).setValue(data.targetStatus);
+    }
+    if (pendingStatusRanges.length > 0) {
+      poSheet.getRangeList(pendingStatusRanges).setValue('Pending GR');
+    }
+    CacheService.getScriptCache().remove('GR_VENDOR_LEAD_STATS_V1');
+
+    // Flush เพื่อให้ข้อมูลถูกบันทึกก่อน แล้วค่อยส่ง LINE
+    SpreadsheetApp.flush();
+
+    // คลังจริงที่ลงสินค้า (จาก Loc_IN) — รองรับลงหลายคลัง / แยกคลัง; fallback เป็นคลังของบิลเดิม
+    const actualWarehouses = collectActualWarehouses_(items, extraItems, data.groupInfo.warehouse);
+    const warehouseLabel = actualWarehouses.join(', ') || data.groupInfo.warehouse;
+
+    // ขั้นตอนที่ 1 (Pending Review - รับลงสินค้าแล้ว) ไม่ต้องส่งแจ้งเตือน LINE ตามนโยบายแจ้งเตือนเฉพาะเมื่ออนุมัติเสร็จสิ้น
+    if (data.targetStatus === 'GR Completed') {
+        if(lineOldStockText === "") lineOldStockText = "- ไม่ได้ระบุ -\n";
+        let lineMsg = `✅ อนุมัติรับเข้าคลังเรียบร้อย (GR Completed)\n`;
+        lineMsg += `🏢 Vendor: ${data.groupInfo.vendor}\n`;
+        lineMsg += `🏠 คลังสินค้า: ${warehouseLabel}\n`;
+        lineMsg += `📅 วันที่รับ: ${data.ata}\n`;
+        lineMsg += `📋 รายการตรวจสอบแล้ว:\n${lineItemsText}\n`;
+        if(data.remark) lineMsg += `📝 หมายเหตุ: ${data.remark}\n`;
+        lineMsg += `👤 ผู้ตรวจสอบ: ${data.receiverName}`;
+        pendingLine = { text: lineMsg, type: 'COMPLETED' };
+    }
+
+    invalidateGRInitialCache_();
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: error && error.message ? error.message : "เกิดข้อผิดพลาดในการบันทึก GR" };
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+
+  // ส่ง LINE หลังปล่อย lock แล้ว เพื่อไม่ให้ผู้ใช้คนอื่นที่กดบันทึกพร้อมกันต้องรอ LINE API
+  if (pendingLine) sendLineMessageAPI(pendingLine.text, pendingLine.type);
+  return { success: true, message: "บันทึกการรับสินค้า (GR) สำเร็จ" };
+}
+
+function sendLineMessageAPI(textMessage, type = 'REVIEW') {
+  let LINE_TOKEN = "";
+  let GROUP_ID = "";
+
+  const props = PropertiesService.getScriptProperties();
+  if (type === 'REVIEW') {
+      LINE_TOKEN = props.getProperty("LINE_TOKEN_REVIEW");
+      GROUP_ID = props.getProperty("LINE_GROUP_REVIEW");
+  } else if (type === 'COMPLETED') {
+      LINE_TOKEN = props.getProperty("LINE_TOKEN_COMPLETED");
+      GROUP_ID = props.getProperty("LINE_GROUP_COMPLETED");
+  }
+
+  if (!LINE_TOKEN || !GROUP_ID) return;
+
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: GROUP_ID,
+    messages: [{ type: "text", text: textMessage }]
+  };
+
+  const options = {
+    method: "post",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + LINE_TOKEN
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+    console.log(`LINE Messaging API (${type}) - Status: ${responseCode}`);
+    if (responseCode !== 200) {
+      console.log(`LINE Messaging API (${type}) - Error Body: ${responseBody}`);
+    }
+  } catch(e) {
+    console.log(`LINE Messaging API (${type}) - Fetch Error: ${e.message}`);
+  }
+}
+
+// ==========================================
+// 5. ดึงบิลกลับมาแก้ไข / รีเซ็ตสถานะบิล (Admin/Supervisor)
+// ==========================================
+function recallGR(data) {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const poSheet = ss.getSheetByName('PO');
+    const grSheet = ss.getSheetByName('GR');
+
+    const poUids = normalizeUidList_((data && data.poUids) || []);
+    const poUidSet = new Set(poUids);
+    const actionType = data && data.actionType;
+
+    if (poUids.length === 0) {
+      return { success: false, message: "ไม่มีรายการที่ต้องอัปเดต" };
+    }
+    if (actionType !== 'reset' && actionType !== 'recall') {
+      return { success: false, message: "ประเภทการทำรายการไม่ถูกต้อง" };
+    }
+
+    const poLastRow = poSheet.getLastRow();
+    if (poLastRow >= 2) {
+      const poData = poSheet.getRange(2, 1, poLastRow - 1, 1).getValues();
+      const poStatusRanges = [];
+      for (let i = 0; i < poData.length; i++) {
+        let poUid = normalizeUid_(poData[i][0]);
+        if (poUidSet.has(poUid)) poStatusRanges.push("L" + (i + 2));
+      }
+      if (poStatusRanges.length !== poUids.length) {
+        return { success: false, message: "พบบางรายการไม่ตรงกับข้อมูลล่าสุด กรุณารีเฟรชแล้วลองใหม่" };
+      }
+      if (poStatusRanges.length > 0) {
+        let newStatus = (actionType === 'reset') ? 'Pending GR' : 'Draft GR';
+        poSheet.getRangeList(poStatusRanges).setValue(newStatus);
+      }
+    }
+
+    const grLastRow = grSheet.getLastRow();
+    if (grLastRow >= 2) {
+      if (actionType === 'reset') {
+        deleteSheetRows_(grSheet, findGrRowsForBill_(grSheet, poUids));
+      } else {
+        const grData = grSheet.getRange(2, 2, grLastRow - 1, 12).getValues(); // B:M
+        const grStatusRanges = [];
+        for (let i = 0; i < grData.length; i++) {
+          let refPoUid = grData[i][0];
+          let remark = grData[i][11];
+          if (grRowBelongsToBill_(refPoUid, remark, poUidSet)) grStatusRanges.push("N" + (i + 2));
+        }
+        if (grStatusRanges.length > 0) {
+          grSheet.getRangeList(grStatusRanges).setValue('Draft GR');
+        }
+      }
+    }
+
+    invalidateGRInitialCache_();
+    return { success: true, message: actionType === 'reset' ? "รีเซ็ตสถานะบิลเป็นรอรับเข้าเรียบร้อยแล้ว" : "ดึงบิลกลับมาเป็นสถานะกำลังลงสินค้าเรียบร้อยแล้ว" };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "เกิดข้อผิดพลาดในการทำรายการ" };
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+// ==========================================
+// 6. Archive แถว GR ที่สำเร็จแล้วเกิน 30 วัน → ชีต GR_Archive
+//    - รันอัตโนมัติด้วย time-driven trigger: รัน setupArchiveTrigger() ครั้งเดียวใน GAS editor
+//    - Append ลง archive + flush ก่อนค่อยลบจากชีต GR (crash กลางทาง = ซ้ำใน archive, ไม่มีข้อมูลหาย)
+//    - ข้อจำกัด: บิลที่ถูก archive แล้ว recall/reset จะไม่เห็นข้อมูลรับเดิม (PO ยังรีเซ็ตสถานะได้)
+// ==========================================
+var GR_ARCHIVE_SHEET = 'GR_Archive';
+var GR_ARCHIVE_AFTER_DAYS = 30;
+var GR_ARCHIVE_MAX_ROWS_PER_RUN = 1000; // กัน execution timeout รอบแรกที่ข้อมูลค้างเยอะ
+
+function archiveOldGRRows() {
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    lock.waitLock(30000);
+    locked = true;
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const grSheet = ss.getSheetByName('GR');
+    if (!grSheet || grSheet.getLastRow() < 2) return { success: true, archived: 0 };
+
+    const cutoff = dateOnly_(new Date());
+    cutoff.setDate(cutoff.getDate() - GR_ARCHIVE_AFTER_DAYS);
+
+    const data = grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 15).getValues();
+    const rowsToArchive = [];
+    const rowNumbers = [];
+    for (let i = 0; i < data.length && rowsToArchive.length < GR_ARCHIVE_MAX_ROWS_PER_RUN; i++) {
+      const status = String(data[i][13] || '');
+      if (status !== 'GR Completed' && status !== 'Completed') continue;
+      const grDate = parseDateValue_(data[i][2]) || parseDateValue_(data[i][3]); // GR_Date, fallback ATA
+      if (!grDate || dateOnly_(grDate).getTime() >= cutoff.getTime()) continue;
+      rowsToArchive.push(data[i]);
+      rowNumbers.push(i + 2);
+    }
+    if (rowsToArchive.length === 0) return { success: true, archived: 0 };
+
+    const archiveSheet = getOrCreateArchiveSheet_(ss);
+    archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToArchive.length, 15).setValues(rowsToArchive);
+    SpreadsheetApp.flush();
+
+    deleteSheetRows_(grSheet, rowNumbers);
+    invalidateGRInitialCache_();
+    CacheService.getScriptCache().remove('GR_VENDOR_LEAD_STATS_V1');
+    console.log('GR archive: moved ' + rowsToArchive.length + ' rows to ' + GR_ARCHIVE_SHEET);
+    return { success: true, archived: rowsToArchive.length };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e && e.message ? e.message : 'archive failed' };
+  } finally {
+    if (locked) lock.releaseLock();
+  }
+}
+
+function getOrCreateArchiveSheet_(ss) {
+  let sheet = ss.getSheetByName(GR_ARCHIVE_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(GR_ARCHIVE_SHEET);
+    const headers = ['GR_UID', 'Ref_PO_UID', 'GR_Date', 'ATA', 'Receiver', 'SKU', 'Product', 'GR_Qty', 'Unit', 'Loc_IN', 'Exp_Date', 'Leadtime_Days', 'Remark', 'Status', 'Old_Stock'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setBackground('#171C8F').setFontColor('white').setFontWeight('bold');
+  }
+  return sheet;
+}
+
+// อ่านเฉพาะคอลัมน์ A:D (UID, Ref_PO_UID, GR_Date, ATA) ท้ายสุดไม่เกิน 2000 แถว
+// สำหรับ vendor lead stats — index ตรงกับแถวจากชีต GR (row[1]=Ref_PO_UID, row[3]=ATA)
+var GR_ARCHIVE_LEAD_ROWS_MAX = 2000;
+function readArchiveLeadRows_(ss) {
+  const sheet = ss.getSheetByName(GR_ARCHIVE_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const lastRow = sheet.getLastRow();
+  const startRow = Math.max(2, lastRow - GR_ARCHIVE_LEAD_ROWS_MAX + 1);
+  return sheet.getRange(startRow, 1, lastRow - startRow + 1, 4).getValues();
+}
+
+// รันครั้งเดียวใน GAS editor เพื่อสร้าง trigger รายวัน (ตี 3)
+function setupArchiveTrigger() {
+  const exists = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'archiveOldGRRows');
+  if (exists) { console.log('Archive trigger already exists'); return; }
+  ScriptApp.newTrigger('archiveOldGRRows').timeBased().everyDays(1).atHour(3).create();
+  console.log('Archive trigger created (daily ~03:00)');
+}
