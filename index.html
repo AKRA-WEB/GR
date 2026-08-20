@@ -223,7 +223,7 @@
 
   <script src="js/supabase-gr-client.js"></script>
   <script>
-    const CURRENT_VERSION = "20260820.02";
+    const CURRENT_VERSION = "20260820.03";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1164,11 +1164,16 @@
           } else if (action === 'bulkReceivePO') {
               try {
                   const supaRes = await AkraSupabaseGR.bulkReceivePO(payload);
-                  fetch(DATA_SCRIPT_URL, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                      body: JSON.stringify({ action, data: payload, token: getSessionToken() })
-                  }).catch(() => {});
+                  try {
+                      fetch(DATA_SCRIPT_URL, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                          body: JSON.stringify({ action, data: payload, token: getSessionToken() }),
+                          keepalive: true
+                      }).catch(e => console.warn('GAS sync/LINE notify warning:', e));
+                  } catch (fetchErr) {
+                      console.warn('GAS sync dispatch error:', fetchErr);
+                  }
                   if (supaRes && supaRes.success) return supaRes;
               } catch (supaErr) {
                   console.warn('Supabase GR bulkReceivePO fallback to GAS:', supaErr);
