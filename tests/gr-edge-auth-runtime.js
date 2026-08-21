@@ -9,7 +9,9 @@ global.Deno = {
         MAIN_VERIFY_URL: 'https://main.example/exec',
         SUPABASE_URL: 'https://database.example',
         GR_SUPABASE_SECRET_KEY: 'server-only-key',
-        GR_ALLOWED_ORIGINS: 'https://akra-web.github.io'
+        GR_ALLOWED_ORIGINS: 'https://akra-web.github.io',
+        LINE_TOKEN_COMPLETED: 'line-token',
+        LINE_GROUP_COMPLETED: 'line-group'
       }[name];
     }
   },
@@ -18,7 +20,10 @@ global.Deno = {
 
 const originalFetch = global.fetch;
 const rpcCalls = [];
+const linePushBodies = [];
+const lineTasks = [];
 let verifyCalls = 0;
+global.EdgeRuntime = { waitUntil(task) { lineTasks.push(task); } };
 global.fetch = async (url, options = {}) => {
   const target = String(url);
   if (target.startsWith('https://main.example/exec')) {
@@ -41,6 +46,10 @@ global.fetch = async (url, options = {}) => {
       headers: new Headers(),
       json: async () => ({ success: true })
     };
+  }
+  if (target === 'https://api.line.me/v2/bot/message/push') {
+    linePushBodies.push(JSON.parse(options.body));
+    return { ok: true, status: 200, text: async () => '' };
   }
   throw new Error(`Unexpected fetch: ${target}`);
 };
@@ -91,6 +100,24 @@ function invoke(body, origin = 'https://akra-web.github.io') {
   assert.equal(response.status, 200);
   assert.match(rpcCalls.at(-1).target, /\/rpc\/gr_recall_v1$/);
 
+  response = await invoke({
+    action: 'bulkReceivePO',
+    token: 'approver-token',
+    data: {
+      targetStatus: 'GR Completed',
+      receiverName: 'Receiving Employee',
+      ata: '21/08/2026',
+      groupInfo: { vendor: 'Vendor A', warehouse: 'W1' },
+      items: [{ uid: 'PO-1', product: 'Product A', expectedStatus: 'Pending Review', grQty: 1, unit: 'EA', locIn: 'W1-A1' }]
+    }
+  });
+  assert.equal(response.status, 200);
+  await Promise.all(lineTasks.splice(0));
+  assert.equal(linePushBodies.length, 1, 'Completed GR must send one LINE notification');
+  const completedLineText = linePushBodies[0].messages[0].text;
+  assert.match(completedLineText, /ผู้รับลงสินค้า: Receiving Employee/, 'LINE must name the employee who received the goods');
+  assert.doesNotMatch(completedLineText, /ผู้รับลงสินค้า: Approver/, 'LINE must not use the employee who clicked approval');
+
   const beforeOrigin = verifyCalls;
   response = await invoke({ action: 'getInitialData', token: 'receiver-token', data: {} }, 'https://evil.example');
   assert.equal(response.status, 403);
@@ -101,6 +128,7 @@ function invoke(body, origin = 'https://akra-web.github.io') {
 })().finally(() => {
   global.fetch = originalFetch;
   delete global.Deno;
+  delete global.EdgeRuntime;
 }).catch(error => {
   console.error(error);
   process.exitCode = 1;

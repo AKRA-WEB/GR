@@ -223,7 +223,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260821.01";
+    const CURRENT_VERSION = "20260821.02";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -429,6 +429,38 @@
     }
 
     
+    function decodeJwtPayload(token) {
+        try {
+            if (!token || typeof token !== 'string') return null;
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            let payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (payloadBase64.length % 4) {
+                payloadBase64 += '=';
+            }
+            let json;
+            if (typeof TextDecoder !== 'undefined' && typeof atob === 'function') {
+                const binaryStr = atob(payloadBase64);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i);
+                }
+                json = new TextDecoder('utf-8').decode(bytes);
+            } else if (typeof Buffer !== 'undefined') {
+                json = Buffer.from(payloadBase64, 'base64').toString('utf8');
+            } else if (typeof atob === 'function') {
+                json = decodeURIComponent(atob(payloadBase64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+            } else {
+                return null;
+            }
+            const parsed = JSON.parse(json);
+            if (parsed && parsed.exp && parsed.exp * 1000 < Date.now()) return null;
+            return parsed;
+        } catch (e) { return null; }
+    }
+
     async function readApiCall(action, payload = null) {
         return apiCall(action, payload);
     }
@@ -459,9 +491,22 @@
                     return;
                 }
 
-                // The Edge bootstrap verifies Main SSO and loads the lean Supabase
-                // projection in one round trip. Its short verification cache also
-                // avoids repeating the Main call for the next GR request.
+                // 1. Instant JWT SSO (<1ms) - Render UI & cached data immediately
+                const jwtUser = decodeJwtPayload(tokenToVerify);
+                if (jwtUser && jwtUser.mustChangePassword !== true) {
+                    const session = buildAppSession(jwtUser, tokenToVerify);
+                    if (hasGrAccess(session)) {
+                        try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
+                        window.appSession = session;
+                        window.currentUser = session.name;
+                        UI.showApp(session.name);
+                        AuthGuard.bindEvents();
+                        await openReceiving();
+                        return;
+                    }
+                }
+
+                // 2. Fallback: Edge bootstrap verifies Main SSO and loads projection
                 if (typeof window.AkraSupabaseGR === 'undefined') throw new Error('GR_CLIENT_MISSING');
                 const result = await AkraSupabaseGR.request('bootstrap', {
                     includeProducts: false,

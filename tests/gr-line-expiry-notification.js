@@ -133,6 +133,7 @@ const completedResult = completedBackend.context.bulkReceivePO({
 assert.equal(completedResult.success, true);
 assert.equal(completedBackend.lineMessages.length, 1);
 assert.match(completedBackend.lineMessages[0], /✅ อนุมัติรับเข้าคลังเรียบร้อย \(GR Completed\)/);
+assert.match(completedBackend.lineMessages[0], /👤 ผู้รับลงสินค้า: Approver/, 'GAS fallback LINE must identify the employee entered as receiver');
 assert.match(
   completedBackend.lineMessages[0],
   /1\. สินค้า A จำนวน 5 EA \[W1\] \| หมดอายุ: 31\/12\/2569/,

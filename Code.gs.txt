@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1iJlJM1Lb2grWBpahpYjwIABTtSHqSdDHXHPxO34b_Z4";
 const MAIN_API_URL = "https://script.google.com/macros/s/AKfycbyQJLwb5HTexG6gxqTehGWlAxfSXVT--CpWnnp2JTcP4xCcMA1vUjSY_eWqPjUKwzq7/exec";
-const GR_BACKEND_REVISION = "20260819.01-perf-concurrency";
+const GR_BACKEND_REVISION = "20260820.05-auth-archive";
 
 function normalizeRoles_(roles) {
   if (Array.isArray(roles)) return roles.map(r => String(r || '').trim().toUpperCase()).filter(Boolean);
@@ -8,31 +8,26 @@ function normalizeRoles_(roles) {
   return String(roles).split(',').map(r => String(r || '').trim().toUpperCase()).filter(Boolean);
 }
 
+function normalizeGrTargetStatus_(value) {
+  const status = String(value || '').trim();
+  return status === 'Draft GR' || status === 'Pending Review' || status === 'GR Completed' ? status : '';
+}
+
 function getProtectedActionGuard_(action, data) {
-  if (action === 'getProductReceiptHistory') return { anyPerm: ['receiveGR', 'approveGR'] };
-  if (action === 'deletePO') return { perm: 'createPO', appName: 'app-po' };
-  if (action === 'updatePO') return { perm: 'createPO', appName: 'app-po' };
+  if (action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning' || action === 'getProductReceiptHistory') {
+    return { anyPerm: ['receiveGR', 'approveGR'] };
+  }
+  if (action === 'getDiagnostics') return { perm: 'approveGR', privilegedRole: true };
+  if (action === 'deletePO') return { perm: 'createPO', verifyAppId: 'app-tracking', permAppId: 'app-po' };
+  if (action === 'updatePO') return { perm: 'createPO', verifyAppId: 'app-tracking', permAppId: 'app-po' };
   if (action === 'bulkReceivePO') {
-    return data && data.targetStatus === 'GR Completed'
-      ? { perm: 'approveGR', privilegedRole: true }
-      : { anyPerm: ['receiveGR', 'approveGR'] };
+    const targetStatus = normalizeGrTargetStatus_(data && data.targetStatus);
+    return targetStatus === 'Draft GR' || targetStatus === 'Pending Review'
+      ? { anyPerm: ['receiveGR', 'approveGR'] }
+      : { perm: 'approveGR', privilegedRole: true };
   }
   if (action === 'recallGR') return { perm: 'approveGR', privilegedRole: true };
   return null;
-}
-
-function decodeJwtPayload_(token) {
-  try {
-    if (!token || typeof token !== 'string') return null;
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const raw = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString();
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.exp && parsed.exp * 1000 < Date.now()) return null;
-    return parsed;
-  } catch (e) {
-    return null;
-  }
 }
 
 function requireAuth(token, opts) {
@@ -40,36 +35,32 @@ function requireAuth(token, opts) {
     return { error: { success: false, message: "กรุณาเข้าสู่ระบบใหม่ (ไม่พบ token)", reason: "no_token" } };
   }
 
-  let result = null;
-  const jwt = decodeJwtPayload_(token);
-  if (jwt && (jwt.id || jwt.sub)) {
-    result = {
-      valid: true,
-      user: {
-        id: jwt.id || jwt.sub,
-        name: jwt.name || jwt.id || 'User',
-        roles: jwt.roles || ['ADMIN', 'WAREHOUSE'],
-        perms: jwt.perms || { 'app-gr': ['receiveGR', 'approveGR'], 'app-po': ['createPO', 'approvePR'] }
-      }
-    };
-  } else {
-    try {
-      const url = MAIN_API_URL + "?action=verifyToken&token=" + encodeURIComponent(token);
-      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-      result = JSON.parse(response.getContentText());
-    } catch (e) {
+  opts = opts || {};
+  let result;
+  try {
+    const verifyAppId = opts.verifyAppId || "app-gr";
+    const url = MAIN_API_URL + "?action=verifyToken&token=" + encodeURIComponent(token) + "&appId=" + encodeURIComponent(verifyAppId);
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const responseCode = response.getResponseCode();
+    if (responseCode < 200 || responseCode >= 300) {
       return { error: { success: false, message: "ตรวจสอบสิทธิ์ไม่สำเร็จ", reason: "verify_failed" } };
     }
+    result = JSON.parse(response.getContentText());
+  } catch (e) {
+    return { error: { success: false, message: "ตรวจสอบสิทธิ์ไม่สำเร็จ", reason: "verify_failed" } };
   }
 
   if (!result || !result.valid || !result.user) {
     return { error: { success: false, message: "เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่", reason: (result && result.reason) || "invalid_or_expired_token" } };
   }
+  if (result.user.mustChangePassword === true) {
+    return { error: { success: false, message: "กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน", reason: "mandatory_password_change_required" } };
+  }
 
   const roles = normalizeRoles_(result.user.roles);
   const isAdmin = roles.indexOf("ADMIN") !== -1 || roles.indexOf("SUPERVISOR") !== -1;
-  const appName = opts.appName || "app-gr";
-  const perms = ((result.user.perms && result.user.perms[appName]) || []).map(String);
+  const permAppId = opts.permAppId || "app-gr";
+  const perms = ((result.user.perms && result.user.perms[permAppId]) || []).map(String);
 
   if (opts.perm) {
     const hasPerm = perms.length > 0 ? perms.indexOf(opts.perm) !== -1 : isAdmin;
@@ -572,7 +563,7 @@ function updatePO(data) {
       return [
         newPoUids[index], refPrUid, today, data.poNumber || "", data.vendor, data.warehouse,
         item.sku || "", item.product, item.quantity, item.unit || "", expectedDate,
-        "Pending GR", refPrUid.indexOf("DIRECT-") === 0 ? "Direct PO (Edited)" : "Ref PR"
+        "Pending GR", ""
       ];
     });
 
@@ -1504,6 +1495,9 @@ function bulkReceivePO(data) {
 
     data = data || {};
     data.groupInfo = data.groupInfo || {};
+    const targetStatus = normalizeGrTargetStatus_(data.targetStatus);
+    if (!targetStatus) return { success: false, message: "สถานะการรับสินค้าไม่ถูกต้อง", reason: "invalid_target_status" };
+    data.targetStatus = targetStatus;
     const items = Array.isArray(data.items) ? data.items : [];
     const extraItems = Array.isArray(data.extraItems) ? data.extraItems : [];
     const groupPoUids = normalizeUidList_((Array.isArray(data.groupPoUids) && data.groupPoUids.length) ? data.groupPoUids : items.map(item => item.uid));
@@ -1629,7 +1623,7 @@ function bulkReceivePO(data) {
         lineMsg += `📅 วันที่รับ: ${data.ata}\n`;
         lineMsg += `📋 รายการตรวจสอบแล้ว:\n${lineItemsText}\n`;
         if(data.remark) lineMsg += `📝 หมายเหตุ: ${data.remark}\n`;
-        lineMsg += `👤 ผู้ตรวจสอบ: ${data.receiverName}`;
+        lineMsg += `👤 ผู้รับลงสินค้า: ${data.receiverName}`;
         pendingLine = { text: lineMsg, type: 'COMPLETED' };
     }
 
@@ -1703,6 +1697,7 @@ function recallGR(data) {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const poSheet = ss.getSheetByName('PO');
     const grSheet = ss.getSheetByName('GR');
+    const archiveSheet = ss.getSheetByName(GR_ARCHIVE_SHEET);
 
     const poUids = normalizeUidList_((data && data.poUids) || []);
     const poUidSet = new Set(poUids);
@@ -1749,6 +1744,32 @@ function recallGR(data) {
         }
       }
     }
+    if (archiveSheet && archiveSheet.getLastRow() >= 2) {
+      const archivedRecords = findGrRowRecordsForBill_(archiveSheet, poUids);
+      if (actionType === 'recall' && archivedRecords.length > 0) {
+        const liveUids = new Set();
+        if (grSheet.getLastRow() >= 2) {
+          grSheet.getRange(2, 1, grSheet.getLastRow() - 1, 1).getValues().forEach(function(row) {
+            const uid = normalizeUid_(row[0]);
+            if (uid) liveUids.add(uid);
+          });
+        }
+        const rowsToRestore = [];
+        archivedRecords.forEach(function(record) {
+          if (record.uid && liveUids.has(record.uid)) return;
+          const values = record.values.slice();
+          values[13] = 'Draft GR';
+          rowsToRestore.push(values);
+          if (record.uid) liveUids.add(record.uid);
+        });
+        if (rowsToRestore.length > 0) {
+          grSheet.getRange(grSheet.getLastRow() + 1, 1, rowsToRestore.length, 15).setValues(rowsToRestore);
+          SpreadsheetApp.flush();
+        }
+      }
+      deleteSheetRows_(archiveSheet, archivedRecords.map(function(record) { return record.rowNumber; }));
+      CacheService.getScriptCache().remove('GR_VENDOR_LEAD_STATS_V1');
+    }
 
     invalidateGRInitialCache_();
     return { success: true, message: actionType === 'reset' ? "รีเซ็ตสถานะบิลเป็นรอรับเข้าเรียบร้อยแล้ว" : "ดึงบิลกลับมาเป็นสถานะกำลังลงสินค้าเรียบร้อยแล้ว" };
@@ -1764,7 +1785,7 @@ function recallGR(data) {
 // 6. Archive แถว GR ที่สำเร็จแล้วเกิน 30 วัน → ชีต GR_Archive
 //    - รันอัตโนมัติด้วย time-driven trigger: รัน setupArchiveTrigger() ครั้งเดียวใน GAS editor
 //    - Append ลง archive + flush ก่อนค่อยลบจากชีต GR (crash กลางทาง = ซ้ำใน archive, ไม่มีข้อมูลหาย)
-//    - ข้อจำกัด: บิลที่ถูก archive แล้ว recall/reset จะไม่เห็นข้อมูลรับเดิม (PO ยังรีเซ็ตสถานะได้)
+//    - reset ลบแถวของบิลจากทั้ง GR และ GR_Archive; recall ย้ายแถว archive กลับ GR เป็น Draft GR
 // ==========================================
 var GR_ARCHIVE_SHEET = 'GR_Archive';
 var GR_ARCHIVE_AFTER_DAYS = 30;
