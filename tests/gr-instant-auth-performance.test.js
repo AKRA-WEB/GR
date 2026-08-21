@@ -15,7 +15,7 @@ console.log("[Test 1] Version Parity Check...");
 const versionMatch = html.match(/const CURRENT_VERSION = "(.*?)";/);
 assert.ok(versionMatch, "CURRENT_VERSION must exist in index.html");
 assert.strictEqual(versionMatch[1], versionJson.version);
-assert.strictEqual(versionJson.version, "20260821.02");
+assert.strictEqual(versionJson.version, "20260821.03");
 console.log("  -> PASS: Version is " + versionJson.version);
 
 // 2. decodeJwtPayload Unit Tests
@@ -103,8 +103,11 @@ const mockAuthGuardContext = {
       return { valid: true, user: { name: "Remote" }, initialData: {} };
     }
   },
+  readApiCall: async () => ({ success: true, pendingPOs: [] }),
+  PERF_MODE: false,
+  initialDataPrefetch: null,
   decodeJwtPayload: sandbox.decodeJwtPayload,
-  CURRENT_VERSION: "20260821.02",
+  CURRENT_VERSION: "20260821.03",
   console
 };
 

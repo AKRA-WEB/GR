@@ -223,7 +223,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260821.02";
+    const CURRENT_VERSION = "20260821.03";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -491,6 +491,14 @@
                     return;
                 }
 
+                // Start active initial data prefetch immediately!
+                initialDataPrefetch = readApiCall('getInitialData', {
+                    includeCompleted: false,
+                    includeProducts: false,
+                    includeDeliveryPlanning: false,
+                    perf: PERF_MODE
+                });
+
                 // 1. Instant JWT SSO (<1ms) - Render UI & cached data immediately
                 const jwtUser = decodeJwtPayload(tokenToVerify);
                 if (jwtUser && jwtUser.mustChangePassword !== true) {
@@ -572,7 +580,18 @@
     }
 
     function getSessionToken() {
-        return (window.appSession && window.appSession.token) || "";
+        if (window.appSession && window.appSession.token) return window.appSession.token;
+        const urlParams = new URLSearchParams(window.location.search);
+        const ssoToken = urlParams.get('sso');
+        if (ssoToken) return ssoToken;
+        const cachedRaw = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
+        try {
+            if (cachedRaw) {
+                const parsed = JSON.parse(cachedRaw);
+                return parsed.token || (parsed.user && parsed.user.token) || "";
+            }
+        } catch(e) {}
+        return "";
     }
 
     function canReceiveGR() {
