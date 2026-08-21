@@ -15,8 +15,14 @@ console.log("[Test 1] Version Parity Check...");
 const versionMatch = html.match(/const CURRENT_VERSION = "(.*?)";/);
 assert.ok(versionMatch, "CURRENT_VERSION must exist in index.html");
 assert.strictEqual(versionMatch[1], versionJson.version);
-assert.strictEqual(versionJson.version, "20260821.03");
+assert.strictEqual(versionJson.version, "20260821.04");
 console.log("  -> PASS: Version is " + versionJson.version);
+
+// Check delivery plan is hidden by default
+const deliveryPlanDefaultMatch = html.match(/var isDeliveryPlanVisible = (false|true);/);
+assert.ok(deliveryPlanDefaultMatch, "isDeliveryPlanVisible must exist in index.html");
+assert.strictEqual(deliveryPlanDefaultMatch[1], "false", "Delivery planning must be hidden by default");
+console.log("  -> PASS: Delivery planning is hidden by default (isDeliveryPlanVisible = false)");
 
 // 2. decodeJwtPayload Unit Tests
 console.log("\n[Test 2] decodeJwtPayload unit tests...");
@@ -107,7 +113,7 @@ const mockAuthGuardContext = {
   PERF_MODE: false,
   initialDataPrefetch: null,
   decodeJwtPayload: sandbox.decodeJwtPayload,
-  CURRENT_VERSION: "20260821.03",
+  CURRENT_VERSION: "20260821.04",
   console
 };
 

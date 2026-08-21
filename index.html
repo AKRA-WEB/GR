@@ -223,7 +223,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260821.03";
+    const CURRENT_VERSION = "20260821.04";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -381,7 +381,7 @@
     var grDeliveryPlanRenderPending = false;
     var deliveryPlanFilter = '';
     var deliveryPlanDayOffset = null;
-    var isDeliveryPlanVisible = true;
+    var isDeliveryPlanVisible = false;
     var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
     const PRODUCT_HISTORY_PAGE_SIZE = 50;
     var productHistoryRequestGeneration = 0;
