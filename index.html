@@ -223,7 +223,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260820.07";
+    const CURRENT_VERSION = "20260821.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -539,8 +539,7 @@
     }
 
     function canViewOrderedQuantity() {
-        var roles = normalizeRoles(window.appSession && window.appSession.roles);
-        return roles.some(function (role) { return ["ADMIN", "SUPERVISOR"].includes(role); });
+        return true;
     }
 
     function esc(v) {
@@ -1590,7 +1589,8 @@
             
             let productsHtml = '<div class="space-y-1 my-3">';
             group.items.slice(0,3).forEach((item, i) => {
-                productsHtml += `<div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${item.product}</p>${itemPlanBadge(item)}</div>`;
+                const itemQtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : (item.poQty || 0);
+                productsHtml += `<div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${item.product} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${item.unit || ''})</span></p>${itemPlanBadge(item)}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
