@@ -69,12 +69,12 @@ global.fetch = async (url, options = {}) => {
   }
   if (target.endsWith('/rest/v1/rpc/gr_receive_v1')) {
     const payload = JSON.parse(options.body).p_payload;
-    assert.deepEqual(payload.items.map(item => item.uid), ['PO-B'], 'Only the submitted remainder may be mutated');
+    assert.deepEqual(payload.items.map(item => item.uid), ['item-b'], 'Only the submitted remainder may be mutated');
     const status = payload.targetStatus;
     po.items[1].status = status;
-    const existing = po.receipts.find(row => row.ref_po_uid === 'PO-B');
+    const existing = po.receipts.find(row => row.ref_po_uid === 'PO-B' || row.ref_po_uid === 'item-b');
     if (existing) existing.status = status;
-    else po.receipts.push(receipt('B', 'item-b', 'PO-B', status));
+    else po.receipts.push(receipt('B', 'item-b', 'item-b', status));
     po.status = po.items.every(item => item.status === 'GR Completed') ? 'GR Completed' : 'Partial GR';
     return { ok: true, status: 200, headers: new Headers(), json: async () => ({ success: true }) };
   }
@@ -103,22 +103,22 @@ async function invoke(action, data) {
   const boot = await invoke('bootstrap', { includeCompleted: true });
   assert.equal(boot.valid, true);
   let data = boot.initialData;
-  assert.deepEqual(data.pendingPOs.map(item => item.uid), ['PO-B']);
-  assert.deepEqual(data.grCompleted.map(item => item.uid), ['PO-A']);
+  assert.deepEqual(data.pendingPOs.map(item => item.uid), ['item-b']);
+  assert.deepEqual(data.grCompleted.map(item => item.uid), ['item-a']);
 
-  await invoke('bulkReceivePO', { targetStatus: 'Pending Review', items: [{ uid: 'PO-B', expectedStatus: 'Pending GR', grQty: 10 }] });
+  await invoke('bulkReceivePO', { targetStatus: 'Pending Review', items: [{ uid: 'item-b', expectedStatus: 'Pending GR', grQty: 10 }] });
   data = await invoke('getInitialData', { includeCompleted: true });
-  assert.deepEqual(data.pendingPOs.map(item => [item.uid, item.status]), [['PO-B', 'Pending Review']]);
-  assert.deepEqual(data.grCompleted.map(item => item.uid), ['PO-A'], 'Receiving the remainder must preserve completed item A');
+  assert.deepEqual(data.pendingPOs.map(item => [item.uid, item.status]), [['item-b', 'Pending Review']]);
+  assert.deepEqual(data.grCompleted.map(item => item.uid), ['item-a'], 'Receiving the remainder must preserve completed item A');
 
-  await invoke('bulkReceivePO', { targetStatus: 'GR Completed', items: [{ uid: 'PO-B', expectedStatus: 'Pending Review', grQty: 10 }] });
+  await invoke('bulkReceivePO', { targetStatus: 'GR Completed', items: [{ uid: 'item-b', expectedStatus: 'Pending Review', grQty: 10 }] });
   data = await invoke('getInitialData', { includeCompleted: true });
   assert.equal(data.pendingPOs.length, 0);
-  assert.deepEqual(new Set(data.grCompleted.map(item => item.uid)), new Set(['PO-A', 'PO-B']));
+  assert.deepEqual(new Set(data.grCompleted.map(item => item.uid)), new Set(['item-a', 'item-b']));
 
-  await invoke('recallGR', { actionType: 'reset', billRef: 'BILL-1', poUids: ['PO-B'] });
+  await invoke('recallGR', { actionType: 'reset', billRef: 'BILL-1', poUids: ['item-b'] });
   data = await invoke('getInitialData', { includeCompleted: true });
-  assert.deepEqual(new Set(data.pendingPOs.map(item => item.uid)), new Set(['PO-A', 'PO-B']));
+  assert.deepEqual(new Set(data.pendingPOs.map(item => item.uid)), new Set(['item-a', 'item-b']));
   assert.equal(data.grCompleted.length, 0);
   console.log('PASS gr-supabase-lifecycle-runtime: partial, later receive, completion, refresh, and reset stay in one Supabase projection');
 })().finally(() => {
