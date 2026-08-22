@@ -1,10 +1,54 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
+const nodeCrypto = require('node:crypto');
+const vm = require('node:vm');
+
+function transpileTsToJs(tsCode) {
+  return tsCode
+    .replace(/\r\n/g, '\n')
+    .replace(/^import\b.*$/gm, '')
+    .replace(/^export\s+/gm, '')
+    .replace(/^type\s+[A-Za-z0-9_]+\s*=.*$/gm, '')
+    .replace(/declare\s+const\s+Deno[\s\S]*?;\n\};/g, '')
+    .replace(/declare\s+const\s+EdgeRuntime[^;]+;/g, '')
+    .replace(/new\s+Map<[^>\n]+>\(\)/g, 'new Map()')
+    .replace(/new\s+Set<[^>\n]+>\(\)/g, 'new Set()')
+    .replace(/\bas\s+[A-Za-z0-9_<>\[\]]+/g, '')
+    .replace(/interface\s+[A-Za-z0-9_]+\s*\{[\s\S]*?\}/g, '')
+    .replace(/\):\s*Promise<\{[\s\S]*?\}\s*>\s*\{/g, ') {')
+    .replace(/\):\s*\{[\s\S]*?\}\s*\{/g, ') {')
+    .replace(/\):\s*[A-Za-z0-9_<>\[\],| ]+\s*\{/g, ') {')
+    .replace(/\(([A-Za-z0-9_$]+)\s*:\s*Record<string,\s*string>,\s*([A-Za-z0-9_$]+)\)\s*=>/g, '($1, $2) =>')
+    .replace(/(function\s+[A-Za-z0-9_$]+\s*)\(([^)]*)\)/g, (match, fn, params) => {
+      const cleaned = params.split(',').map(param => param.split(':')[0].trim()).join(', ');
+      return fn + '(' + cleaned + ')';
+    })
+    .replace(/\(([A-Za-z0-9_$,\s:]+)\)\s*=>/g, (match, params) => {
+      const cleaned = params.split(',').map(param => param.split(':')[0].trim()).join(', ');
+      return '(' + cleaned + ') =>';
+    })
+    .replace(/\b(const|let|var)\s+([A-Za-z0-9_$]+)\s*:\s*[A-Za-z0-9_<>\[\],| ]+\s*=/g, '$1 $2 =')
+    .replace(/catch\s*\(\s*([A-Za-z0-9_$]+)\s*:\s*[A-Za-z0-9_]+\s*\)/g, 'catch ($1)')
+    .replace(/\)!([.;,\s\)])/g, ')$1')
+    .replace(/([A-Za-z0-9_$]+)!([.;,\s\)])/g, '$1$2');
+}
+
+function signedToken(claims) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const input = `${header}.${payload}`;
+  const signature = nodeCrypto
+    .createHmac('sha256', 'test-main-jwt-secret-at-least-32-characters')
+    .update(input)
+    .digest('base64url');
+  return `${input}.${signature}`;
+}
 
 let handler;
 global.Deno = {
   env: { get: name => ({
-    MAIN_VERIFY_URL: 'https://main.example/exec',
+    MAIN_JWT_SECRET: 'test-main-jwt-secret-at-least-32-characters',
     SUPABASE_URL: 'https://database.example',
     GR_SUPABASE_SECRET_KEY: 'server-only-key',
     GR_ALLOWED_ORIGINS: 'https://akra-web.github.io'
@@ -49,14 +93,12 @@ function receipt(label, itemId, uid, status) {
 const originalFetch = global.fetch;
 global.fetch = async (url, options = {}) => {
   const target = String(url);
-  if (target.startsWith('https://main.example/exec')) {
-    return { ok: true, json: async () => ({ valid: true, user: {
-      id: 'A1', name: 'Approver', roles: ['SUPERVISOR'], perms: { 'app-gr': ['receiveGR', 'approveGR'] }
-    } }) };
-  }
   if (target.startsWith('https://database.example/rest/v1/')) {
     assert.equal(options.headers.get('apikey'), 'server-only-key');
     assert.equal(options.headers.has('Authorization'), false, 'Modern Supabase secrets use apikey only');
+  }
+  if (target.endsWith('/rest/v1/rpc/auth_validate_session_v1')) {
+    return { ok: true, status: 200, headers: new Headers(), json: async () => ({ valid: true }) };
   }
   if (target.includes('/rest/v1/purchase_order_items?')) {
     return { ok: true, status: 200, headers: new Headers(), json: async () => [{ po_id: po.id }] };
@@ -87,13 +129,32 @@ global.fetch = async (url, options = {}) => {
   throw new Error(`Unexpected fetch: ${target}`);
 };
 
-require(path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', 'gr-api', 'index.ts'));
+const sharedSource = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', '_shared', 'main-jwt.ts'),
+  'utf8'
+);
+const grSource = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', 'gr-api', 'index.ts'),
+  'utf8'
+);
+vm.runInThisContext(transpileTsToJs(`${sharedSource}\n${grSource}`), { filename: 'gr-api.bundle.ts' });
+
+const approverToken = signedToken({
+  tokenVersion: 2,
+  sessionVersion: 1,
+  authorizationRevision: 'revision-1',
+  id: 'A1',
+  name: 'Approver',
+  roles: ['SUPERVISOR'],
+  perms: { 'app-gr': ['receiveGR', 'approveGR'] },
+  exp: Date.now() + 60000
+});
 
 async function invoke(action, data) {
   const response = await handler(new Request('https://database.example/functions/v1/gr-api', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://akra-web.github.io' },
-    body: JSON.stringify({ action, data, token: 'approver-token' })
+    body: JSON.stringify({ action, data, token: approverToken })
   }));
   assert.equal(response.status, 200);
   return response.json();
