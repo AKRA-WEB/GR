@@ -15,7 +15,7 @@ console.log("[Test 1] Version Parity Check...");
 const versionMatch = html.match(/const CURRENT_VERSION = "(.*?)";/);
 assert.ok(versionMatch, "CURRENT_VERSION must exist in index.html");
 assert.strictEqual(versionMatch[1], versionJson.version);
-assert.strictEqual(versionJson.version, "20260821.04");
+assert.strictEqual(versionJson.version, "20260824.01");
 console.log("  -> PASS: Version is " + versionJson.version);
 
 // Check delivery plan is hidden by default
@@ -113,7 +113,7 @@ const mockAuthGuardContext = {
   PERF_MODE: false,
   initialDataPrefetch: null,
   decodeJwtPayload: sandbox.decodeJwtPayload,
-  CURRENT_VERSION: "20260821.04",
+  CURRENT_VERSION: "20260824.01",
   console
 };
 

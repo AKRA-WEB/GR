@@ -217,13 +217,14 @@
       </main>
   </div>
 
-  <div id="data-loader" class="fixed inset-0 bg-white/80 z-[9000] hidden flex-col justify-center items-center backdrop-blur-sm">
-      <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#E35205] mb-4"></div>
+  <div id="data-loader" role="status" aria-live="polite" aria-busy="false" class="fixed inset-0 bg-white/80 z-[9000] hidden flex-col justify-center items-center backdrop-blur-sm">
+      <div id="data-loader-spinner" class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#E35205] mb-4"></div>
       <p class="text-brand-orange font-medium" id="data-loader-text">กำลังประมวลผล...</p>
+      <button type="button" id="data-loader-retry" onclick="openReceiving(true)" class="hidden mt-5 px-5 py-2.5 rounded-lg bg-brand-orange text-white font-medium shadow-md hover:bg-[#CC4904]">ลองอีกครั้ง</button>
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260821.04";
+    const CURRENT_VERSION = "20260824.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -363,6 +364,7 @@
     var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzN9bIC6gxWGMR4tbj96E0yzWbHrrZ9NeYLtJR_Al7mRW_4L_sALC1rU4nCizVn3I/exec";
     
     var appData = { products: [], pendingPOs: [] };
+    var grActiveDataRendered = false;
     var initialDataPrefetch = null;
     var groupedPOs = [];
     var currentActiveGroup = null;
@@ -613,8 +615,30 @@
         });
     }
 
-    function showDataLoading(text = 'กำลังโหลด...') { document.getElementById('data-loader-text').innerText = text; document.getElementById('data-loader').classList.remove('hidden'); document.getElementById('data-loader').classList.add('flex'); }
-    function hideDataLoading() { document.getElementById('data-loader').classList.add('hidden'); document.getElementById('data-loader').classList.remove('flex'); }
+    function showDataLoading(text = 'กำลังโหลด...') {
+        document.getElementById('data-loader-text').innerText = text;
+        document.getElementById('data-loader-spinner').classList.remove('hidden');
+        document.getElementById('data-loader-retry').classList.add('hidden');
+        const loader = document.getElementById('data-loader');
+        if (loader.setAttribute) loader.setAttribute('aria-busy', 'true');
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+    }
+    function showDataLoadFailure(message) {
+        document.getElementById('data-loader-text').innerText = message;
+        document.getElementById('data-loader-spinner').classList.add('hidden');
+        document.getElementById('data-loader-retry').classList.remove('hidden');
+        const loader = document.getElementById('data-loader');
+        if (loader.setAttribute) loader.setAttribute('aria-busy', 'false');
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+    }
+    function hideDataLoading() {
+        const loader = document.getElementById('data-loader');
+        if (loader.setAttribute) loader.setAttribute('aria-busy', 'false');
+        loader.classList.add('hidden');
+        loader.classList.remove('flex');
+    }
     const GR_CACHE_TTL = 60 * 1000;
     const GR_PRODUCTS_CACHE_TTL = 2 * 60 * 60 * 1000;
     var grProductsLoaded = false;
@@ -1183,7 +1207,7 @@
         grDeliveryPlanningLoaded = false;
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
-        const coldStart = !cachedData && !isManualRefresh;
+        let cacheUsable = isManualRefresh && grActiveDataRendered;
         if (cachedData && !isManualRefresh) {
             try {
                 appData = cachedData;
@@ -1192,14 +1216,22 @@
                 renderPOListForReceiving();
                 showView('receiving-list-view');
                 showNotification('กำลังอัปเดตข้อมูลล่าสุด...', 'warning');
-            } catch(e) { showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...'); }
+                cacheUsable = true;
+                grActiveDataRendered = true;
+            } catch(e) {
+                showView('receiving-list-view');
+                renderPOListSkeleton();
+                showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
+            }
         } else if (isManualRefresh) {
             showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
         } else {
-            // Cold start: show app chrome/filters + skeleton instead of a full-screen blocking spinner.
+            // Cold start: render the shell/skeleton behind a truthful full-page loading state.
             showView('receiving-list-view');
             renderPOListSkeleton();
+            showDataLoading('กำลังโหลดข้อมูลรอรับเข้า...');
         }
+        const coldStart = !cacheUsable && !isManualRefresh;
 
         const fetchStart = Date.now();
         const fetchPromise = (!isManualRefresh && initialDataPrefetch)
@@ -1209,8 +1241,6 @@
         const response = await fetchPromise;
         perfLog(coldStart ? 'active fetch (cold start)' : (isManualRefresh ? 'active fetch (manual refresh)' : 'active fetch (warm cache)'), fetchStart);
         if (response.serverTimings) perfLog('active server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
-
-        if (isManualRefresh) hideDataLoading();
 
         if (response.success) {
             const productsAlreadyLoaded = (appData && appData.products) || [];
@@ -1228,12 +1258,17 @@
                 await ensureCompletedLoaded();
             }
             renderPOListForReceiving();
+            grActiveDataRendered = true;
 
-            if (!cachedData && !isManualRefresh && !productHistoryIsOpen) showView('receiving-list-view');
+            if (!cacheUsable && !isManualRefresh && !productHistoryIsOpen) showView('receiving-list-view');
             if (!grProductsLoaded) loadGRProductsBackground();
-        } else if (!cachedData) {
+            if (!cacheUsable || isManualRefresh) hideDataLoading();
+        } else if (!cacheUsable) {
             if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
             showNotification('ดึงข้อมูลไม่สำเร็จ: ' + (response.message || response.error || 'กรุณาลองใหม่'), 'error');
+            showDataLoadFailure('โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง');
+        } else if (isManualRefresh) {
+            hideDataLoading();
         }
         // Independent of whether the active fetch succeeded: if cachedData already rendered the
         // list (or pendingPOs is otherwise populated), still attempt to fill in the plan/calendar
