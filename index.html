@@ -71,6 +71,9 @@
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
               <p class="text-sm text-white/90 font-light hidden sm:block">ผู้รับของ: <span id="display-username" class="font-medium text-white">-</span></p>
+              <button type="button" onclick="openVendorLeadtimeDashboard()" aria-label="เปิดประวัติและ Leadtime ของ Vendor" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
+                <i data-lucide="trending-up" class="w-4 h-4"></i> <span class="hidden sm:inline">Leadtime & ประวัติ</span>
+              </button>
               <button type="button" onclick="openProductHistory()" aria-label="เปิดประวัติสินค้า" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
                 <i data-lucide="history" class="w-4 h-4"></i> <span class="hidden sm:inline">ประวัติสินค้า</span>
               </button>
@@ -142,6 +145,149 @@
               <div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-5 py-10 text-center text-sm text-gray-500">เลือกสินค้าเพื่อเริ่มค้นหาประวัติการรับเข้า</div>
             </div>
             <button type="button" id="product-history-load-more" class="hidden mx-auto px-5 py-3 rounded-xl border border-brand-orange/30 bg-white text-brand-orange text-sm font-bold hover:bg-brand-orangeLight">โหลดประวัติเพิ่ม</button>
+          </div>
+        </section>
+
+        <!-- Vendor Leadtime & Receiving History Section -->
+        <section id="vendor-leadtime-view" class="hidden" aria-labelledby="vendor-leadtime-title">
+          <div class="flex flex-col gap-4">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
+              <div>
+                <button type="button" onclick="showView('receiving-list-view')" class="text-sm font-medium text-gray-500 flex items-center mb-2 hover:text-brand-orange transition"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารับสินค้า</button>
+                <h2 id="vendor-leadtime-title" class="text-xl font-bold text-brand-orange flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-6 h-6"></i> วิเคราะห์ Leadtime ของ Vendor & ประวัติการรับสินค้า
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">วิเคราะห์ระยะเวลาส่งมอบเฉลี่ย ความตรงต่อเวลา และสืบค้นประวัติการรับเข้าย้อนหลัง</p>
+              </div>
+              <div class="flex gap-1.5 bg-gray-200/80 p-1 rounded-xl self-start sm:self-auto">
+                <button type="button" id="tab-btn-vendor-benchmarks" onclick="switchVendorLeadtimeTab('benchmarks')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition bg-white text-brand-orange shadow-sm">
+                  📊 สรุป Leadtime ราย Vendor
+                </button>
+                <button type="button" id="tab-btn-vendor-history" onclick="switchVendorLeadtimeTab('history')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-gray-600 hover:text-gray-900">
+                  📜 ประวัติบิลรับเข้าทั้งหมด
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 1: Vendor Leadtime Benchmarks -->
+            <div id="vendor-leadtime-tab-benchmarks" class="flex flex-col gap-4">
+              <!-- KPI Cards -->
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="glass-card p-4 border-l-4 border-l-brand-orange">
+                  <p class="text-xs font-medium text-gray-500">จำนวน Vendor ทั้งหมด</p>
+                  <p id="vl-kpi-vendor-count" class="text-2xl font-black text-gray-900 mt-1">-</p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">มีประวัติรับสินค้าสำเร็จ</p>
+                </div>
+                <div class="glass-card p-4 border-l-4 border-l-brand-blue">
+                  <p class="text-xs font-medium text-gray-500">Leadtime เฉลี่ยรวม</p>
+                  <p id="vl-kpi-avg-leadtime" class="text-2xl font-black text-brand-blue mt-1">-</p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">นับจากวัน PO ถึงวันรับจริง</p>
+                </div>
+                <div class="glass-card p-4 border-l-4 border-l-emerald-500">
+                  <p class="text-xs font-medium text-gray-500">อัตราส่งตรงเวลา (On-Time)</p>
+                  <p id="vl-kpi-ontime-rate" class="text-2xl font-black text-emerald-600 mt-1">-</p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">เทียบวันนัดส่ง Expected Date</p>
+                </div>
+                <div class="glass-card p-4 border-l-4 border-l-purple-500">
+                  <p class="text-xs font-medium text-gray-500">บิลรับเข้าสำเร็จทั้งหมด</p>
+                  <p id="vl-kpi-total-receipts" class="text-2xl font-black text-purple-700 mt-1">-</p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">ประวัติรับเข้าสะสม</p>
+                </div>
+              </div>
+
+              <!-- Search & Filter Controls -->
+              <div class="glass-card p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label for="vl-search-input" class="block text-xs font-medium text-gray-600 mb-1">🔍 ค้นหา Vendor</label>
+                  <input type="search" id="vl-search-input" oninput="renderVendorLeadtimeList()" placeholder="พิมพ์ชื่อผู้ขาย เช่น UFM, ไร่ทิพย์..." class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                </div>
+                <div>
+                  <label for="vl-confidence-filter" class="block text-xs font-medium text-gray-600 mb-1">ความน่าเชื่อถือข้อมูล</label>
+                  <select id="vl-confidence-filter" onchange="renderVendorLeadtimeList()" class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                    <option value="">ทั้งหมด (All Confidence)</option>
+                    <option value="high">สูง (High - 8+ บิล)</option>
+                    <option value="medium">ปานกลาง (Medium - 3-7 บิล)</option>
+                    <option value="low">เบื้องต้น (Low - 1-2 บิล)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="vl-sort-by" class="block text-xs font-medium text-gray-600 mb-1">เรียงตาม</label>
+                  <select id="vl-sort-by" onchange="renderVendorLeadtimeList()" class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                    <option value="receipts_desc">จำนวนบิลรับเข้ามากสุด</option>
+                    <option value="lead_asc">Leadtime เร็วสุด (น้อยไปมาก)</option>
+                    <option value="lead_desc">Leadtime ช้าสุด (มากไปน้อย)</option>
+                    <option value="ontime_desc">อัตราส่งตรงเวลาสูงสุด</option>
+                    <option value="name_asc">ชื่อ Vendor (ก-ฮ / A-Z)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Vendor Cards Container -->
+              <div id="vl-vendor-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- Tab 2: Detailed Filterable Receiving History -->
+            <div id="vendor-leadtime-tab-history" class="hidden flex flex-col gap-4">
+              <!-- Filter Card -->
+              <form id="vl-history-filter-form" class="glass-card p-4 sm:p-5" onsubmit="event.preventDefault(); fetchVendorReceiptHistory(true);">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label for="vlh-search-input" class="block text-xs font-medium text-gray-600 mb-1">🔍 ค้นหา (PO / สินค้า / SKU)</label>
+                    <input type="text" id="vlh-search-input" placeholder="เลข PO, สินค้า, SKU..." class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                  </div>
+                  <div>
+                    <label for="vlh-vendor-filter" class="block text-xs font-medium text-gray-600 mb-1">🏢 Vendor (ผู้ขาย)</label>
+                    <input type="text" id="vlh-vendor-filter" list="vlh-vendor-options" placeholder="พิมพ์หรือเลือกชื่อ Vendor" class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                    <datalist id="vlh-vendor-options"></datalist>
+                  </div>
+                  <div>
+                    <label for="vlh-wh-filter" class="block text-xs font-medium text-gray-600 mb-1">🛒 คลังรับสินค้า</label>
+                    <select id="vlh-wh-filter" class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                      <option value="">ทุกคลัง (All)</option>
+                      <option value="W1">W1</option><option value="W2">W2</option><option value="W3">W3</option>
+                      <option value="W4">W4</option><option value="W5">W5</option><option value="C1">C1</option><option value="C2">C2</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="vlh-date-range-preset" class="block text-xs font-medium text-gray-600 mb-1">📅 ช่วงวันที่รับเข้า</label>
+                    <select id="vlh-date-range-preset" onchange="handleHistoryDatePresetChange()" class="input-field m-0 text-sm py-2 bg-white border-gray-200">
+                      <option value="30d">30 วันล่าสุด</option>
+                      <option value="7d">7 วันล่าสุด</option>
+                      <option value="90d">90 วันล่าสุด</option>
+                      <option value="all">ทั้งหมด (All Time)</option>
+                      <option value="custom">กำหนดเอง (Custom)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="vlh-custom-date-container" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-100">
+                  <div>
+                    <label for="vlh-date-from" class="block text-xs font-medium text-gray-600 mb-1">ตั้งแต่วันที่</label>
+                    <input type="date" id="vlh-date-from" class="input-field m-0 text-sm py-1.5 bg-white border-gray-200">
+                  </div>
+                  <div>
+                    <label for="vlh-date-to" class="block text-xs font-medium text-gray-600 mb-1">ถึงวันที่</label>
+                    <input type="date" id="vlh-date-to" class="input-field m-0 text-sm py-1.5 bg-white border-gray-200">
+                  </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-100">
+                  <span id="vlh-status-text" class="text-xs text-gray-500"></span>
+                  <div class="flex gap-2 self-end sm:self-auto">
+                    <button type="button" onclick="resetHistoryFilters()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50">ล้างตัวกรอง</button>
+                    <button type="submit" class="px-5 py-1.5 rounded-lg bg-brand-orange hover:bg-[#CC4904] text-xs font-bold text-white shadow-sm flex items-center gap-1.5">
+                      <i data-lucide="search" class="w-3.5 h-3.5"></i> ค้นหาประวัติ
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Detailed History List -->
+              <div id="vlh-history-results" class="flex flex-col gap-3"></div>
+
+              <button type="button" id="vlh-load-more" onclick="loadMoreVendorReceiptHistory()" class="hidden mx-auto px-5 py-3 rounded-xl border border-brand-orange/30 bg-white text-brand-orange text-sm font-bold hover:bg-brand-orangeLight">โหลดประวัติเพิ่ม</button>
+            </div>
           </div>
         </section>
 
@@ -224,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260824.01";
+    const CURRENT_VERSION = "20260831.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -388,6 +534,17 @@
     const PRODUCT_HISTORY_PAGE_SIZE = 50;
     var productHistoryRequestGeneration = 0;
     var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
+    var vendorLeadtimeInsights = null;
+    var vendorLeadtimeLoaded = false;
+    var currentVendorLeadtimeTab = 'benchmarks';
+    var vendorReceiptHistoryState = {
+        bills: [],
+        total: 0,
+        offset: 0,
+        limit: 20,
+        hasMore: false,
+        loading: false
+    };
 
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -471,7 +628,7 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getVendorDeliveryInsights', 'getProductReceiptHistory'] });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getVendorDeliveryInsights', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory'] });
 
             lucide.createIcons();
             UI.showLoading();
@@ -1140,7 +1297,7 @@
     }
 
     function isReadApiAction(action) {
-        return action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning' || action === 'getProductReceiptHistory';
+        return action === 'getInitialData' || action === 'getProducts' || action === 'getDeliveryPlanning' || action === 'getProductReceiptHistory' || action === 'getVendorLeadtimeInsights' || action === 'getVendorReceiptHistory';
     }
 
     function delay(ms) {
@@ -1455,6 +1612,394 @@
         searchProductReceiptHistory(true);
     });
     document.getElementById('product-history-load-more').addEventListener('click', loadMoreProductReceiptHistory);
+
+    // ===== Vendor Leadtime & Receiving History Functions =====
+    const CACHE_GR_VENDOR_LEADTIME_KEY = 'CACHE_GR_VENDOR_LEADTIME_V1';
+    const GR_VENDOR_LEADTIME_CACHE_TTL = 15 * 60 * 1000;
+
+    function switchVendorLeadtimeTab(tab) {
+        currentVendorLeadtimeTab = tab;
+        const btnBenchmarks = document.getElementById('tab-btn-vendor-benchmarks');
+        const btnHistory = document.getElementById('tab-btn-vendor-history');
+        const tabBenchmarks = document.getElementById('vendor-leadtime-tab-benchmarks');
+        const tabHistory = document.getElementById('vendor-leadtime-tab-history');
+
+        if (tab === 'benchmarks') {
+            if (btnBenchmarks) btnBenchmarks.className = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition bg-white text-brand-orange shadow-sm';
+            if (btnHistory) btnHistory.className = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-gray-600 hover:text-gray-900';
+            if (tabBenchmarks) tabBenchmarks.classList.remove('hidden');
+            if (tabHistory) tabHistory.classList.add('hidden');
+            if (!vendorLeadtimeLoaded) loadVendorLeadtimeInsights();
+        } else {
+            if (btnHistory) btnHistory.className = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition bg-white text-brand-orange shadow-sm';
+            if (btnBenchmarks) btnBenchmarks.className = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-gray-600 hover:text-gray-900';
+            if (tabHistory) tabHistory.classList.remove('hidden');
+            if (tabBenchmarks) tabBenchmarks.classList.add('hidden');
+            if (vendorReceiptHistoryState.bills.length === 0 && !vendorReceiptHistoryState.loading) {
+                fetchVendorReceiptHistory(true);
+            }
+        }
+        lucide.createIcons({ root: document.getElementById('vendor-leadtime-view') });
+    }
+
+    async function openVendorLeadtimeDashboard() {
+        showView('vendor-leadtime-view');
+        switchVendorLeadtimeTab(currentVendorLeadtimeTab || 'benchmarks');
+        if (!vendorLeadtimeLoaded) {
+            await loadVendorLeadtimeInsights();
+        }
+    }
+
+    async function loadVendorLeadtimeInsights(force = false) {
+        const container = document.getElementById('vl-vendor-list');
+        if (!force) {
+            const cached = getCache(CACHE_GR_VENDOR_LEADTIME_KEY, GR_VENDOR_LEADTIME_CACHE_TTL);
+            if (cached && cached.summary && cached.vendors) {
+                vendorLeadtimeInsights = cached;
+                vendorLeadtimeLoaded = true;
+                applyVendorLeadtimeSummary(cached.summary);
+                populateVendorOptions(cached.vendors);
+                renderVendorLeadtimeList();
+                return;
+            }
+        }
+
+        if (container) {
+            container.innerHTML = `
+                <div class="col-span-full glass-card p-8 text-center animate-pulse">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-orange border-t-transparent mb-3"></div>
+                    <p class="text-sm font-medium text-gray-600">กำลังประมวลผลสถิติ Leadtime ของ Vendor...</p>
+                </div>`;
+        }
+
+        try {
+            const response = await apiCall('getVendorLeadtimeInsights', {});
+            if (response.success) {
+                vendorLeadtimeInsights = response;
+                vendorLeadtimeLoaded = true;
+                setCache(CACHE_GR_VENDOR_LEADTIME_KEY, response);
+                applyVendorLeadtimeSummary(response.summary);
+                populateVendorOptions(response.vendors);
+                renderVendorLeadtimeList();
+            } else if (container) {
+                container.innerHTML = `<div class="col-span-full rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-medium text-red-600">${esc(response.message || response.error || 'ไม่สามารถโหลดสถิติได้')}</div>`;
+            }
+        } catch (e) {
+            if (container) container.innerHTML = `<div class="col-span-full rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-medium text-red-600">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>`;
+        }
+    }
+
+    function applyVendorLeadtimeSummary(summary) {
+        if (!summary) return;
+        const countEl = document.getElementById('vl-kpi-vendor-count');
+        const avgEl = document.getElementById('vl-kpi-avg-leadtime');
+        const ontimeEl = document.getElementById('vl-kpi-ontime-rate');
+        const totalEl = document.getElementById('vl-kpi-total-receipts');
+        if (countEl) countEl.innerText = `${summary.vendorCount || 0} ราย`;
+        if (avgEl) avgEl.innerText = `${summary.overallAvgLeadDays || 0} วัน`;
+        if (ontimeEl) ontimeEl.innerText = summary.overallOnTimeRate !== null ? `${summary.overallOnTimeRate}%` : '-';
+        if (totalEl) totalEl.innerText = `${Number(summary.totalReceipts || 0).toLocaleString()} บิล`;
+    }
+
+    function populateVendorOptions(vendors) {
+        const datalist = document.getElementById('vlh-vendor-options');
+        if (!datalist) return;
+        datalist.replaceChildren();
+        (vendors || []).forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.vendorName;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function renderVendorLeadtimeList() {
+        const container = document.getElementById('vl-vendor-list');
+        if (!container || !vendorLeadtimeInsights || !vendorLeadtimeInsights.vendors) return;
+
+        const search = (document.getElementById('vl-search-input')?.value || '').trim().toLowerCase();
+        const confFilter = document.getElementById('vl-confidence-filter')?.value || '';
+        const sortBy = document.getElementById('vl-sort-by')?.value || 'receipts_desc';
+
+        let list = (vendorLeadtimeInsights.vendors || []).filter(v => {
+            if (search && !v.vendorName.toLowerCase().includes(search)) return false;
+            if (confFilter && v.confidence !== confFilter) return false;
+            return true;
+        });
+
+        list.sort((a, b) => {
+            if (sortBy === 'lead_asc') return (a.avgLeadDays - b.avgLeadDays) || (b.totalReceipts - a.totalReceipts);
+            if (sortBy === 'lead_desc') return (b.avgLeadDays - a.avgLeadDays) || (b.totalReceipts - a.totalReceipts);
+            if (sortBy === 'ontime_desc') return ((b.onTimeRate ?? -1) - (a.onTimeRate ?? -1)) || (b.totalReceipts - a.totalReceipts);
+            if (sortBy === 'name_asc') return a.vendorName.localeCompare(b.vendorName, 'th');
+            return (b.totalReceipts - a.totalReceipts) || (a.avgLeadDays - b.avgLeadDays);
+        });
+
+        if (list.length === 0) {
+            container.innerHTML = `<div class="col-span-full rounded-2xl border border-dashed border-gray-300 bg-white/60 p-10 text-center text-sm text-gray-500">ไม่พบข้อมูล Vendor ตามเงื่อนไขที่ค้นหา</div>`;
+            return;
+        }
+
+        container.innerHTML = list.map(v => {
+            const leadClass = v.avgLeadDays <= 2 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : (v.avgLeadDays <= 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200');
+
+            const confBadge = v.confidence === 'high' ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">เชื่อถือสูง (8+ บิล)</span>`
+                : (v.confidence === 'medium' ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue">ปานกลาง (3-7 บิล)</span>`
+                : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">เบื้องต้น (1-2 บิล)</span>`);
+
+            const onTimeBadge = v.onTimeRate !== null
+                ? `<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">🎯 ${v.onTimeRate}% ตรงเวลา</span>`
+                : `<span class="text-[11px] text-gray-400">ยังไม่มีวันนัด</span>`;
+
+            return `
+                <div class="glass-card p-4 sm:p-5 flex flex-col justify-between hover:shadow-md transition">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <h3 class="font-bold text-gray-900 text-base leading-tight">${esc(v.vendorName)}</h3>
+                            ${confBadge}
+                        </div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-lg border ${leadClass}">
+                                ⏱️ เฉลี่ย ${esc(v.avgLeadDays)} วัน
+                            </span>
+                            ${onTimeBadge}
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs bg-gray-50/80 p-2.5 rounded-xl border border-gray-100 mb-3">
+                            <div><span class="text-gray-400">มัธยฐาน:</span> <span class="font-semibold text-gray-700">${esc(v.medianLeadDays)} วัน</span></div>
+                            <div><span class="text-gray-400">P75 Safety:</span> <span class="font-semibold text-gray-700">${esc(v.p75LeadDays)} วัน</span></div>
+                            <div><span class="text-gray-400">ช่วง (Min-Max):</span> <span class="font-semibold text-gray-700">${esc(v.minLeadDays)} - ${esc(v.maxLeadDays)} วัน</span></div>
+                            <div><span class="text-gray-400">รับล่าสุด:</span> <span class="font-semibold text-gray-700">${esc(v.latestAtaDate || '-')}</span></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <span class="text-xs text-gray-500 font-medium">📦 รับเข้าแล้ว ${esc(v.totalReceipts)} บิล (${esc(v.totalItems)} รายการ)</span>
+                        <button type="button" onclick="viewVendorHistory('${esc(v.vendorName)}')" class="text-xs font-bold text-brand-orange hover:text-[#CC4904] flex items-center gap-1 bg-brand-orangeLight px-2.5 py-1.5 rounded-lg border border-brand-orange/20 transition">
+                            ดูบิลประวัติ <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                </div>`;
+        }).join('');
+
+        lucide.createIcons({ root: container });
+    }
+
+    function viewVendorHistory(vendorName) {
+        switchVendorLeadtimeTab('history');
+        const vendorInput = document.getElementById('vlh-vendor-filter');
+        if (vendorInput) vendorInput.value = vendorName;
+        const presetEl = document.getElementById('vlh-date-range-preset');
+        if (presetEl) presetEl.value = 'all';
+        handleHistoryDatePresetChange();
+        fetchVendorReceiptHistory(true);
+    }
+
+    function handleHistoryDatePresetChange() {
+        const preset = document.getElementById('vlh-date-range-preset')?.value;
+        const customContainer = document.getElementById('vlh-custom-date-container');
+        if (customContainer) {
+            if (preset === 'custom') {
+                customContainer.classList.remove('hidden');
+            } else {
+                customContainer.classList.add('hidden');
+            }
+        }
+    }
+
+    function calculateHistoryDateRange() {
+        const preset = document.getElementById('vlh-date-range-preset')?.value || '30d';
+        if (preset === 'custom') {
+            return {
+                dateFrom: document.getElementById('vlh-date-from')?.value || '',
+                dateTo: document.getElementById('vlh-date-to')?.value || ''
+            };
+        }
+        if (preset === 'all') return { dateFrom: '', dateTo: '' };
+        const now = new Date();
+        const days = preset === '7d' ? 7 : (preset === '90d' ? 90 : 30);
+        const past = new Date(now.getTime() - days * 86400000);
+        const yyyy = past.getFullYear();
+        const mm = String(past.getMonth() + 1).padStart(2, '0');
+        const dd = String(past.getDate()).padStart(2, '0');
+        return {
+            dateFrom: `${yyyy}-${mm}-${dd}`,
+            dateTo: ''
+        };
+    }
+
+    function resetHistoryFilters() {
+        const searchInp = document.getElementById('vlh-search-input');
+        const vendorInp = document.getElementById('vlh-vendor-filter');
+        const whInp = document.getElementById('vlh-wh-filter');
+        const presetInp = document.getElementById('vlh-date-range-preset');
+        const dateFromInp = document.getElementById('vlh-date-from');
+        const dateToInp = document.getElementById('vlh-date-to');
+        if (searchInp) searchInp.value = '';
+        if (vendorInp) vendorInp.value = '';
+        if (whInp) whInp.value = '';
+        if (presetInp) presetInp.value = '30d';
+        if (dateFromInp) dateFromInp.value = '';
+        if (dateToInp) dateToInp.value = '';
+        handleHistoryDatePresetChange();
+        fetchVendorReceiptHistory(true);
+    }
+
+    async function fetchVendorReceiptHistory(reset = true) {
+        if (vendorReceiptHistoryState.loading) return;
+        const resultsContainer = document.getElementById('vlh-history-results');
+        const statusText = document.getElementById('vlh-status-text');
+        const loadMoreBtn = document.getElementById('vlh-load-more');
+
+        const dates = calculateHistoryDateRange();
+        const payload = {
+            search: (document.getElementById('vlh-search-input')?.value || '').trim(),
+            vendorName: (document.getElementById('vlh-vendor-filter')?.value || '').trim(),
+            warehouse: document.getElementById('vlh-wh-filter')?.value || '',
+            dateFrom: dates.dateFrom,
+            dateTo: dates.dateTo,
+            offset: reset ? 0 : vendorReceiptHistoryState.offset,
+            limit: 20
+        };
+
+        vendorReceiptHistoryState.loading = true;
+        if (loadMoreBtn) loadMoreBtn.disabled = true;
+        if (reset) {
+            if (resultsContainer) {
+                resultsContainer.innerHTML = `
+                    <div class="glass-card p-8 text-center animate-pulse">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-orange border-t-transparent mb-3"></div>
+                        <p class="text-sm font-medium text-gray-600">กำลังค้นหาประวัติการรับสินค้า...</p>
+                    </div>`;
+            }
+            if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+        } else if (loadMoreBtn) {
+            loadMoreBtn.innerText = 'กำลังโหลดประวัติเพิ่ม...';
+        }
+
+        try {
+            const response = await apiCall('getVendorReceiptHistory', payload);
+            if (response.success) {
+                const incoming = response.bills || [];
+                if (reset) {
+                    vendorReceiptHistoryState.bills = incoming;
+                } else {
+                    vendorReceiptHistoryState.bills = vendorReceiptHistoryState.bills.concat(incoming);
+                }
+                vendorReceiptHistoryState.total = Number(response.total || 0);
+                vendorReceiptHistoryState.offset = (payload.offset || 0) + incoming.length;
+                vendorReceiptHistoryState.hasMore = !!response.hasMore;
+
+                if (statusText) {
+                    statusText.innerText = `พบประวัติทั้งหมด ${vendorReceiptHistoryState.total.toLocaleString()} บิล (แสดงแล้ว ${vendorReceiptHistoryState.bills.length} บิล)`;
+                }
+                renderVendorReceiptHistoryList();
+            } else if (reset && resultsContainer) {
+                resultsContainer.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-medium text-red-600">${esc(response.message || response.error || 'ดึงประวัติไม่สำเร็จ')}</div>`;
+            }
+        } catch (e) {
+            if (reset && resultsContainer) resultsContainer.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-medium text-red-600">เกิดข้อผิดพลาดในการโหลดประวัติ</div>`;
+        } finally {
+            vendorReceiptHistoryState.loading = false;
+            if (loadMoreBtn) {
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.innerText = 'โหลดประวัติเพิ่ม';
+                loadMoreBtn.classList.toggle('hidden', !vendorReceiptHistoryState.hasMore);
+            }
+        }
+    }
+
+    function loadMoreVendorReceiptHistory() {
+        if (!vendorReceiptHistoryState.hasMore) return;
+        fetchVendorReceiptHistory(false);
+    }
+
+    function renderVendorReceiptHistoryList() {
+        const container = document.getElementById('vlh-history-results');
+        if (!container) return;
+        const bills = vendorReceiptHistoryState.bills || [];
+
+        if (bills.length === 0) {
+            container.innerHTML = `<div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 p-10 text-center text-sm text-gray-500">ไม่พบประวัติบิลรับเข้าตามเงื่อนไขที่เลือก</div>`;
+            return;
+        }
+
+        container.innerHTML = bills.map((b, index) => {
+            const leadClass = b.leadtimeDays <= 2 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : (b.leadtimeDays <= 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200');
+
+            let varianceHtml = '';
+            if (b.varianceDays !== null && b.varianceDays !== undefined) {
+                if (b.varianceDays < 0) {
+                    varianceHtml = `<span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-brand-blue border border-blue-200">⚡ เร็วกว่านัด ${Math.abs(b.varianceDays)} วัน</span>`;
+                } else if (b.varianceDays === 0) {
+                    varianceHtml = `<span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">🎯 ตรงวันนัด</span>`;
+                } else {
+                    varianceHtml = `<span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200">⚠️ ช้ากว่านัด ${b.varianceDays} วัน</span>`;
+                }
+            }
+
+            const itemsHtml = (b.items || []).map((item, i) => `
+                <tr class="border-b border-gray-100 last:border-b-0 hover:bg-orange-50/30 text-xs">
+                    <td class="py-2 px-3 text-gray-400 w-8">${i + 1}</td>
+                    <td class="py-2 px-3">
+                        <span class="font-bold text-gray-800">${esc(item.product)}</span>
+                        ${item.isExtra ? '<span class="text-[10px] text-brand-orange bg-brand-orangeLight px-1 rounded ml-1 font-bold">ของแถม/นอกบิล</span>' : ''}
+                        ${item.sku ? `<span class="block text-[11px] text-gray-400 font-mono">SKU: ${esc(item.sku)}</span>` : ''}
+                    </td>
+                    <td class="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">${esc(item.grQty)} <span class="text-gray-500 font-normal">${esc(item.unit || '')}</span></td>
+                    <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(item.locIn || '-')}</td>
+                    <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(item.expDate || '-')}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <article class="glass-card p-4 sm:p-5 border-l-4 border-l-brand-orange">
+                    <!-- Bill Header -->
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 border-b border-gray-100 pb-3 mb-3">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-black text-gray-900">${esc(b.poNumber || '-')}</span>
+                                ${getWarehouseBadge(b.warehouse)}
+                                <span class="text-xs font-bold text-brand-orange bg-brand-orangeLight px-2 py-0.5 rounded-md">${esc(b.vendor || '-')}</span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 mt-1.5">
+                                <span>📅 วันที่ PO: <strong class="text-gray-700">${esc(b.poDate || '-')}</strong></span>
+                                <span>📥 วันที่รับจริง (ATA): <strong class="text-gray-800">${esc(b.ataDate || b.grDate || '-')}</strong></span>
+                                ${b.expectedDate ? `<span>🎯 วันนัดส่ง: <strong class="text-gray-700">${esc(b.expectedDate)}</strong></span>` : ''}
+                                <span>👤 ผู้รับ: <strong class="text-gray-700">${esc(b.receiver || '-')}</strong></span>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-lg border ${leadClass}">
+                                ⏱️ Leadtime ${esc(b.leadtimeDays)} วัน
+                            </span>
+                            ${varianceHtml}
+                        </div>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div class="overflow-x-auto rounded-xl border border-gray-100 bg-white/70">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50/80 text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                <tr>
+                                    <th class="py-1.5 px-3">#</th>
+                                    <th class="py-1.5 px-3">รายการสินค้า</th>
+                                    <th class="py-1.5 px-3">จำนวนรับ</th>
+                                    <th class="py-1.5 px-3">ตำแหน่ง (Loc.IN)</th>
+                                    <th class="py-1.5 px-3">วันหมดอายุ (Exp)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    ${b.remark ? `<p class="mt-2.5 text-xs text-gray-500"><strong class="text-gray-600">หมายเหตุ:</strong> ${esc(cleanDirectPoRemark(b.remark))}</p>` : ''}
+                </article>`;
+        }).join('');
+
+        lucide.createIcons({ root: container });
+    }
 
     function groupPendingPOs() {
       const groups = {};

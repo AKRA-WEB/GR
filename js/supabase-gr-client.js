@@ -15,7 +15,7 @@
 }(typeof self !== 'undefined' ? self : this, function () {
 
     const API_URL = 'https://hgxrrskztbpejirrdpbq.supabase.co/functions/v1/gr-api';
-    const READ_ACTIONS = new Set(['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory']);
+    const READ_ACTIONS = new Set(['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory']);
 
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -64,6 +64,8 @@
         bulkReceivePO: (data, token) => request('bulkReceivePO', data, token),
         recallGR: (data, token) => request('recallGR', data, token),
         getProductReceiptHistory: (data, token) => request('getProductReceiptHistory', data, token),
+        getVendorLeadtimeInsights: (data, token) => request('getVendorLeadtimeInsights', data, token),
+        getVendorReceiptHistory: (data, token) => request('getVendorReceiptHistory', data, token),
         API_URL
     };
 }));
