@@ -370,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260831.01";
+    const CURRENT_VERSION = "20260831.02";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1308,13 +1308,13 @@
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
 
-      const supabaseGrActions = ['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'bulkReceivePO', 'recallGR'];
+      const supabaseGrActions = ['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'bulkReceivePO', 'recallGR'];
       if (supabaseGrActions.includes(action)) {
         if (typeof window === 'undefined' || !window.AkraSupabaseGR) {
           return { success: false, message: 'ไม่พบตัวเชื่อมต่อฐานข้อมูล GR กรุณารีโหลดหน้า' };
         }
         try {
-          return await AkraSupabaseGR.request(action, payload, getSessionToken());
+          return await window.AkraSupabaseGR.request(action, payload, getSessionToken());
         } catch (error) {
           console.error('Supabase GR request failed:', { action, reason: error && error.reason });
           return { success: false, message: error && error.message ? error.message : 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
