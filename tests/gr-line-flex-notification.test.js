@@ -140,7 +140,7 @@ function createHarness(options = {}) {
     assert.equal(bubble.type, 'bubble');
     assert.equal(bubble.size, 'mega');
     assert.equal(bubble.header.backgroundColor, '#0F172A');
-    assert.equal(bubble.header.contents[0].contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย');
+    assert.equal(bubble.header.contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย (GR Completed)');
     assert.match(bubble.header.contents[1].text, /ผู้รับลงสินค้า: สมชาย คลังสินค้า/);
 
     const json = JSON.stringify(bubble);
