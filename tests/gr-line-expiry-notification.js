@@ -136,13 +136,13 @@ assert.match(completedBackend.lineMessages[0], /✅ อนุมัติรั�
 assert.match(completedBackend.lineMessages[0], /👤 ผู้รับลงสินค้า: Approver/, 'GAS fallback LINE must identify the employee entered as receiver');
 assert.match(
   completedBackend.lineMessages[0],
-  /1\. สินค้า A จำนวน 5 EA \[W1\] \| หมดอายุ: 31\/12\/2569/,
-  'a received item with expiry must show that expiry on its completed LINE entry'
+  /1\. สินค้า A จำนวน 5 EA \[W1-F1-Z1\] \| หมดอายุ: 31\/12\/2569/,
+  'a received item with expiry must show that expiry and location on its completed LINE entry'
 );
 assert.match(
   completedBackend.lineMessages[0],
-  /2\. ของแถม A จำนวน 2 ชิ้น \[W2\] \(ของแถม\/นอกบิล\) \| หมดอายุ: 30\/11\/2569/,
-  'an extra item with expiry must show that expiry on its own completed LINE entry'
+  /2\. ของแถม A จำนวน 2 ชิ้น \[W2-F1-Z2\] \(ของแถม\/นอกบิล\) \| หมดอายุ: 30\/11\/2569/,
+  'an extra item with expiry must show that expiry and location on its own completed LINE entry'
 );
 
 console.log('PASS gr-line-expiry-notification: populated PO and extra-item expiry appears in completed LINE');
@@ -163,8 +163,8 @@ for (const blankExpiry of ['', '   ', null, undefined]) {
 
   assert.equal(blankResult.success, true);
   assert.equal(blankBackend.lineMessages.length, 1);
-  assert.match(blankBackend.lineMessages[0], /1\. สินค้า A จำนวน 5 EA \[W1\]\n/);
-  assert.match(blankBackend.lineMessages[0], /2\. ของแถมไม่มีวันหมดอายุ จำนวน 1 ชิ้น \[W1\] \(ของแถม\/นอกบิล\)\n/);
+  assert.match(blankBackend.lineMessages[0], /1\. สินค้า A จำนวน 5 EA \[W1-F1-Z1\]\n/);
+  assert.match(blankBackend.lineMessages[0], /2\. ของแถมไม่มีวันหมดอายุ จำนวน 1 ชิ้น \[W1-F1-Z2\] \(ของแถม\/นอกบิล\)\n/);
   assert.doesNotMatch(blankBackend.lineMessages[0], /หมดอายุ:/, `blank expiry ${String(blankExpiry)} must add no expiry label`);
   assert.doesNotMatch(blankBackend.lineMessages[0], / \| \n/, 'blank expiry must add no separator or empty fragment');
 }

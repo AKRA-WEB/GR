@@ -1559,8 +1559,8 @@ function bulkReceivePO(data) {
       poStatusRanges.push("L" + poRecord.rowNumber);
 
       if(item.grQty && parseFloat(item.grQty) > 0) {
-         const itemWh = locWarehouseList_(item.locIn);
-         lineItemsText += `${itemCounter}. ${productName} จำนวน ${item.grQty} ${item.unit || ''}${itemWh ? ' [' + itemWh + ']' : ''}${itemExp ? ' | หมดอายุ: ' + itemExp : ''}\n`;
+         const itemLoc = String(item.locIn || '').trim();
+         lineItemsText += `${itemCounter}. ${productName} จำนวน ${item.grQty} ${item.unit || ''}${itemLoc ? ' [' + itemLoc + ']' : ''}${itemExp ? ' | หมดอายุ: ' + itemExp : ''}\n`;
          if (item.oldStock) lineOldStockText += `- ${productName}: ${item.oldStock}\n`;
          itemCounter++;
       }
@@ -1583,8 +1583,8 @@ function bulkReceivePO(data) {
         ]);
 
         if(ex.grQty && parseFloat(ex.grQty) > 0) {
-           const exWh = locWarehouseList_(ex.locIn);
-           lineItemsText += `${itemCounter}. ${ex.product} จำนวน ${ex.grQty} ${ex.unit || ''}${exWh ? ' [' + exWh + ']' : ''} (ของแถม/นอกบิล)${extraExp ? ' | หมดอายุ: ' + extraExp : ''}\n`;
+           const exLoc = String(ex.locIn || '').trim();
+           lineItemsText += `${itemCounter}. ${ex.product} จำนวน ${ex.grQty} ${ex.unit || ''}${exLoc ? ' [' + exLoc + ']' : ''} (ของแถม/นอกบิล)${extraExp ? ' | หมดอายุ: ' + extraExp : ''}\n`;
            if (ex.oldStock) lineOldStockText += `- ${ex.product}: ${ex.oldStock}\n`;
            itemCounter++;
         }
