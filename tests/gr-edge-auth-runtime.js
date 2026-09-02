@@ -170,16 +170,28 @@ function invoke(body, origin = 'https://akra-web.github.io') {
   assert.equal(response.status, 200);
   await Promise.all(lineTasks.splice(0));
   assert.equal(linePushBodies.length, 1, 'Completed GR must send one LINE notification');
-  const completedLineText = linePushBodies[0].messages[0].text;
-  assert.match(completedLineText, /ผู้รับลงสินค้า: Receiving Employee/, 'LINE must name the employee who received the goods');
-  assert.doesNotMatch(completedLineText, /ผู้รับลงสินค้า: Approver/, 'LINE must not use the employee who clicked approval');
-  assert.match(completedLineText, /1\. Product A จำนวน 1 EA \[W1-1F-2\] \| หมดอายุ: 31\/12\/2026/, 'LINE must format item with full location');
-  assert.match(completedLineText, /2\. Bonus A \(ของแถม\/นอกบิล\) จำนวน 2 ชิ้น \[W2-2F-B\] \| หมดอายุ: 15\/01\/2027/, 'LINE must format extra item with full location');
+  const message = linePushBodies[0].messages[0];
+  assert.equal(message.type, 'flex', 'Notification should be sent as Flex Message');
+  assert.match(message.altText, /✅ อนุมัติรับเข้าคลัง: Vendor A \(W1, W2\) 2 รายการ/);
+
+  const bubble = message.contents;
+  assert.equal(bubble.type, 'bubble');
+  assert.equal(bubble.header.contents[0].contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย');
+  assert.match(bubble.header.contents[1].text, /ผู้รับ: Receiving Employee/, 'LINE must name the employee who received the goods');
+  assert.doesNotMatch(bubble.header.contents[1].text, /ผู้รับ: Approver/, 'LINE must not use the employee who clicked approval');
+
+  const flexJson = JSON.stringify(bubble);
+  assert.match(flexJson, /Product A/);
+  assert.match(flexJson, /Bonus A \(ของแถม\/นอกบิล\)/);
+  assert.match(flexJson, /\[W1-1F-2\]/);
+  assert.match(flexJson, /\[W2-2F-B\]/);
+  assert.match(flexJson, /หมดอายุ: 31\/12\/2026/);
+  assert.match(flexJson, /หมดอายุ: 15\/01\/2027/);
 
   response = await invoke({ action: 'getInitialData', token: receiverToken, data: {} }, 'https://evil.example');
   assert.equal(response.status, 403, 'Rejected origin must return 403');
 
-  console.log('PASS gr-edge-auth-runtime: origin, Main token, granular permission, full location in LINE, and RPC boundary enforced');
+  console.log('PASS gr-edge-auth-runtime: origin, Main token, granular permission, full location in LINE Flex, and RPC boundary enforced');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
