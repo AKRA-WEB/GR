@@ -177,8 +177,8 @@ function invoke(body, origin = 'https://akra-web.github.io') {
   const bubble = message.contents;
   assert.equal(bubble.type, 'bubble');
   assert.equal(bubble.header.contents[0].contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย');
-  assert.match(bubble.header.contents[1].text, /ผู้รับ: Receiving Employee/, 'LINE must name the employee who received the goods');
-  assert.doesNotMatch(bubble.header.contents[1].text, /ผู้รับ: Approver/, 'LINE must not use the employee who clicked approval');
+  assert.match(bubble.header.contents[1].text, /ผู้รับลงสินค้า: Receiving Employee/, 'LINE must name the employee who received the goods');
+  assert.doesNotMatch(bubble.header.contents[1].text, /ผู้รับลงสินค้า: Approver/, 'LINE must not use the employee who clicked approval');
 
   const flexJson = JSON.stringify(bubble);
   assert.match(flexJson, /Product A/);

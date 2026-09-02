@@ -141,7 +141,7 @@ function createHarness(options = {}) {
     assert.equal(bubble.size, 'mega');
     assert.equal(bubble.header.backgroundColor, '#0F172A');
     assert.equal(bubble.header.contents[0].contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย');
-    assert.match(bubble.header.contents[1].text, /ผู้รับ: สมชาย คลังสินค้า/);
+    assert.match(bubble.header.contents[1].text, /ผู้รับลงสินค้า: สมชาย คลังสินค้า/);
 
     const json = JSON.stringify(bubble);
     assert.match(json, /บริษัท แป้งสยาม จำกัด/);
@@ -187,11 +187,11 @@ function createHarness(options = {}) {
     console.log('PASS Test 2: Blank / null expiry produces clean rows without empty tags');
   }
 
-  // Test 3: Overflow items (> 15 items) adds overflow summary
+  // Test 3: Overflow items (> 30 items) adds overflow summary
   {
     const harness = createHarness();
     const manyItems = [];
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 35; i++) {
       manyItems.push({ uid: `ITEM-${i}`, product: `วัตถุดิบทดสอบ #${i}`, grQty: i, unit: 'ชิ้น', locIn: `W1-1F-Z${i}`, exp: '' });
     }
     await harness.invoke({
@@ -210,11 +210,11 @@ function createHarness(options = {}) {
     const bubble = harness.linePushBodies[0].messages[0].contents;
     const json = JSON.stringify(bubble);
     assert.match(json, /วัตถุดิบทดสอบ #1/);
-    assert.match(json, /วัตถุดิบทดสอบ #15/);
-    assert.doesNotMatch(json, /วัตถุดิบทดสอบ #16/, 'Item 16 should be capped in display items');
+    assert.match(json, /วัตถุดิบทดสอบ #30/);
+    assert.doesNotMatch(json, /วัตถุดิบทดสอบ #31/, 'Item 31 should be capped in display items');
     assert.match(json, /และรายการอื่นๆ อีก 5 รายการ \(ตรวจสอบได้ในระบบ GR\)/);
 
-    console.log('PASS Test 3: > 15 items properly bounded with summary notice');
+    console.log('PASS Test 3: > 30 items properly bounded with summary notice');
   }
 
   // Test 4: Graceful fallback to Plain Text when Flex push fails
