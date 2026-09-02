@@ -140,13 +140,14 @@ function createHarness(options = {}) {
     assert.equal(bubble.type, 'bubble');
     assert.equal(bubble.size, 'mega');
     assert.equal(bubble.header.backgroundColor, '#0F172A');
-    assert.equal(bubble.header.contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย (GR Completed)');
+    assert.equal(bubble.header.contents[0].contents[0].text, '✅ อนุมัติรับเข้าคลังเรียบร้อย');
+    assert.equal(bubble.header.contents[0].contents[1].text, 'GR Completed');
     assert.match(bubble.header.contents[1].text, /ผู้รับลงสินค้า: สมชาย คลังสินค้า/);
 
     const json = JSON.stringify(bubble);
     assert.match(json, /บริษัท แป้งสยาม จำกัด/);
-    assert.match(json, /PO-20260902-01/);
-    assert.match(json, /BILL-999/);
+    assert.doesNotMatch(json, /PO-20260902-01/, 'PO number omitted from bubble');
+    assert.doesNotMatch(json, /BILL-999/, 'Bill ref omitted from bubble');
     assert.match(json, /แป้งเค้กพัดโบก 1 กก\./);
     assert.match(json, /10 ถุง/);
     assert.match(json, /\[W1-1F-Z1\]/);
