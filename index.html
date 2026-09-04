@@ -370,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260831.02";
+    const CURRENT_VERSION = "20260904.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2031,9 +2031,13 @@
                 confirmedDaysUntil: null,
                 estimatedDate: '',
                 estimatedDaysUntil: null,
+                billRemark: po.billRemark || '',
                 extraItems: [],
                 items: []
             };
+        }
+        if (!groups[key].billRemark && po.billRemark) {
+            groups[key].billRemark = po.billRemark;
         }
         const poDays = (po.daysUntil === null || po.daysUntil === undefined || po.daysUntil === '') ? null : Number(po.daysUntil);
         if (po.planSource === 'confirmed' && po.expectedDate) {
@@ -2088,7 +2092,8 @@
       });
       groupedPOs.forEach((group, index) => {
           group.index = index;
-          group.searchText = `${group.vendor || ''} ${group.poNumber || ''} ${group.items.map(item => item.product || '').join(' ')}`.toLowerCase();
+          const itemsText = group.items.map(item => `${item.product || ''} ${item.itemRemark || ''} ${item.poRemark || ''}`).join(' ');
+          group.searchText = `${group.vendor || ''} ${group.poNumber || ''} ${group.billRemark || ''} ${itemsText}`.toLowerCase();
       });
     }
 
@@ -2231,13 +2236,21 @@
                 ? `<p class="text-[11px] text-brand-blue mt-2 font-semibold">บิลเดียวกัน: ${statusSplitEntries.map(([status, count]) => `${esc(receivingStatusLabel(status))} ${count}`).join(' · ')}</p>`
                 : '';
             
-            let productsHtml = '<div class="space-y-1 my-3">';
+            let productsHtml = '<div class="space-y-1.5 my-3">';
             group.items.slice(0,3).forEach((item, i) => {
                 const itemQtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : (item.poQty || 0);
-                productsHtml += `<div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${item.product} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${item.unit || ''})</span></p>${itemPlanBadge(item)}</div>`;
+                const itemRemarkText = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+                const itemRemarkHtml = itemRemarkText ? `<span class="block text-[11px] text-amber-800 font-normal pl-4 italic">↳ หมายเหตุ: ${esc(itemRemarkText)}</span>` : '';
+                productsHtml += `<div><div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemPlanBadge(item)}</div>${itemRemarkHtml}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
+
+            const billRemarkHtml = group.billRemark ? `
+                <div class="mb-3 text-xs bg-amber-50 text-amber-900 border border-amber-200/80 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mt-0.5 text-amber-600 flex-shrink-0"></i>
+                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล:</strong> ${esc(group.billRemark)}</span>
+                </div>` : '';
 
             htmlStr += `
             <div class="${cardClass}" onclick="openReceivingDetail(${idx})">
@@ -2247,7 +2260,8 @@
                 </div>
                 ${statusSplitNote}
                 ${productsHtml}
-                <div class="mb-3">${deliveryPlanBadge(group)}</div>
+                <div class="mb-2">${deliveryPlanBadge(group)}</div>
+                ${billRemarkHtml}
                 <div class="mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
                     <div>
                         <p class="font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5"><i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i> <span class="truncate max-w-[120px]">${group.vendor}</span></p>
@@ -2299,6 +2313,11 @@
                     <p>Vendor Avg: <span class="font-bold text-gray-700">${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : '-'}</span></p>
                     <p>ตัวอย่าง: <span class="font-bold text-gray-700">${esc(group.vendorLeadSampleCount || 0)} ครั้ง</span></p>
                 </div>
+                ${group.billRemark ? `
+                <div class="mt-3 pt-2.5 border-t border-brand-blue/10 text-xs bg-amber-50 text-amber-900 border border-amber-200/80 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                    <i data-lucide="file-text" class="w-4 h-4 mt-0.5 text-amber-600 flex-shrink-0"></i>
+                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล (จาก PO):</strong> ${esc(group.billRemark)}</span>
+                </div>` : ''}
             </div>
         `;
         
@@ -2381,15 +2400,20 @@
             const orderedQtyBadge = showOrderedQuantity
                 ? `<span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${itemQtyVal}</span> ${item.unit || ''}</span>`
                 : '';
+            const itemRemarkText = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+            const itemRemarkHtml = itemRemarkText ? `<span class="block text-xs text-amber-800 font-normal mt-0.5 italic">↳ หมายเหตุจาก PO: ${esc(itemRemarkText)}</span>` : '';
             htmlStr += `
             <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}">
                 <div class="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
-                    <div class="font-bold text-gray-800 flex-1 pr-2 flex items-center gap-2 text-sm">
-                        <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
-                        <span>${item.product}</span>
-                        <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
-                            <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
-                        </button>
+                    <div class="font-bold text-gray-800 flex-1 pr-2">
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
+                            <span>${esc(item.product)}</span>
+                            <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
+                                <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        ${itemRemarkHtml}
                     </div>
                     <div class="flex flex-col items-end gap-1 flex-shrink-0">${orderedQtyBadge}${itemPlanBadge(item)}</div>
                 </div>
