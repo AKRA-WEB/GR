@@ -1257,7 +1257,7 @@
     function cleanDirectPoRemark(text) {
         if (!text) return '';
         return String(text)
-            .replace(/(?:^|\b)(?:Direct\s*PO\s*Web\s*App|Direct\s*PO\s*\(Edited\)|Direct\s*PO|DirectPO|Ref\s*PR)(?:\b|$)/gi, '')
+            .replace(/(?:^|\b)(?:(?:หมายเหตุ\s*(?:PO)?|PO)\s*[:\-–—]\s*)?(?:Direct\s*PO\s*Web\s*App|Direct\s*PO\s*\(Edited\)|Direct\s*PO|DirectPO|Ref\s*PR)(?:\b|$)/gi, '')
             .replace(/^[\s:\-|/()]+|[\s:\-|/()]+$/g, '')
             .replace(/\s{2,}/g, ' ')
             .trim();
@@ -2239,17 +2239,19 @@
             let productsHtml = '<div class="space-y-1.5 my-3">';
             group.items.slice(0,3).forEach((item, i) => {
                 const itemQtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : (item.poQty || 0);
-                const itemRemarkText = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+                const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+                const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
                 const itemRemarkHtml = itemRemarkText ? `<span class="block text-[11px] text-amber-800 font-normal pl-4 italic">↳ หมายเหตุ: ${esc(itemRemarkText)}</span>` : '';
                 productsHtml += `<div><div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemPlanBadge(item)}</div>${itemRemarkHtml}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
 
-            const billRemarkHtml = group.billRemark ? `
+            const cleanBillRemark = cleanDirectPoRemark(group.billRemark);
+            const billRemarkHtml = cleanBillRemark ? `
                 <div class="mb-3 text-xs bg-amber-50 text-amber-900 border border-amber-200/80 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
                     <i data-lucide="file-text" class="w-3.5 h-3.5 mt-0.5 text-amber-600 flex-shrink-0"></i>
-                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล:</strong> ${esc(group.billRemark)}</span>
+                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล:</strong> ${esc(cleanBillRemark)}</span>
                 </div>` : '';
 
             htmlStr += `
@@ -2313,10 +2315,10 @@
                     <p>Vendor Avg: <span class="font-bold text-gray-700">${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : '-'}</span></p>
                     <p>ตัวอย่าง: <span class="font-bold text-gray-700">${esc(group.vendorLeadSampleCount || 0)} ครั้ง</span></p>
                 </div>
-                ${group.billRemark ? `
+                ${cleanDirectPoRemark(group.billRemark) ? `
                 <div class="mt-3 pt-2.5 border-t border-brand-blue/10 text-xs bg-amber-50 text-amber-900 border border-amber-200/80 rounded-lg px-3 py-2 flex items-start gap-1.5">
                     <i data-lucide="file-text" class="w-4 h-4 mt-0.5 text-amber-600 flex-shrink-0"></i>
-                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล (จาก PO):</strong> ${esc(group.billRemark)}</span>
+                    <span class="font-normal break-words"><strong class="font-semibold text-amber-950">หมายเหตุบิล (จาก PO):</strong> ${esc(cleanDirectPoRemark(group.billRemark))}</span>
                 </div>` : ''}
             </div>
         `;
@@ -2400,7 +2402,8 @@
             const orderedQtyBadge = showOrderedQuantity
                 ? `<span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${itemQtyVal}</span> ${item.unit || ''}</span>`
                 : '';
-            const itemRemarkText = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+            const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
+            const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
             const itemRemarkHtml = itemRemarkText ? `<span class="block text-xs text-amber-800 font-normal mt-0.5 italic">↳ หมายเหตุจาก PO: ${esc(itemRemarkText)}</span>` : '';
             htmlStr += `
             <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}">

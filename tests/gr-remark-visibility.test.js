@@ -200,4 +200,40 @@ const modalItemsHtml = getEl('r-items-container').innerHTML;
 assert.ok(modalItemsHtml.includes('↳ หมายเหตุจาก PO: ต้องการถุงสภาพสมบูรณ์ ไม่ชื้น'), 'Modal items container must render itemRemark line');
 console.log('[PASS] 6. openReceivingDetail populates billRemark banner and itemRemark line in modal');
 
+// 7. Test "Direct PO" suppression in both card and modal
+sandbox.appData.pendingPOs = [
+    {
+        id: 'direct-po-item',
+        rowNumber: 10,
+        uid: 'direct-po-item',
+        poNumber: 'PO-2026-DIR',
+        vendor: 'SUPPLIER DIRECT',
+        poDate: '04/09/2026',
+        warehouse: 'W2',
+        status: 'Pending GR',
+        expectedDate: '05/09/2026',
+        product: 'สินค้า Direct PO',
+        quantity: 10,
+        unit: 'กล่อง',
+        billRemark: 'Direct PO',
+        itemRemark: 'Direct PO Web App',
+        poRemark: 'Direct PO'
+    }
+];
+sandbox.groupPendingPOs();
+assert.strictEqual(sandbox.groupedPOs.length, 1);
+const directGroup = sandbox.groupedPOs[0];
+
+sandbox.renderPOListForReceiving();
+const directContainerHtml = getEl('po-list-container').innerHTML;
+assert.ok(!directContainerHtml.includes('หมายเหตุบิล:'), 'Cards must NOT display billRemark banner when remark is Direct PO');
+assert.ok(!directContainerHtml.includes('↳ หมายเหตุ:'), 'Cards must NOT display itemRemark line when remark is Direct PO');
+
+sandbox.openReceivingDetail(0);
+const directModalDeliveryPlan = getEl('r-delivery-plan').innerHTML;
+assert.ok(!directModalDeliveryPlan.includes('หมายเหตุบิล (จาก PO):'), 'Modal must NOT render bill remark banner for Direct PO');
+const directModalItemsHtml = getEl('r-items-container').innerHTML;
+assert.ok(!directModalItemsHtml.includes('↳ หมายเหตุจาก PO:'), 'Modal items container must NOT render itemRemark for Direct PO');
+console.log('[PASS] 7. "Direct PO" remarks cleanly suppressed from both card and modal displays');
+
 console.log('\n🌟 ALL GR BILL & ITEM REMARK CONTRACT TESTS PASSED (100%)! 🌟');
