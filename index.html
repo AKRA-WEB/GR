@@ -370,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260904.04";
+    const CURRENT_VERSION = "20260904.05";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2722,7 +2722,6 @@
       let formHasError = false;
 
       const poItemsData = [];
-      const splitNotes = [];
       document.querySelectorAll('.po-item-row').forEach(row => {
           const rowNum = row.dataset.rownum;
           const uid = row.dataset.uid;
@@ -2754,7 +2753,6 @@
                   const loc2 = serializeLoc(wh2.value, floor2El.value, zone2.value);
                   const uStr = unit ? ` ${unit}` : '';
                   locIn = `${loc1} (${q1}${uStr}) | ${loc2} (${q2}${uStr})`;
-                  splitNotes.push(`[${itemMeta.product || ''}] ลง ${whSel.value}-${q1} ${unit} / ${wh2.value}-${q2} ${unit}`);
               }
           }
 
@@ -2791,8 +2789,7 @@
       const totalReceived = poItemsData.filter(i => i.grQty && parseFloat(i.grQty) > 0).length + extraItemsData.length;
       if (!isDraft && totalReceived === 0) return showNotification("โปรดใส่จำนวนรับสินค้าอย่างน้อย 1 รายการ", "warning");
 
-      let finalRemark = remark.trim();
-      if (splitNotes.length) finalRemark = (finalRemark ? finalRemark + ' ' : '') + splitNotes.join(' | ');
+      const finalRemark = remark.trim();
 
       const bulkPayload = {
           ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: finalRemark, targetStatus: targetStatus,
