@@ -370,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260904.03";
+    const CURRENT_VERSION = "20260904.04";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2586,7 +2586,7 @@
         const group = currentActiveGroup || groupedPOs[index];
         if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า", "error");
 
-        const poUids = itemUids(loadedBillItems(group));
+        const poUids = itemUids(group.items);
         if (poUids.length === 0) return showNotification("ไม่พบ UID ของรายการในบิลนี้ กรุณารีเฟรชข้อมูล", "error");
 
         const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
