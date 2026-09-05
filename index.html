@@ -370,7 +370,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260904.05";
+    const CURRENT_VERSION = "20260905.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -949,12 +949,17 @@
                 buckets[key].group = group;
             }
         });
-        return Object.values(buckets).map(bucket => ({
-            ...bucket.group,
-            ...summarizeReceivingBillPlan(bucket.groups),
-            extraItems: mergeBillExtras(bucket.groups.map(group => group.extraItems || [])),
-            listStatusCounts: bucket.statusCounts
-        }));
+        return Object.values(buckets).map(bucket => {
+            const primaryGroup = bucket.group;
+            const modalItems = getBillModalItems(primaryGroup);
+            return {
+                ...primaryGroup,
+                items: modalItems.length ? modalItems : primaryGroup.items,
+                ...summarizeReceivingBillPlan(bucket.groups),
+                extraItems: mergeBillExtras(bucket.groups.map(group => group.extraItems || [])),
+                listStatusCounts: bucket.statusCounts
+            };
+        });
     }
     function mergeBillExtras(extraLists) {
         const extras = new Map();
@@ -980,6 +985,43 @@
         ];
         const matched = allItems.filter(item => isSameBillItem(item, group));
         return matched.length ? matched : (group.items || []);
+    }
+    function getBillModalItems(group) {
+        if (!group) return [];
+        const currentStatus = group.status;
+        const allItems = loadedBillItems(group);
+        if (!allItems || allItems.length === 0) return group.items || [];
+
+        // If viewing a completed receipt, strictly show the completed items for this group
+        if (currentStatus === 'GR Completed') {
+            const completedItems = allItems.filter(item => item.status === 'GR Completed' || item.status === 'Completed');
+            return completedItems.length ? completedItems : (group.items || []);
+        }
+
+        // For active receiving (Draft GR, Pending Review, Pending GR):
+        // Include items in the active draft/review status PLUS any unreceived (Pending GR) items of the same bill
+        const targetStatuses = new Set([currentStatus, 'Pending GR']);
+        if (currentStatus === 'Draft GR' || currentStatus === 'Pending GR') {
+            targetStatuses.add('Draft GR');
+            targetStatuses.add('Draft');
+            targetStatuses.add('Pending GR');
+        }
+
+        const activeItems = allItems.filter(item => targetStatuses.has(item.status));
+        if (activeItems.length === 0) return group.items || [];
+
+        // Deduplicate by uid while preserving order
+        const seen = new Set();
+        const uniqueItems = [];
+        activeItems.forEach(item => {
+            const uid = String(item.uid || item.id || '');
+            if (!uid || seen.has(uid)) return;
+            seen.add(uid);
+            uniqueItems.push(item);
+        });
+
+        uniqueItems.sort((a, b) => (Number(a.rowNumber) || 0) - (Number(b.rowNumber) || 0));
+        return uniqueItems;
     }
     function showNotification(msg, type='success') {
         const c = document.getElementById('toast-container'); if(!c) return;
@@ -2314,6 +2356,7 @@
         const group = groupedPOs[index];
         currentActiveGroup = group; 
         const currentGroupStatus = group.status; // ใช้ตัวแปร status ของกลุ่มตรงๆ
+        group.items = getBillModalItems(group);
         
         document.getElementById('r-display-vendor-header').innerHTML = `
             <div class="bg-gray-100 p-2 rounded-lg text-gray-500"><i data-lucide="building-2" class="w-5 h-5"></i></div>
@@ -2586,7 +2629,9 @@
         const group = currentActiveGroup || groupedPOs[index];
         if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า", "error");
 
-        const poUids = itemUids(group.items);
+        const recallableItems = (group.items || []).filter(item => item.status && item.status !== 'Pending GR');
+        const targetItems = recallableItems.length ? recallableItems : group.items;
+        const poUids = itemUids(targetItems);
         if (poUids.length === 0) return showNotification("ไม่พบ UID ของรายการในบิลนี้ กรุณารีเฟรชข้อมูล", "error");
 
         const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
