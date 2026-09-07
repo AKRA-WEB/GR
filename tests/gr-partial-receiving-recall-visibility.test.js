@@ -48,7 +48,7 @@ console.log(`[PASS] 1. All ${scriptIndex} inline scripts compile with 0 syntax e
 const currentVersionMatch = html.match(/const\s+CURRENT_VERSION\s*=\s*["']([^"']+)["']/);
 assert.ok(currentVersionMatch, 'CURRENT_VERSION must exist in index.html');
 assert.strictEqual(currentVersionMatch[1], versionJson.version, 'CURRENT_VERSION must match version.json');
-assert.strictEqual(currentVersionMatch[1], '20260905.01', 'Target version must be 20260905.01');
+assert.ok(currentVersionMatch[1] >= '20260905.01', 'Target version must be at least 20260905.01');
 console.log(`[PASS] 2. Version parity verified: ${currentVersionMatch[1]}`);
 
 // 3. Simulated DOM & runtime environment

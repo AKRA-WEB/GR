@@ -12,6 +12,7 @@
 
   <link rel="stylesheet" href="tailwind.css">
   <script src="js/supabase-gr-client.js" defer></script>
+  <script src="js/gr-expiry.js" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -370,7 +371,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260905.01";
+    const CURRENT_VERSION = "20260907.01";
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2499,7 +2500,8 @@
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                     <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ</label>
-                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2569" value="${isSavedData ? (item.exp||'') : ''}"></div>
+                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? (item.exp||'') : ''}" oninput="handleExpiryInputChange(this)">
+                    <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อคเก่า</label>
                     <input type="number" class="input-field po-old-stock py-2 bg-white border-gray-200 focus:border-brand-blue" placeholder="ไม่บังคับ" value="${isSavedData && item.oldStock ? item.oldStock : ''}"></div>
                 </div>
@@ -2528,6 +2530,7 @@
         document.getElementById('r-extra-items-container').innerHTML = '';
         currentBillHadLoadedExtras = loadedExtras.length > 0;
         loadedExtras.forEach(item => addExtraItemRow(item));
+        container.querySelectorAll('.po-exp').forEach(initExpiryInputPreview);
         
         // ผูก Event ให้กับ 3 ปุ่มใหม่
         document.getElementById('btn-draft').onclick = (e) => submitReceiving(e, 'Draft GR');
@@ -2597,6 +2600,21 @@
             el.disabled = disabled;
             if (disabled) { el.classList.add('bg-gray-100', 'cursor-not-allowed', 'opacity-60'); }
             else { el.classList.remove('bg-gray-100', 'cursor-not-allowed', 'opacity-60'); }
+        });
+        document.querySelectorAll('.extra-item-row input').forEach(input => {
+            input.disabled = disabled;
+            if (disabled) input.classList.add('bg-gray-100', 'cursor-not-allowed');
+            else input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        });
+        document.querySelectorAll('.extra-item-row select').forEach(el => {
+            el.disabled = disabled;
+            if (disabled) el.classList.add('bg-gray-100', 'cursor-not-allowed', 'opacity-60');
+            else el.classList.remove('bg-gray-100', 'cursor-not-allowed', 'opacity-60');
+        });
+        document.querySelectorAll('.exp-preview-wrap button').forEach(b => {
+            b.disabled = disabled;
+            if (disabled) b.classList.add('opacity-50', 'cursor-not-allowed');
+            else b.classList.remove('opacity-50', 'cursor-not-allowed');
         });
 
         document.getElementById('r-ata').disabled = disabled;
@@ -2689,7 +2707,8 @@
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                 <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1" value="${esc(initial.unit || '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ</label>
-                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="วว/ดด/ปป" value="${esc(initial.exp || '')}"></div>
+                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="31/12/2026 หรือ 31/12/2569" value="${esc(initial.exp || '')}" oninput="handleExpiryInputChange(this)">
+                <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อคเก่า</label>
                 <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ไม่บังคับ" value="${esc(initial.oldStock ?? '')}"></div>
             </div>
@@ -2699,6 +2718,7 @@
             </div>
         `;
         container.appendChild(div);
+        initExpiryInputPreview(div.querySelector('.ex-exp'));
         setupAutocomplete(div.querySelector('.ex-product')); lucide.createIcons({ root: div });
     }
 
@@ -2727,6 +2747,69 @@
         });
         inputEl.addEventListener('blur', () => setTimeout(() => suggestionBox.classList.add('hidden'), 200));
         inputEl.addEventListener('focus', function() { if (this.value && suggestionBox.children.length > 0) suggestionBox.classList.remove('hidden'); });
+    }
+
+    function initExpiryInputPreview(inputEl) {
+        if (!inputEl) return;
+        updateExpiryPreview(inputEl);
+    }
+
+    function handleExpiryInputChange(inputEl) {
+        updateExpiryPreview(inputEl);
+    }
+
+    function updateExpiryPreview(inputEl) {
+        if (!inputEl || typeof GrExpiry === 'undefined') return;
+        const wrap = inputEl.parentElement ? inputEl.parentElement.querySelector('.exp-preview-wrap') : null;
+        if (!wrap) return;
+
+        const val = inputEl.value.trim();
+        if (!val) {
+            wrap.innerHTML = '';
+            inputEl.classList.remove('input-error');
+            delete inputEl.dataset.resolvedIso;
+            return;
+        }
+
+        const res = GrExpiry.parseExpiryInput(val);
+        if (res.valid) {
+            inputEl.classList.remove('input-error');
+            inputEl.dataset.resolvedIso = res.iso;
+            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]"><i data-lucide="check" class="w-3 h-3"></i> ${esc(res.previewText)}</span>`;
+            if (window.lucide && lucide.createIcons) lucide.createIcons({ root: wrap });
+        } else if (res.ambiguous) {
+            inputEl.classList.remove('input-error');
+            delete inputEl.dataset.resolvedIso;
+            wrap.innerHTML = `
+                <div class="p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-900 mt-1">
+                    <div class="font-bold flex items-center gap-1 text-[11px] mb-1">
+                        <span>⚠️ โปรดเลือกปีหรือวันที่ที่ถูกต้อง:</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${res.candidates.map(cand => `
+                            <button type="button" class="px-2 py-1 bg-white border border-amber-300 hover:bg-amber-100 hover:border-amber-400 rounded text-xs font-bold text-amber-900 shadow-sm transition active:scale-95"
+                                    onclick="selectExpiryCandidate(this, '${cand.iso}', '${esc(cand.preview)}')">
+                                ${esc(cand.label)}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>`;
+        } else if (res.incomplete || res.error) {
+            delete inputEl.dataset.resolvedIso;
+            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium text-[11px]">⚠️ ${esc(res.error || 'วันที่ไม่ถูกต้อง')}</span>`;
+        }
+    }
+
+    function selectExpiryCandidate(btnEl, iso, preview) {
+        const wrap = btnEl.closest('.exp-preview-wrap');
+        if (!wrap || !wrap.parentElement) return;
+        const inputEl = wrap.parentElement.querySelector('input.po-exp, input.ex-exp');
+        if (!inputEl) return;
+
+        inputEl.dataset.resolvedIso = iso;
+        inputEl.classList.remove('input-error');
+        wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]"><i data-lucide="check" class="w-3 h-3"></i> ${esc(preview)}</span>`;
+        if (window.lucide && lucide.createIcons) lucide.createIcons({ root: wrap });
     }
 
     async function submitReceiving(e, targetStatus) {
@@ -2765,6 +2848,7 @@
       const group = currentActiveGroup || groupedPOs[index];
       if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า กรุณาลองใหม่อีกครั้ง", "error");
       let formHasError = false;
+      let expiryHasError = false;
 
       const poItemsData = [];
       document.querySelectorAll('.po-item-row').forEach(row => {
@@ -2775,7 +2859,27 @@
           const whSel = row.querySelector('.po-loc-wh'); const floorSel = row.querySelector('.po-loc-floor'); const zoneInp = row.querySelector('.po-loc-zone');
           qtyInput.classList.remove('input-error'); floorSel.classList.remove('input-error');
 
-          const unit = row.querySelector('.po-unit').value.trim(); const exp = row.querySelector('.po-exp').value.trim();
+          const unit = row.querySelector('.po-unit').value.trim();
+          const expInp = row.querySelector('.po-exp');
+          if (expInp) expInp.classList.remove('input-error');
+          const rawExp = expInp ? expInp.value.trim() : '';
+          let exp = '';
+          if (rawExp) {
+              if (typeof GrExpiry !== 'undefined') {
+                  const parsed = GrExpiry.parseExpiryInput(rawExp);
+                  if (expInp && expInp.dataset.resolvedIso) {
+                      exp = expInp.dataset.resolvedIso;
+                  } else if (parsed.valid) {
+                      exp = parsed.iso;
+                  } else {
+                      if (expInp) expInp.classList.add('input-error');
+                      formHasError = true;
+                      expiryHasError = true;
+                  }
+              } else {
+                  exp = rawExp;
+              }
+          }
           const oldStockInput = row.querySelector('.po-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
 
           let grQty = qtyInput.value.trim();
@@ -2819,7 +2923,27 @@
           const sku = row.querySelector('.ex-sku') ? row.querySelector('.ex-sku').value.trim() : '';
           const product = pInput.value.trim(); const grQty = qInput.value.trim();
           const locIn = serializeLoc(whSel.value, floorSel.value, zoneInp.value);
-          const unit = row.querySelector('.ex-unit').value.trim(); const exp = row.querySelector('.ex-exp').value.trim();
+          const unit = row.querySelector('.ex-unit').value.trim();
+          const expInp = row.querySelector('.ex-exp');
+          if (expInp) expInp.classList.remove('input-error');
+          const rawExp = expInp ? expInp.value.trim() : '';
+          let exp = '';
+          if (rawExp) {
+              if (typeof GrExpiry !== 'undefined') {
+                  const parsed = GrExpiry.parseExpiryInput(rawExp);
+                  if (expInp && expInp.dataset.resolvedIso) {
+                      exp = expInp.dataset.resolvedIso;
+                  } else if (parsed.valid) {
+                      exp = parsed.iso;
+                  } else {
+                      if (expInp) expInp.classList.add('input-error');
+                      formHasError = true;
+                      expiryHasError = true;
+                  }
+              } else {
+                  exp = rawExp;
+              }
+          }
           const oldStockInput = row.querySelector('.ex-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
 
           if (product || grQty) {
@@ -2830,6 +2954,7 @@
           }
       });
 
+      if (expiryHasError) return showNotification("กรุณาตรวจสอบและเลือกวันหมดอายุให้ถูกต้อง", "warning");
       if (formHasError) return showNotification("กรุณากรอกข้อมูลโลเคชั่น หรือข้อมูลของแถมให้ครบถ้วน", "warning");
       const totalReceived = poItemsData.filter(i => i.grQty && parseFloat(i.grQty) > 0).length + extraItemsData.length;
       if (!isDraft && totalReceived === 0) return showNotification("โปรดใส่จำนวนรับสินค้าอย่างน้อย 1 รายการ", "warning");
