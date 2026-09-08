@@ -209,34 +209,31 @@ assert.strictEqual(draftGroup.items.length, 9, 'Raw Draft GR group only contains
 
 // Call getBillModalItems for draftGroup
 const modalItems = sandbox.getBillModalItems(draftGroup);
-assert.strictEqual(modalItems.length, 10, 'getBillModalItems must combine all 10 items (9 Draft GR + 1 Pending GR)');
+assert.strictEqual(modalItems.length, 9, 'getBillModalItems must only contain the 9 Draft GR items');
 assert.strictEqual(modalItems[0].uid, 'item-1');
-assert.strictEqual(modalItems[9].uid, 'item-10');
-assert.strictEqual(modalItems[9].status, 'Pending GR', '10th item must retain its Pending GR status');
-assert.strictEqual(modalItems[9].grQty, '', '10th item must have empty grQty');
-console.log('[PASS] 3. getBillModalItems combines all 10 items (9 Draft GR + 1 Pending GR) in correct order');
+assert.strictEqual(modalItems[8].uid, 'item-9');
+console.log('[PASS] 3. getBillModalItems strictly isolates the 9 Draft GR items');
 
 // 4. Test selectOneStatusGroupPerBill
 const displayBills = sandbox.selectOneStatusGroupPerBill(sandbox.groupedPOs);
-assert.strictEqual(displayBills.length, 1, 'Should consolidate to 1 bill card in default view');
-const consolidatedBill = displayBills[0];
-assert.strictEqual(consolidatedBill.status, 'Draft GR', 'Primary status must be Draft GR');
-assert.strictEqual(consolidatedBill.items.length, 10, 'Consolidated card items must contain all 10 items');
-assert.deepStrictEqual(JSON.parse(JSON.stringify(consolidatedBill.listStatusCounts)), { 'Draft GR': 9, 'Pending GR': 1 });
-console.log('[PASS] 4. selectOneStatusGroupPerBill consolidates to 1 card with 10 items and status breakdown');
+assert.strictEqual(displayBills.length, 2, 'Should split into 2 bill cards in default view (Draft GR and Pending GR)');
+const draftBill = displayBills.find(b => b.status === 'Draft GR');
+assert.strictEqual(draftBill.items.length, 9, 'Draft card items must contain only 9 items');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(draftBill.listStatusCounts)), { 'Draft GR': 9, 'Pending GR': 1 }, 'listStatusCounts must contain overall bill breakdown across all split cards');
+console.log('[PASS] 4. selectOneStatusGroupPerBill splits into separate cards based on status while preserving listStatusCounts');
 
 // 5. Test openReceivingDetail
 sandbox.openReceivingDetail(draftGroup.index);
-assert.strictEqual(sandbox.currentActiveGroup.items.length, 10, 'currentActiveGroup.items must have all 10 items');
+assert.strictEqual(sandbox.currentActiveGroup.items.length, 9, 'currentActiveGroup.items must have 9 items');
 const itemsContainerHtml = getEl('r-items-container').innerHTML;
 assert.ok(itemsContainerHtml.includes('data-uid="item-1"'), 'Modal HTML must include item 1');
 assert.ok(itemsContainerHtml.includes('data-uid="item-9"'), 'Modal HTML must include item 9');
-assert.ok(itemsContainerHtml.includes('data-uid="item-10"'), 'Modal HTML must include unreceived item 10');
-console.log('[PASS] 5. openReceivingDetail renders all 10 item rows into modal');
+assert.ok(!itemsContainerHtml.includes('data-uid="item-10"'), 'Modal HTML must NOT include unreceived item 10');
+console.log('[PASS] 5. openReceivingDetail renders only 9 item rows into modal');
 
 // 6. Test handleRecallOrReset scoping
 // In a scenario where 9 items are in Draft GR/Pending Review and 1 item is Pending GR,
-// recalling must only target the 9 items, NOT the pending item.
+// recalling must only target the 9 items.
 (async () => {
     await sandbox.handleRecallOrReset('recall');
     const recallCall = apiCalls.find(c => c.action === 'recallGR');
@@ -284,10 +281,9 @@ const item6DraftGroup = sandbox.groupedPOs.find(g => g.refPrUid === 'PR-PARTIAL-
 assert.ok(item6DraftGroup, 'Must find Draft GR group for item 6');
 const item6ModalItems = sandbox.getBillModalItems(item6DraftGroup);
 
-// Must strictly contain items 6-10 (1 Draft + 4 Pending), EXCLUDING items 1-5
-assert.strictEqual(item6ModalItems.length, 5, 'Must contain only 5 items (items 6-10)');
+// Must strictly contain item 6 (1 Draft)
+assert.strictEqual(item6ModalItems.length, 1, 'Must contain only 1 item (item 6)');
 assert.strictEqual(item6ModalItems[0].uid, 'pitem-6');
-assert.strictEqual(item6ModalItems[4].uid, 'pitem-10');
 assert.ok(!item6ModalItems.some(it => it.status === 'GR Completed'), 'Must NOT include completed items 1-5');
 
 // Find completed group for items 1-5

@@ -371,7 +371,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260908.01';
+    const CURRENT_VERSION = '20260908.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -938,14 +938,25 @@
         };
     }
     function selectOneStatusGroupPerBill(groups) {
+        const overallCounts = {};
+        (groups || []).forEach(group => {
+            const ref = usableBillRefUid(group && group.refPrUid);
+            if (ref) {
+                if (!overallCounts[ref]) overallCounts[ref] = {};
+                const status = group.status || '';
+                overallCounts[ref][status] = (overallCounts[ref][status] || 0) + (group.items ? group.items.length : 0);
+            }
+        });
+
         const buckets = {};
         (groups || []).forEach((group, index) => {
             const ref = usableBillRefUid(group && group.refPrUid);
-            const key = ref ? 'bill:' + ref : 'legacy-status-group:' + index;
-            if (!buckets[key]) buckets[key] = { group, groups: [], statusCounts: {} };
-            buckets[key].groups.push(group);
             const status = group.status || '';
-            buckets[key].statusCounts[status] = (buckets[key].statusCounts[status] || 0) + group.items.length;
+            const key = ref ? 'bill:' + ref + ':status:' + status : 'legacy-status-group:' + index;
+            if (!buckets[key]) {
+                buckets[key] = { group, groups: [], listStatusCounts: ref ? overallCounts[ref] : { [status]: (group.items ? group.items.length : 0) } };
+            }
+            buckets[key].groups.push(group);
             if (receivingStatusPriority(status) > receivingStatusPriority(buckets[key].group.status)) {
                 buckets[key].group = group;
             }
@@ -958,7 +969,7 @@
                 items: modalItems.length ? modalItems : primaryGroup.items,
                 ...summarizeReceivingBillPlan(bucket.groups),
                 extraItems: mergeBillExtras(bucket.groups.map(group => group.extraItems || [])),
-                listStatusCounts: bucket.statusCounts
+                listStatusCounts: bucket.listStatusCounts
             };
         });
     }
@@ -1000,12 +1011,11 @@
         }
 
         // For active receiving (Draft GR, Pending Review, Pending GR):
-        // Include items in the active draft/review status PLUS any unreceived (Pending GR) items of the same bill
-        const targetStatuses = new Set([currentStatus, 'Pending GR']);
-        if (currentStatus === 'Draft GR' || currentStatus === 'Pending GR') {
+        // Strictly isolate by status to separate partial receiving from unreceived items
+        const targetStatuses = new Set([currentStatus]);
+        if (currentStatus === 'Draft GR' || currentStatus === 'Draft') {
             targetStatuses.add('Draft GR');
             targetStatuses.add('Draft');
-            targetStatuses.add('Pending GR');
         }
 
         const activeItems = allItems.filter(item => targetStatuses.has(item.status));
