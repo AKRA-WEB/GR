@@ -371,7 +371,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = "20260907.01";
+    const CURRENT_VERSION = '20260908.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2771,45 +2771,23 @@
             return;
         }
 
+        if (val.length > 200) {
+            inputEl.classList.add('input-error');
+            delete inputEl.dataset.resolvedIso;
+            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium text-[11px]">⚠️ ความยาวเกิน 200 ตัวอักษร</span>`;
+            return;
+        }
+
         const res = GrExpiry.parseExpiryInput(val);
+        inputEl.classList.remove('input-error');
+        delete inputEl.dataset.resolvedIso;
+
         if (res.valid) {
-            inputEl.classList.remove('input-error');
-            inputEl.dataset.resolvedIso = res.iso;
             wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]"><i data-lucide="check" class="w-3 h-3"></i> ${esc(res.previewText)}</span>`;
             if (window.lucide && lucide.createIcons) lucide.createIcons({ root: wrap });
-        } else if (res.ambiguous) {
-            inputEl.classList.remove('input-error');
-            delete inputEl.dataset.resolvedIso;
-            wrap.innerHTML = `
-                <div class="p-2 bg-amber-50 border border-amber-200 rounded-md text-amber-900 mt-1">
-                    <div class="font-bold flex items-center gap-1 text-[11px] mb-1">
-                        <span>⚠️ โปรดเลือกปีหรือวันที่ที่ถูกต้อง:</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                        ${res.candidates.map(cand => `
-                            <button type="button" class="px-2 py-1 bg-white border border-amber-300 hover:bg-amber-100 hover:border-amber-400 rounded text-xs font-bold text-amber-900 shadow-sm transition active:scale-95"
-                                    onclick="selectExpiryCandidate(this, '${cand.iso}', '${esc(cand.preview)}')">
-                                ${esc(cand.label)}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>`;
-        } else if (res.incomplete || res.error) {
-            delete inputEl.dataset.resolvedIso;
-            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium text-[11px]">⚠️ ${esc(res.error || 'วันที่ไม่ถูกต้อง')}</span>`;
+        } else {
+            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">บันทึกเป็นข้อความ: ${esc(val)}</span>`;
         }
-    }
-
-    function selectExpiryCandidate(btnEl, iso, preview) {
-        const wrap = btnEl.closest('.exp-preview-wrap');
-        if (!wrap || !wrap.parentElement) return;
-        const inputEl = wrap.parentElement.querySelector('input.po-exp, input.ex-exp');
-        if (!inputEl) return;
-
-        inputEl.dataset.resolvedIso = iso;
-        inputEl.classList.remove('input-error');
-        wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]"><i data-lucide="check" class="w-3 h-3"></i> ${esc(preview)}</span>`;
-        if (window.lucide && lucide.createIcons) lucide.createIcons({ root: wrap });
     }
 
     async function submitReceiving(e, targetStatus) {
@@ -2865,17 +2843,10 @@
           const rawExp = expInp ? expInp.value.trim() : '';
           let exp = '';
           if (rawExp) {
-              if (typeof GrExpiry !== 'undefined') {
-                  const parsed = GrExpiry.parseExpiryInput(rawExp);
-                  if (expInp && expInp.dataset.resolvedIso) {
-                      exp = expInp.dataset.resolvedIso;
-                  } else if (parsed.valid) {
-                      exp = parsed.iso;
-                  } else {
-                      if (expInp) expInp.classList.add('input-error');
-                      formHasError = true;
-                      expiryHasError = true;
-                  }
+              if (rawExp.length > 200) {
+                  if (expInp) expInp.classList.add('input-error');
+                  formHasError = true;
+                  expiryHasError = true;
               } else {
                   exp = rawExp;
               }
@@ -2929,17 +2900,10 @@
           const rawExp = expInp ? expInp.value.trim() : '';
           let exp = '';
           if (rawExp) {
-              if (typeof GrExpiry !== 'undefined') {
-                  const parsed = GrExpiry.parseExpiryInput(rawExp);
-                  if (expInp && expInp.dataset.resolvedIso) {
-                      exp = expInp.dataset.resolvedIso;
-                  } else if (parsed.valid) {
-                      exp = parsed.iso;
-                  } else {
-                      if (expInp) expInp.classList.add('input-error');
-                      formHasError = true;
-                      expiryHasError = true;
-                  }
+              if (rawExp.length > 200) {
+                  if (expInp) expInp.classList.add('input-error');
+                  formHasError = true;
+                  expiryHasError = true;
               } else {
                   exp = rawExp;
               }
@@ -2954,7 +2918,7 @@
           }
       });
 
-      if (expiryHasError) return showNotification("กรุณาตรวจสอบและเลือกวันหมดอายุให้ถูกต้อง", "warning");
+      if (expiryHasError) return showNotification("ความยาวข้อความวันหมดอายุเกินกำหนด 200 ตัวอักษร", "warning");
       if (formHasError) return showNotification("กรุณากรอกข้อมูลโลเคชั่น หรือข้อมูลของแถมให้ครบถ้วน", "warning");
       const totalReceived = poItemsData.filter(i => i.grQty && parseFloat(i.grQty) > 0).length + extraItemsData.length;
       if (!isDraft && totalReceived === 0) return showNotification("โปรดใส่จำนวนรับสินค้าอย่างน้อย 1 รายการ", "warning");
