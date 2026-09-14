@@ -179,10 +179,13 @@
     }
     @media (max-width: 640px) {
       .gr-main { padding-top: 22px !important; }
-      .gr-view-heading { align-items: start; flex-direction: column; gap: 14px; }
-      .gr-count-block { justify-items: start; }
-      .gr-filter-bento { grid-template-columns: 1fr; padding: 7px; }
-      .gr-filter-bento input { grid-column: auto; }
+      .gr-view-heading { align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .gr-view-heading > div:first-child { flex: 1 1 190px; min-width: 0; }
+      .gr-count-block { justify-items: start; min-width: 0; padding: 7px 9px; }
+      .gr-count-block span { font-size: 20px !important; }
+      .gr-filter-bento { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 7px; }
+      .gr-filter-bento input { grid-column: 1 / -1; }
+      .gr-filter-bento select { min-width: 0; }
       .gr-bill-grid > .gr-bento-card, .gr-bill-grid > .gr-bento-card:nth-child(4n + 1), .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: 1 / -1; }
       #delivery-plan-calendar-body > .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .gr-brand-lockup h1 { font-size: 14px; }
@@ -466,7 +469,9 @@
       /* Keep the action group in normal document flow so it never covers the bill. */
       .gr-topbar .space-x-2 { gap: 4px; }
       .gr-topbar .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; }
-      .gr-topbar .space-x-2 > button { width: 34px; min-width: 34px; height: 34px; padding: 8px !important; justify-content: center; }
+      .gr-topbar > div > div > .space-x-2 > button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 8px !important; justify-content: center; }
+      .gr-topbar > div > div > div:first-child { flex-shrink: 1; gap: 6px; }
+      .gr-topbar .gr-brand-lockup h1 { white-space: normal; }
       .gr-topbar #local-preview-badge { display: none !important; }
       #form-receiving > .sticky {
         position: static !important;
@@ -813,7 +818,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260914.07';
+    const CURRENT_VERSION = '20260914.08';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
