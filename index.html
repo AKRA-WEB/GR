@@ -118,7 +118,7 @@
     .gr-bill-card__po { color: var(--gr-muted) !important; font-family: var(--gr-display); font-size: 11px !important; letter-spacing: .08em; }
     .gr-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 42%); border-radius: 999px; background: color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 88%); color: var(--status-accent, var(--gr-orange)); font-size: 10px !important; font-weight: 700; white-space: nowrap; }
     .gr-bill-card__items { position: relative; z-index: 1; display: grid; gap: 3px; min-height: 94px; margin: 18px 0 12px !important; }
-    .gr-bill-card__item { padding: 9px 0; border-top: 1px solid var(--gr-line); }
+    .gr-bill-card__item { min-width: 0; padding: 9px 0; border-top: 1px solid var(--gr-line); }
     .gr-bill-card__item p { color: var(--gr-ink) !important; font-size: 13px !important; }
     .gr-bill-card__item p span { color: var(--gr-muted) !important; }
     .gr-bill-card__item .text-gray-400, .gr-bill-card__item .text-gray-500 { color: var(--gr-muted) !important; }
@@ -299,6 +299,139 @@
     .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: auto; min-width: 0; }
     @media (max-width: 640px) {
       .gr-bill-grid { grid-template-columns: 1fr; gap: 12px !important; }
+    }
+
+    /* Action hierarchy and status surfaces: presentation-only refinement. */
+    .gr-bill-card.status-card--pending {
+      --status-accent: #4777a9;
+      background: linear-gradient(145deg, #fbfdff 0%, #f1f6fc 100%) !important;
+      border-color: #ccdae8 !important;
+    }
+    .gr-bill-card.status-card--overdue {
+      --status-accent: #c4454d;
+      background: linear-gradient(145deg, #fffafa 0%, #fff1f0 100%) !important;
+      border-color: #f0c7c8 !important;
+    }
+    .gr-bill-card.status-card--review {
+      --status-accent: #b85f22;
+      background: linear-gradient(145deg, #fffdf8 0%, #fff3e8 100%) !important;
+      border-color: #efd0ad !important;
+    }
+    .gr-bill-card.status-card--draft {
+      --status-accent: #515da8;
+      background: linear-gradient(145deg, #fbfbff 0%, #f0f2ff 100%) !important;
+      border-color: #d0d4f3 !important;
+    }
+    .gr-bill-card.status-card--completed {
+      --status-accent: #2e7d52;
+      background: linear-gradient(145deg, #fbfffc 0%, #edf9f1 100%) !important;
+      border-color: #c5e3d0 !important;
+    }
+    .gr-bill-card .gr-status-badge {
+      background: color-mix(in srgb, var(--status-accent), white 90%) !important;
+      border-color: color-mix(in srgb, var(--status-accent), white 65%) !important;
+      color: var(--status-accent) !important;
+    }
+
+    body.gr-shell .btn {
+      border: 1px solid rgba(24, 34, 48, .14) !important;
+      border-radius: 10px !important;
+      background: #ffffff !important;
+      color: var(--gr-ink) !important;
+      box-shadow: 0 4px 12px rgba(25, 35, 48, .08), inset 0 1px 0 rgba(255,255,255,.96) !important;
+      transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+    }
+    body.gr-shell .btn::after { background: linear-gradient(100deg, transparent 22%, rgba(255,255,255,.28) 50%, transparent 78%); }
+    body.gr-shell .btn:hover {
+      filter: none;
+      background: #f8fafc !important;
+      border-color: rgba(24, 34, 48, .26) !important;
+      color: var(--gr-ink) !important;
+      box-shadow: 0 8px 18px rgba(25, 35, 48, .12), inset 0 1px 0 rgba(255,255,255,.98) !important;
+      transform: translateY(-1px);
+    }
+    body.gr-shell .btn:focus-visible {
+      outline: 3px solid rgba(71, 119, 169, .24);
+      outline-offset: 2px;
+    }
+    #product-history-submit {
+      background: linear-gradient(135deg, #d95f2b, #b7471d) !important;
+      border-color: #b7471d !important;
+      color: #ffffff !important;
+      box-shadow: 0 7px 16px rgba(183, 71, 29, .2) !important;
+    }
+    #product-history-submit:hover { background: linear-gradient(135deg, #c95325, #a73d19) !important; color: #ffffff !important; }
+
+    #form-receiving > .sticky {
+      border-color: #d9e0e8 !important;
+      background: rgba(255,255,255,.98) !important;
+      box-shadow: 0 -10px 22px rgba(25,35,48,.08) !important;
+    }
+    #form-receiving > .sticky .btn {
+      min-height: 48px;
+      letter-spacing: -.01em;
+    }
+    #form-receiving > .sticky #btn-draft {
+      background: #f5f7fa !important;
+      border-color: #d0d5dd !important;
+      color: #344054 !important;
+      box-shadow: 0 4px 10px rgba(25,35,48,.06) !important;
+    }
+    #form-receiving > .sticky #btn-review {
+      background: linear-gradient(135deg, #d97706, #b45309) !important;
+      border-color: #b45309 !important;
+      color: #ffffff !important;
+      box-shadow: 0 7px 16px rgba(180,83,9,.2) !important;
+    }
+    #form-receiving > .sticky #btn-confirm-receive {
+      background: linear-gradient(135deg, #2f8b61, #23734f) !important;
+      border-color: #23734f !important;
+      color: #ffffff !important;
+      box-shadow: 0 7px 16px rgba(35,115,79,.2) !important;
+    }
+    #form-receiving > .sticky #btn-recall {
+      background: linear-gradient(135deg, #4777a9, #365f8c) !important;
+      border-color: #365f8c !important;
+      color: #ffffff !important;
+      box-shadow: 0 7px 16px rgba(54,95,140,.18) !important;
+    }
+    #form-receiving > .sticky #btn-reset {
+      background: #fff7f7 !important;
+      border-color: #e5aaa9 !important;
+      color: #b42318 !important;
+      box-shadow: 0 4px 10px rgba(180,35,24,.08) !important;
+    }
+    #form-receiving > .sticky #btn-review:hover { background: linear-gradient(135deg, #c66b05, #9a4708) !important; color: #ffffff !important; }
+    #form-receiving > .sticky #btn-confirm-receive:hover { background: linear-gradient(135deg, #287b56, #1d6244) !important; color: #ffffff !important; }
+    #form-receiving > .sticky #btn-recall:hover { background: linear-gradient(135deg, #3d6b9b, #2f527a) !important; color: #ffffff !important; }
+    #form-receiving > .sticky #btn-reset:hover { background: #fff0f0 !important; border-color: #d88b89 !important; color: #912018 !important; }
+
+    #form-receiving .po-split-btn {
+      background: #eef4fb !important;
+      border: 1px solid #c6d8eb !important;
+      color: #365f8c !important;
+    }
+    #form-receiving .po-split-btn:hover { background: #e2edf8 !important; border-color: #9dbbd8 !important; color: #294e78 !important; }
+    #form-receiving button[onclick="addExtraItemRow()"] {
+      background: #ffffff !important;
+      border-color: #e2a889 !important;
+      color: #b7471d !important;
+    }
+    #form-receiving button[onclick="addExtraItemRow()"]:hover { background: #fff6f1 !important; border-color: #d9825c !important; }
+
+    @media (max-width: 640px) {
+      /* Keep the action group in normal document flow so it never covers the bill. */
+      #form-receiving > .sticky {
+        position: static !important;
+        inset: auto !important;
+        z-index: auto !important;
+        margin-top: 0;
+        padding: 12px 0 calc(12px + env(safe-area-inset-bottom)) !important;
+        border-radius: 14px !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+      }
+      #form-receiving > .sticky .btn { flex: 1 1 100%; min-width: 0; min-height: 48px; }
     }
 
   </style>
@@ -630,7 +763,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260914.01';
+    const CURRENT_VERSION = '20260914.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
