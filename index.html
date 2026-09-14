@@ -3,7 +3,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,9 +15,9 @@
   <script src="js/gr-expiry.js" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; letter-spacing: 0.2px; }
+    body { font-family: 'Inter', 'Noto Sans Thai', 'Noto Sans', Arial, sans-serif; background-color: #f3f4f6; letter-spacing: 0.2px; }
     .glass-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.3); }
     .glass-card.status-card { background: var(--status-bg, rgba(255, 255, 255, 0.95)); border: 1px solid var(--status-border, #e5e7eb); border-left: 6px solid var(--status-accent, #9ca3af); box-shadow: 0 8px 24px var(--status-shadow, rgba(0, 0, 0, 0.06)); }
     .glass-card.status-card:hover { box-shadow: 0 12px 30px var(--status-shadow-strong, rgba(0, 0, 0, 0.1)); }
@@ -42,9 +42,259 @@
     @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
     
     .loading-active { overflow: hidden; }
+
+    /* GR visual system: dark inbound-control workspace with task-shaped bento surfaces. */
+    :root {
+      --gr-bg: #080b11;
+      --gr-surface: #0e141d;
+      --gr-surface-2: #111a25;
+      --gr-surface-3: #162232;
+      --gr-line: rgba(177, 198, 222, .14);
+      --gr-line-strong: rgba(177, 198, 222, .28);
+      --gr-ink: #f4f7fb;
+      --gr-muted: #91a0b2;
+      --gr-orange: #ff784f;
+      --gr-orange-soft: rgba(255, 120, 79, .12);
+      --gr-blue: #79c7ff;
+      --gr-lime: #a8e88a;
+      --gr-yellow: #f4cf69;
+      --gr-red: #ff6f79;
+      --gr-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+      --gr-display: 'Inter', 'Noto Sans Thai', 'Noto Sans', Arial, sans-serif;
+      --gr-body: 'Inter', 'Noto Sans Thai', 'Noto Sans', Arial, sans-serif;
+    }
+    body.gr-shell { background: radial-gradient(circle at 78% -12%, rgba(53, 107, 164, .22), transparent 34%), radial-gradient(circle at 10% 16%, rgba(255, 120, 79, .08), transparent 30%), var(--gr-bg); color: var(--gr-ink); font-family: var(--gr-body); letter-spacing: 0; }
+    body.gr-shell::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .24; background-image: linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px); background-size: 64px 64px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+    body.gr-shell .fixed.bg-white, body.gr-shell #auth-loading, body.gr-shell #auth-error { background: var(--gr-bg) !important; color: var(--gr-ink); }
+    body.gr-shell #auth-loading p { color: var(--gr-orange) !important; }
+    body.gr-shell #auth-loading .border-t-4, body.gr-shell #auth-loading .border-b-4 { border-color: var(--gr-orange) !important; }
+    body.gr-shell #auth-error > div { background: var(--gr-surface) !important; border-color: var(--gr-line-strong) !important; box-shadow: var(--gr-shadow); }
+    body.gr-shell #auth-error h2 { color: var(--gr-ink); }
+    body.gr-shell #auth-error p { color: var(--gr-muted); }
+    .gr-topbar { position: relative; background: rgba(9, 13, 20, .78) !important; border-bottom: 1px solid var(--gr-line-strong); box-shadow: 0 12px 30px rgba(0, 0, 0, .18) !important; backdrop-filter: blur(18px); }
+    .gr-topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--gr-orange), transparent); opacity: .7; }
+    .gr-topbar > div { max-width: 1440px !important; }
+    .gr-brand-lockup { display: grid; gap: 1px; }
+    .gr-brand-lockup .gr-brand-kicker { color: var(--gr-orange); font-family: var(--gr-display); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    .gr-brand-lockup h1 { color: var(--gr-ink); font-family: var(--gr-display); font-size: 17px; font-weight: 700; letter-spacing: -.04em; }
+    .gr-topbar nav, .gr-topbar button { color: var(--gr-muted); }
+    .gr-topbar button { border: 1px solid var(--gr-line); background: rgba(255,255,255,.035) !important; border-radius: 9px; transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease; }
+    .gr-topbar button:hover { border-color: var(--gr-orange); background: var(--gr-orange-soft) !important; color: var(--gr-ink); box-shadow: 0 0 22px rgba(255, 120, 79, .14); transform: translateY(-1px); }
+    .gr-topbar button:hover svg { transform: rotate(-8deg) scale(1.08); }
+    .gr-topbar button svg { transition: transform .2s ease; }
+    .gr-topbar #logout-btn { color: #ff9aa2; border-color: rgba(255, 111, 121, .25); background: rgba(255, 111, 121, .07) !important; }
+    .gr-main { position: relative; z-index: 1; max-width: 1440px !important; padding: 32px clamp(16px, 4vw, 52px) 72px !important; }
+    .gr-view-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 4px 0 22px; }
+    .gr-eyebrow { display: block; margin-bottom: 7px; color: var(--gr-orange); font-family: var(--gr-display); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .gr-view-title { color: var(--gr-ink) !important; font-family: var(--gr-display); font-size: clamp(26px, 3vw, 42px) !important; font-weight: 700 !important; letter-spacing: -.065em; line-height: 1 !important; }
+    .gr-view-subtitle { max-width: 640px; margin-top: 8px; color: var(--gr-muted); font-size: 13px; }
+    .gr-count-block { display: grid; justify-items: end; gap: 2px; min-width: 104px; padding: 13px 16px; border: 1px solid var(--gr-line-strong); border-radius: 12px; background: linear-gradient(145deg, rgba(255, 120, 79, .14), rgba(121, 199, 255, .04)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+    .gr-count-block small { color: var(--gr-muted); font-family: var(--gr-display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .gr-count-block span { color: var(--gr-orange) !important; background: transparent !important; border: 0 !important; padding: 0 !important; font-family: var(--gr-display); font-size: 27px !important; line-height: 1; }
+    .gr-filter-bento { display: grid !important; grid-template-columns: minmax(0, 1.6fr) minmax(190px, .7fr) minmax(190px, .7fr); gap: 8px !important; margin: 0 0 14px !important; padding: 9px; border: 1px solid var(--gr-line); border-radius: 14px; background: rgba(14, 20, 29, .74); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+    .gr-control-field { min-height: 44px; }
+    body.gr-shell .input-field, .gr-control-field { border: 1px solid var(--gr-line-strong) !important; border-radius: 9px !important; background: rgba(255,255,255,.035) !important; color: var(--gr-ink) !important; box-shadow: none !important; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease; }
+    body.gr-shell .input-field::placeholder { color: #6f7e91; }
+    body.gr-shell .input-field:focus { border-color: var(--gr-orange) !important; background: rgba(255,120,79,.06) !important; box-shadow: 0 0 0 3px rgba(255,120,79,.12), 0 0 24px rgba(255,120,79,.1) !important; transform: translateY(-1px); }
+    body.gr-shell select option { background: var(--gr-surface); color: var(--gr-ink); }
+    .gr-bento-card { position: relative; isolation: isolate; }
+    .gr-bento-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; opacity: 0; background: radial-gradient(circle at 94% 4%, color-mix(in srgb, var(--status-accent), transparent 72%), transparent 36%); transition: opacity .25s ease; }
+    .gr-bento-card:hover::after { opacity: 1; }
+    .gr-bill-grid { display: grid !important; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px !important; align-items: stretch; }
+    .gr-bill-grid > .gr-bento-card { grid-column: span 4; min-height: 250px; }
+    .gr-bill-grid > .gr-bento-card:nth-child(4n + 1) { grid-column: span 6; }
+    .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: span 3; }
+    .gr-bill-grid > button { grid-column: 1 / -1; }
+    .gr-bill-card { display: flex; flex-direction: column; padding: 17px !important; border: 1px solid var(--gr-line) !important; border-left: 1px solid var(--gr-line) !important; border-radius: 15px !important; background: linear-gradient(145deg, rgba(17, 26, 37, .96), rgba(11, 16, 24, .96)) !important; box-shadow: 0 10px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.04) !important; transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease; }
+    .gr-bill-card::before { content: ''; position: absolute; left: 0; top: 18px; bottom: 18px; width: 2px; border-radius: 2px; background: var(--status-accent, var(--gr-orange)); box-shadow: 0 0 18px var(--status-accent, var(--gr-orange)); }
+    .gr-bill-card:hover { border-color: color-mix(in srgb, var(--status-accent, var(--gr-orange)), white 20%) !important; box-shadow: 0 18px 42px rgba(0,0,0,.22), 0 0 28px color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 84%), inset 0 1px 0 rgba(255,255,255,.07) !important; transform: translateY(-3px); }
+    .gr-bill-card:active { transform: translateY(0) scale(.995); }
+    .gr-bill-card.status-card--pending { --status-accent: var(--gr-blue); }
+    .gr-bill-card.status-card--overdue { --status-accent: var(--gr-red); }
+    .gr-bill-card.status-card--review { --status-accent: var(--gr-yellow); }
+    .gr-bill-card.status-card--draft { --status-accent: #9ca7ff; }
+    .gr-bill-card.status-card--completed { --status-accent: var(--gr-lime); }
+    .gr-bill-card__header { position: relative; z-index: 1; display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .gr-bill-card__po { color: var(--gr-muted) !important; font-family: var(--gr-display); font-size: 11px !important; letter-spacing: .08em; }
+    .gr-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 42%); border-radius: 999px; background: color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 88%); color: var(--status-accent, var(--gr-orange)); font-size: 10px !important; font-weight: 700; white-space: nowrap; }
+    .gr-bill-card__items { position: relative; z-index: 1; display: grid; gap: 3px; min-height: 94px; margin: 18px 0 12px !important; }
+    .gr-bill-card__item { padding: 9px 0; border-top: 1px solid var(--gr-line); }
+    .gr-bill-card__item p { color: var(--gr-ink) !important; font-size: 13px !important; }
+    .gr-bill-card__item p span { color: var(--gr-muted) !important; }
+    .gr-bill-card__item .text-gray-400, .gr-bill-card__item .text-gray-500 { color: var(--gr-muted) !important; }
+    .gr-bill-card__footer { position: relative; z-index: 1; display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-top: auto !important; padding-top: 13px !important; border-top: 1px solid var(--gr-line) !important; color: var(--gr-muted) !important; }
+    .gr-bill-card__footer p { color: var(--gr-muted) !important; }
+    .gr-bill-card__footer p:first-child { color: var(--gr-ink) !important; }
+    .gr-bill-card__open { display: inline-flex; align-items: center; gap: 5px; color: var(--status-accent, var(--gr-orange)) !important; background: transparent !important; border: 1px solid color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 50%) !important; border-radius: 7px !important; padding: 5px 8px !important; box-shadow: none !important; transition: gap .2s ease, background .2s ease; }
+    .gr-bill-card:hover .gr-bill-card__open { gap: 9px; background: color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 88%) !important; }
+    .gr-shell .glass-card { border: 1px solid var(--gr-line) !important; border-radius: 15px !important; background: linear-gradient(145deg, rgba(17, 26, 37, .95), rgba(11, 16, 24, .95)) !important; box-shadow: 0 12px 34px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.04) !important; }
+    .gr-shell .glass-card.status-card { border-left: 1px solid var(--gr-line) !important; }
+    #delivery-plan-summary > div { border-color: var(--gr-line) !important; border-radius: 15px !important; background: linear-gradient(145deg, rgba(17, 26, 37, .92), rgba(11, 16, 24, .9)) !important; box-shadow: var(--gr-shadow) !important; }
+    #delivery-plan-summary h3, #delivery-plan-summary .text-gray-800, #delivery-plan-summary .text-gray-700 { color: var(--gr-ink) !important; }
+    #delivery-plan-summary .text-gray-500, #delivery-plan-summary .text-gray-400 { color: var(--gr-muted) !important; }
+    #delivery-plan-summary button { border-color: var(--gr-line) !important; background: rgba(255,255,255,.025) !important; color: var(--gr-muted) !important; transition: border-color .2s ease, transform .2s ease, background .2s ease; }
+    #delivery-plan-summary button:hover, #delivery-plan-summary button[aria-pressed="true"] { border-color: var(--gr-orange) !important; background: var(--gr-orange-soft) !important; color: var(--gr-ink) !important; transform: translateY(-1px); }
+    #delivery-plan-calendar-body > .grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    #wh-chips { gap: 6px !important; }
+    #wh-chips button { min-height: 31px; border: 1px solid var(--gr-line) !important; border-radius: 999px !important; background: rgba(255,255,255,.025) !important; color: var(--gr-muted) !important; box-shadow: none !important; transition: border-color .2s ease, color .2s ease, transform .2s ease, background .2s ease; }
+    #wh-chips button:hover, #wh-chips button:has(+ button) { }
+    #wh-chips button:hover { border-color: var(--gr-orange) !important; color: var(--gr-ink) !important; transform: translateY(-1px); }
+    #wh-chips button.bg-brand-orange { border-color: var(--gr-orange) !important; background: var(--gr-orange-soft) !important; color: var(--gr-orange) !important; }
+    .gr-detail-card { max-width: 1040px !important; }
+    .gr-back-link { color: var(--gr-muted) !important; transition: color .2s ease, transform .2s ease; }
+    .gr-back-link:hover { color: var(--gr-orange) !important; transform: translateX(-3px); }
+    .gr-bill-header { border-color: var(--gr-line) !important; border-radius: 12px !important; background: linear-gradient(145deg, rgba(20, 31, 45, .95), rgba(12, 18, 27, .9)) !important; }
+    .gr-bill-header .text-gray-800, .gr-bill-header .text-gray-700 { color: var(--gr-ink) !important; }
+    .gr-bill-header .text-gray-500, .gr-bill-header .text-gray-400 { color: var(--gr-muted) !important; }
+    #r-display-vendor-header > div:first-child { border: 1px solid var(--gr-line-strong); border-radius: 10px; background: var(--gr-orange-soft) !important; color: var(--gr-orange) !important; }
+    #r-delivery-plan > div { border-color: rgba(121,199,255,.28) !important; border-radius: 12px !important; background: linear-gradient(145deg, rgba(121,199,255,.12), rgba(17, 26, 37, .82)) !important; }
+    #r-delivery-plan .text-gray-800, #r-delivery-plan .text-gray-700 { color: var(--gr-ink) !important; }
+    #r-delivery-plan .text-gray-500, #r-delivery-plan .text-gray-400 { color: var(--gr-muted) !important; }
+    #form-receiving > div, #form-receiving > section { border-color: var(--gr-line) !important; border-radius: 13px !important; background: rgba(14, 20, 29, .76) !important; }
+    #form-receiving h3, #form-receiving label, #form-receiving .text-gray-800, #form-receiving .text-gray-700 { color: var(--gr-ink) !important; }
+    #form-receiving .text-gray-500, #form-receiving .text-gray-400 { color: var(--gr-muted) !important; }
+    #form-receiving .po-item-row { border-color: var(--gr-line) !important; border-radius: 12px !important; background: linear-gradient(145deg, rgba(17, 26, 37, .98), rgba(11, 16, 24, .92)) !important; transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+    #form-receiving .po-item-row:hover { border-color: rgba(121,199,255,.5) !important; box-shadow: 0 0 24px rgba(121,199,255,.08); transform: translateY(-1px); }
+    #form-receiving .po-item-row .border-gray-100, #form-receiving .po-item-row .border-gray-200 { border-color: var(--gr-line) !important; }
+    #form-receiving .po-item-row .bg-gray-50, #form-receiving .po-item-row .bg-gray-50\/70 { background: rgba(255,255,255,.035) !important; }
+    #form-receiving .po-item-row .po-qty { color: var(--gr-orange) !important; }
+    #form-receiving .po-item-row .po-loc-zone, #form-receiving .po-item-row .po-loc-zone2 { min-width: 0; }
+    #form-receiving .po-split { border-color: var(--gr-line-strong) !important; }
+    #form-receiving .sticky { border-color: var(--gr-line) !important; background: rgba(8, 11, 17, .9) !important; box-shadow: 0 -18px 34px rgba(0,0,0,.25) !important; }
+    body.gr-shell .btn { position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, var(--gr-orange), white 8%); border-radius: 9px !important; background: linear-gradient(135deg, #ff8559, #e95539) !important; color: #190c09 !important; box-shadow: 0 8px 22px rgba(255, 120, 79, .16); font-family: var(--gr-body); font-weight: 700; transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+    body.gr-shell .btn::after { content: ''; position: absolute; inset: 0; transform: translateX(-115%); background: linear-gradient(100deg, transparent 22%, rgba(255,255,255,.34) 50%, transparent 78%); transition: transform .45s ease; }
+    body.gr-shell .btn:hover { filter: brightness(1.08); box-shadow: 0 12px 28px rgba(255, 120, 79, .25); transform: translateY(-2px); }
+    body.gr-shell .btn:hover::after { transform: translateX(115%); }
+    body.gr-shell .btn:active { transform: translateY(0) scale(.985); }
+    body.gr-shell .btn.bg-white, body.gr-shell button.border-gray-300 { border-color: var(--gr-line-strong) !important; background: rgba(255,255,255,.04) !important; color: var(--gr-muted) !important; box-shadow: none; }
+    body.gr-shell .btn.bg-yellow-500 { border-color: rgba(244, 207, 105, .5) !important; background: linear-gradient(135deg, #e3b950, #a97b29) !important; color: #171108 !important; }
+    body.gr-shell .btn.bg-brand-blue { border-color: rgba(121, 199, 255, .5) !important; background: linear-gradient(135deg, #5fb7ee, #376fae) !important; color: #06121d !important; }
+    body.gr-shell .btn.bg-red-600 { border-color: rgba(255, 111, 121, .5) !important; background: linear-gradient(135deg, #ee6673, #a73d4d) !important; color: #1c070b !important; }
+    body.gr-shell .toast { border: 1px solid var(--gr-line-strong); border-left: 3px solid var(--gr-orange); border-radius: 12px; background: var(--gr-surface-2); color: var(--gr-ink); box-shadow: var(--gr-shadow); }
+    body.gr-shell .toast p { color: var(--gr-ink) !important; }
+    @media (max-width: 980px) {
+      .gr-bill-grid > .gr-bento-card, .gr-bill-grid > .gr-bento-card:nth-child(4n + 1), .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: span 6; }
+      .gr-filter-bento { grid-template-columns: 1fr 1fr; }
+      .gr-filter-bento input { grid-column: 1 / -1; }
+      #delivery-plan-calendar-body > .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .gr-main { padding-top: 22px !important; }
+      .gr-view-heading { align-items: start; flex-direction: column; gap: 14px; }
+      .gr-count-block { justify-items: start; }
+      .gr-filter-bento { grid-template-columns: 1fr; padding: 7px; }
+      .gr-filter-bento input { grid-column: auto; }
+      .gr-bill-grid > .gr-bento-card, .gr-bill-grid > .gr-bento-card:nth-child(4n + 1), .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: 1 / -1; }
+      #delivery-plan-calendar-body > .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .gr-brand-lockup .gr-brand-kicker { font-size: 8px; }
+      .gr-brand-lockup h1 { font-size: 15px; }
+      body.gr-shell { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+      .gr-warehouse-chips { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+      #wh-chips button { min-height: 44px; padding: 0 13px !important; }
+      #delivery-plan-summary button { min-height: 44px; }
+      #form-receiving .po-item-row > .grid.grid-cols-2 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+      #form-receiving .po-item-row .grid.grid-cols-3 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+      #form-receiving .po-item-row .grid.grid-cols-3 .po-loc-zone,
+      #form-receiving .po-item-row .po-split .po-loc-zone2,
+      #form-receiving .po-item-row .po-split .po-qty2 { grid-column: 1 / -1; }
+      #form-receiving .po-item-row .po-split > .grid { grid-template-columns: 1fr 1fr !important; }
+      #form-receiving .po-split-btn, #form-receiving #lift-fee-container label { min-height: 44px; }
+      #form-receiving > .sticky { flex-wrap: wrap; overflow-x: visible; gap: 8px; }
+      #form-receiving > .sticky .btn { flex: 1 1 100%; min-width: 0; min-height: 48px; }
+      #form-receiving input, #form-receiving select, #form-receiving textarea { font-size: 16px !important; }
+      #form-receiving .po-item-row label, #form-receiving .po-split p { font-size: 11px !important; }
+    }
+
+    /* Warm Paper canvas: visual theme only; receiving flow and field order stay unchanged. */
+    :root {
+      --gr-bg: #f3ede3;
+      --gr-surface: #fffaf2;
+      --gr-surface-2: #f8f1e7;
+      --gr-surface-3: #e7dccd;
+      --gr-line: rgba(55, 47, 39, .14);
+      --gr-line-strong: rgba(55, 47, 39, .27);
+      --gr-ink: #202832;
+      --gr-muted: #6e675e;
+      --gr-orange: #c84f20;
+      --gr-orange-soft: rgba(200, 79, 32, .1);
+      --gr-blue: #2458a6;
+      --gr-lime: #28784e;
+      --gr-yellow: #a97810;
+      --gr-red: #b4434c;
+      --gr-shadow: 0 18px 48px rgba(73, 57, 39, .13);
+    }
+    body.gr-shell { background: radial-gradient(circle at 78% -12%, rgba(36, 88, 166, .1), transparent 34%), radial-gradient(circle at 10% 16%, rgba(200, 79, 32, .1), transparent 30%), var(--gr-bg); color: var(--gr-ink); }
+    body.gr-shell::before { opacity: .2; background-image: linear-gradient(rgba(55,47,39,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(55,47,39,.035) 1px, transparent 1px); mask-image: linear-gradient(to bottom, black, transparent 74%); }
+    body.gr-shell .fixed.bg-white, body.gr-shell #auth-loading, body.gr-shell #auth-error { background: var(--gr-bg) !important; color: var(--gr-ink); }
+    body.gr-shell #auth-error > div { background: var(--gr-surface) !important; border-color: var(--gr-line-strong) !important; box-shadow: var(--gr-shadow); }
+    .gr-topbar { background: rgba(255, 250, 242, .88) !important; border-bottom-color: var(--gr-line-strong); box-shadow: 0 10px 26px rgba(73,57,39,.1) !important; }
+    .gr-topbar::after { background: linear-gradient(90deg, transparent, var(--gr-orange), transparent); }
+    .gr-topbar, .gr-topbar .text-white, .gr-topbar .text-white\/90 { color: var(--gr-ink) !important; }
+    .gr-brand-lockup h1 { color: var(--gr-ink) !important; }
+    .gr-topbar button { color: var(--gr-muted) !important; background: rgba(55,47,39,.045) !important; }
+    .gr-topbar button:hover { color: var(--gr-ink) !important; background: var(--gr-orange-soft) !important; }
+    .gr-topbar #logout-btn { color: var(--gr-red) !important; background: rgba(180,67,76,.08) !important; }
+    .gr-filter-bento { background: rgba(255, 250, 242, .78); box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 8px 24px rgba(73,57,39,.06); }
+    body.gr-shell .input-field, .gr-control-field { background: rgba(255,255,255,.7) !important; color: var(--gr-ink) !important; }
+    body.gr-shell .input-field::placeholder { color: #92887a; }
+    body.gr-shell .input-field:focus { background: #fffdf9 !important; }
+    body.gr-shell select option { background: var(--gr-surface); color: var(--gr-ink); }
+    .gr-shell .glass-card, #delivery-plan-summary > div, #form-receiving > div, #form-receiving > section { background: linear-gradient(145deg, rgba(255,250,242,.98), rgba(248,241,231,.94)) !important; box-shadow: 0 10px 28px rgba(73,57,39,.08), inset 0 1px 0 rgba(255,255,255,.8) !important; }
+    .gr-bill-card { background: linear-gradient(145deg, rgba(255,250,242,.98), rgba(248,241,231,.94)) !important; box-shadow: 0 10px 28px rgba(73,57,39,.09), inset 0 1px 0 rgba(255,255,255,.8) !important; }
+    .gr-bill-card:hover { box-shadow: 0 18px 42px rgba(73,57,39,.14), 0 0 24px color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 86%), inset 0 1px 0 rgba(255,255,255,.95) !important; }
+    .gr-bill-card__item p, .gr-bill-header .text-gray-800, .gr-bill-header .text-gray-700, #delivery-plan-summary .text-gray-800, #delivery-plan-summary .text-gray-700, #form-receiving h3, #form-receiving label, #form-receiving .text-gray-800, #form-receiving .text-gray-700 { color: var(--gr-ink) !important; }
+    .gr-bill-card__item p span, .gr-bill-card__item .text-gray-400, .gr-bill-card__item .text-gray-500, .gr-bill-card__footer, .gr-bill-card__footer p, #delivery-plan-summary .text-gray-500, #delivery-plan-summary .text-gray-400, #form-receiving .text-gray-500, #form-receiving .text-gray-400 { color: var(--gr-muted) !important; }
+    #delivery-plan-summary > div { background: linear-gradient(145deg, rgba(255,250,242,.98), rgba(242,247,253,.95)) !important; }
+    #delivery-plan-summary button, #wh-chips button { background: rgba(255,255,255,.62) !important; color: var(--gr-muted) !important; }
+    #delivery-plan-summary button:hover, #delivery-plan-summary button[aria-pressed="true"], #wh-chips button:hover { background: var(--gr-orange-soft) !important; color: var(--gr-orange) !important; }
+    .gr-bill-header { background: linear-gradient(145deg, rgba(255,250,242,.98), rgba(242,247,253,.96)) !important; }
+    #r-delivery-plan > div { background: linear-gradient(145deg, rgba(242,247,253,.95), rgba(255,250,242,.92)) !important; }
+    #form-receiving .po-item-row { background: linear-gradient(145deg, rgba(255,253,249,.98), rgba(248,241,231,.94)) !important; box-shadow: 0 8px 22px rgba(73,57,39,.07); }
+    #form-receiving .po-item-row .bg-gray-50, #form-receiving .po-item-row .bg-gray-50\/70 { background: rgba(55,47,39,.045) !important; }
+    #form-receiving .sticky { background: rgba(255,250,242,.9) !important; box-shadow: 0 -16px 30px rgba(73,57,39,.14) !important; }
+    body.gr-shell .btn.bg-white, body.gr-shell button.border-gray-300 { background: rgba(255,255,255,.72) !important; color: var(--gr-muted) !important; }
+    body.gr-shell .toast { background: var(--gr-surface) !important; color: var(--gr-ink); box-shadow: var(--gr-shadow); }
+
+    /* White Canvas refinement: keep the GR workflow intact and remove surface tint only. */
+    :root {
+      --gr-bg: #ffffff;
+      --gr-surface: #ffffff;
+      --gr-surface-2: #ffffff;
+      --gr-surface-3: #f5f7fa;
+      --gr-line: rgba(25, 35, 48, .12);
+      --gr-line-strong: rgba(25, 35, 48, .22);
+      --gr-ink: #182230;
+      --gr-muted: #667085;
+      --gr-shadow: 0 12px 28px rgba(25, 35, 48, .08);
+    }
+    body.gr-shell { background: #ffffff !important; }
+    body.gr-shell::before { display: none; }
+    body.gr-shell .fixed.bg-white, body.gr-shell #auth-loading, body.gr-shell #auth-error { background: #ffffff !important; }
+    .gr-topbar { background: rgba(255,255,255,.96) !important; box-shadow: 0 8px 20px rgba(25,35,48,.06) !important; }
+    .gr-filter-bento, .gr-shell .glass-card, #delivery-plan-summary > div, #form-receiving > div, #form-receiving > section, .gr-bill-card { background: #ffffff !important; box-shadow: 0 8px 22px rgba(25,35,48,.06), inset 0 1px 0 rgba(255,255,255,.96) !important; }
+    .gr-bill-card:hover { box-shadow: 0 14px 32px rgba(25,35,48,.1), 0 0 20px color-mix(in srgb, var(--status-accent, var(--gr-orange)), transparent 88%) !important; }
+    body.gr-shell .input-field, .gr-control-field, #form-receiving input, #form-receiving select, #form-receiving textarea { background: #ffffff !important; color: var(--gr-ink) !important; }
+    #delivery-plan-summary button, #wh-chips button, body.gr-shell .btn.bg-white, body.gr-shell button.border-gray-300 { background: #ffffff !important; }
+    #form-receiving .po-item-row { background: #ffffff !important; box-shadow: 0 6px 18px rgba(25,35,48,.05); }
+    #form-receiving .po-item-row .bg-gray-50, #form-receiving .po-item-row .bg-gray-50\/70 { background: #f8fafc !important; }
+    #form-receiving .sticky { background: rgba(255,255,255,.96) !important; box-shadow: 0 -12px 24px rgba(25,35,48,.1) !important; }
+    /* Keep the existing dark navigation while the app canvas is white. */
+    .gr-topbar { background: rgba(9,13,20,.94) !important; color: #f4f7fb !important; box-shadow: 0 10px 24px rgba(25,35,48,.16) !important; }
+    .gr-topbar, .gr-topbar .text-white, .gr-topbar .text-white\/90 { color: #f4f7fb !important; }
+    .gr-brand-lockup h1 { color: #f4f7fb !important; }
+    .gr-topbar button { color: #aeb9c8 !important; background: rgba(255,255,255,.06) !important; border-color: rgba(177,198,222,.2) !important; }
+    .gr-topbar button:hover { color: #f4f7fb !important; background: rgba(255,120,79,.13) !important; }
+
+    /* Inter type system: one family, explicit roles, Thai-safe fallback. */
+    body.gr-shell { font-family: var(--gr-body); font-feature-settings: "kern" 1, "liga" 1; }
+    .gr-brand-lockup h1, .gr-view-title, .gr-view-heading h2, .gr-bill-card__po, #form-receiving h3 { font-family: var(--gr-display); }
+    .gr-view-title, .gr-view-heading h2 { letter-spacing: -.04em; }
+    .gr-view-subtitle, #form-receiving p, #form-receiving label, #form-receiving input, #form-receiving select, #form-receiving textarea { line-height: 1.5; }
+    .gr-count-block span, .gr-bill-card__po, #form-receiving .po-qty, #form-receiving .po-qty2 { font-variant-numeric: tabular-nums; }
+
   </style>
 </head>
-<body class="text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
+<body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
   <!-- Auth UI -->
   <div id="auth-loading" class="fixed inset-0 bg-white z-[9999] flex flex-col justify-center items-center">
@@ -63,12 +313,12 @@
 
   <!-- App Content -->
   <div id="app-content" class="hidden flex-1 flex flex-col h-screen w-full">
-      <nav class="bg-brand-orange text-white shadow-md sticky top-0 z-20">
+      <nav class="gr-topbar bg-brand-orange text-white shadow-md sticky top-0 z-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div class="flex justify-between items-center h-16">
             <div class="flex-shrink-0 flex items-center">
               <i data-lucide="box" class="w-6 h-6 mr-2"></i>
-              <h1 class="text-lg font-semibold tracking-wide">ระบบรับสินค้า (GR)</h1>
+              <div class="gr-brand-lockup"><span class="gr-brand-kicker">AKRA OPS / INBOUND CONTROL</span><h1>ระบบรับสินค้า (GR)</h1></div>
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
               <p class="text-sm text-white/90 font-light hidden sm:block">ผู้รับของ: <span id="display-username" class="font-medium text-white">-</span></p>
@@ -89,17 +339,17 @@
         </div>
       </nav>
 
-      <main class="flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-6xl mx-auto pb-10">
+      <main class="gr-main flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-6xl mx-auto pb-10">
         
         <section id="receiving-list-view" class="block">
-          <div class="flex justify-between items-end mb-4 px-1">
-            <h2 class="text-lg font-semibold text-brand-orange">รายการบิลรอรับสินค้า</h2>
-            <span class="text-xs font-medium bg-brand-orangeLight text-brand-orange px-2.5 py-1 rounded-full border border-brand-orange/20" id="pending-count">0 บิล</span>
+          <div class="gr-view-heading px-1">
+            <div><span class="gr-eyebrow">Inbound control / today</span><h2 class="gr-view-title text-lg font-semibold text-brand-orange">รายการบิลรอรับสินค้า</h2><p class="gr-view-subtitle">จัดลำดับบิลตามสถานะ แผนส่ง และคลังรับเข้า เพื่อเปิดงานต่อได้ทันที</p></div>
+            <div class="gr-count-block"><small>active queue</small><span id="pending-count">0 บิล</span></div>
           </div>
 
-          <div class="mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
-            <input type="text" id="r-search-input" oninput="schedulePOListRender()" placeholder="🔍 ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
-            <select id="r-status-filter" onchange="handleStatusFilterChange()" class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
+          <div class="gr-filter-bento mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
+            <input type="text" id="r-search-input" oninput="schedulePOListRender()" aria-label="ค้นหาบิลรับสินค้า" placeholder="ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
+            <select id="r-status-filter" onchange="handleStatusFilterChange()" aria-label="กรองสถานะบิล" class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
               <option value="">📌 ทุกสถานะ</option>
               <option value="Overdue">🚨 นานผิดปกติ (Overdue)</option>
               <option value="Draft GR">📦 กำลังลงสินค้า (Draft)</option>
@@ -107,21 +357,21 @@
               <option value="GR Completed">✅ ลงสินค้าสำเร็จแล้ว</option>
               <option value="Pending GR">🕒 รอรับเข้า</option>
             </select>
-            <select id="r-warehouse-filter" onchange="renderPOListForReceiving()" class="input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
+            <select id="r-warehouse-filter" onchange="renderPOListForReceiving()" aria-label="กรองคลังรับสินค้า" class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
               <option value="">🛒 ทุกคลัง (All)</option>
               <option value="W1">W1</option><option value="W2">W2</option><option value="W3">W3</option>
               <option value="W4">W4</option><option value="W5">W5</option><option value="C1">C1</option><option value="C2">C2</option>
             </select>
           </div>
 
-          <div id="delivery-plan-summary" class="mb-5 px-1"></div>
+          <div id="delivery-plan-summary" class="gr-delivery-summary mb-5 px-1"></div>
 
-          <div id="wh-chips" class="flex flex-wrap gap-2 mb-5 px-1"></div>
+          <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
 
-          <div id="po-list-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+          <div id="po-list-container" class="gr-bill-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
 
-        <section id="product-history-view" class="hidden" aria-labelledby="product-history-title">
+        <section id="product-history-view" class="gr-secondary-view hidden" aria-labelledby="product-history-title">
           <div class="flex flex-col gap-4">
             <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
               <div>
@@ -150,7 +400,7 @@
         </section>
 
         <!-- Vendor Leadtime & Receiving History Section -->
-        <section id="vendor-leadtime-view" class="hidden" aria-labelledby="vendor-leadtime-title">
+        <section id="vendor-leadtime-view" class="gr-secondary-view hidden" aria-labelledby="vendor-leadtime-title">
           <div class="flex flex-col gap-4">
             <!-- Header -->
             <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
@@ -292,11 +542,11 @@
           </div>
         </section>
 
-        <section id="receiving-detail-view" class="hidden">
-          <div class="glass-card p-4 sm:p-5 relative max-w-3xl mx-auto">
-            <button type="button" onclick="showView('receiving-list-view')" class="text-sm font-medium text-gray-500 flex items-center mb-5 hover:text-brand-orange transition"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารายการ</button>
+        <section id="receiving-detail-view" class="gr-secondary-view hidden">
+          <div class="glass-card gr-detail-card p-4 sm:p-5 relative max-w-3xl mx-auto">
+            <button type="button" onclick="showView('receiving-list-view')" class="gr-back-link text-sm font-medium text-gray-500 flex items-center mb-5 hover:text-brand-orange transition"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารายการ</button>
 
-            <div class="bg-white p-4 rounded-xl border border-gray-200 mb-6 shadow-sm flex flex-col gap-3">
+            <div class="gr-bill-header bg-white p-4 rounded-xl border border-gray-200 mb-6 shadow-sm flex flex-col gap-3">
               <div class="flex justify-between items-start">
                   <div>
                       <div class="flex items-center gap-2 mb-1.5" id="r-display-vendor-header">
@@ -313,7 +563,7 @@
               <div id="r-delivery-plan"></div>
             </div>
             
-            <form id="form-receiving" class="space-y-6" novalidate>
+            <form id="form-receiving" class="gr-receiving-form space-y-6" novalidate>
               <input type="hidden" id="r-group-index">
 
               <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
@@ -371,7 +621,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260908.02';
+    const CURRENT_VERSION = '20260913.07';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2292,21 +2542,21 @@
             const isPendingReview = group.status === 'Pending Review';
             const isCompleted = group.status === 'GR Completed';
 
-            let cardClass = "glass-card status-card status-card--pending p-4 cursor-pointer transition active:scale-95";
-            let statusBadge = `<span class="text-xs status-badge--pending px-2.5 py-1 rounded-md font-bold border">รอสินค้าเข้า</span>`;
+            let cardClass = "glass-card status-card status-card--pending gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
+            let statusBadge = `<span class="gr-status-badge text-xs status-badge--pending px-2.5 py-1 rounded-md font-bold border">รอสินค้าเข้า</span>`;
             
             if (hasOverdue && !isPendingReview) {
-                cardClass = "glass-card status-card status-card--overdue p-4 cursor-pointer transition active:scale-95";
-                statusBadge = `<span class="text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-md font-bold border border-red-200"><i data-lucide="alert-triangle" class="w-3 h-3 inline"></i> นานผิดปกติ</span>`;
+                cardClass = "glass-card status-card status-card--overdue gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
+                statusBadge = `<span class="gr-status-badge text-xs bg-red-100 text-red-600 px-2.5 py-1 rounded-md font-bold border border-red-200"><i data-lucide="alert-triangle" class="w-3 h-3 inline"></i> นานผิดปกติ</span>`;
             } else if (isPendingReview) {
-                cardClass = "glass-card status-card status-card--review p-4 cursor-pointer transition active:scale-95";
-                statusBadge = `<span class="text-xs bg-brand-orangeLight text-brand-orange px-2.5 py-1 rounded-md font-bold border border-brand-orange/30 shadow-sm"><i data-lucide="clock" class="w-3 h-3 inline"></i> รอตรวจสอบ</span>`;
+                cardClass = "glass-card status-card status-card--review gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
+                statusBadge = `<span class="gr-status-badge text-xs bg-brand-orangeLight text-brand-orange px-2.5 py-1 rounded-md font-bold border border-brand-orange/30 shadow-sm"><i data-lucide="clock" class="w-3 h-3 inline"></i> รอตรวจสอบ</span>`;
             } else if (isDraft) {
-                cardClass = "glass-card status-card status-card--draft p-4 cursor-pointer transition active:scale-95";
-                statusBadge = `<span class="text-xs bg-brand-blueLight text-brand-blue px-2.5 py-1 rounded-md font-bold border border-brand-blue/20 shadow-sm"><i data-lucide="package" class="w-3 h-3 inline"></i> กำลังลงสินค้า</span>`;
+                cardClass = "glass-card status-card status-card--draft gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
+                statusBadge = `<span class="gr-status-badge text-xs bg-brand-blueLight text-brand-blue px-2.5 py-1 rounded-md font-bold border border-brand-blue/20 shadow-sm"><i data-lucide="package" class="w-3 h-3 inline"></i> กำลังลงสินค้า</span>`;
             } else if (isCompleted) {
-                cardClass = "glass-card status-card status-card--completed p-4 cursor-pointer transition active:scale-95";
-                statusBadge = `<span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold border border-emerald-200 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> ลงสินค้าสำเร็จ</span>`;
+                cardClass = "glass-card status-card status-card--completed gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
+                statusBadge = `<span class="gr-status-badge text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold border border-emerald-200 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> ลงสินค้าสำเร็จ</span>`;
             }
 
             const statusSplitEntries = Object.entries(group.listStatusCounts || {}).sort((a, b) => receivingStatusPriority(b[0]) - receivingStatusPriority(a[0]));
@@ -2314,13 +2564,13 @@
                 ? `<p class="text-[11px] text-brand-blue mt-2 font-semibold">บิลเดียวกัน: ${statusSplitEntries.map(([status, count]) => `${esc(receivingStatusLabel(status))} ${count}`).join(' · ')}</p>`
                 : '';
             
-            let productsHtml = '<div class="space-y-1.5 my-3">';
+            let productsHtml = '<div class="gr-bill-card__items space-y-1.5 my-3">';
             group.items.slice(0,3).forEach((item, i) => {
                 const itemQtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : (item.poQty || 0);
                 const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
                 const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
                 const itemRemarkHtml = itemRemarkText ? `<span class="block text-[11px] text-amber-800 font-normal pl-4 italic">↳ หมายเหตุ: ${esc(itemRemarkText)}</span>` : '';
-                productsHtml += `<div><div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemPlanBadge(item)}</div>${itemRemarkHtml}</div>`;
+                productsHtml += `<div class="gr-bill-card__item"><div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemPlanBadge(item)}</div>${itemRemarkHtml}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
@@ -2334,22 +2584,22 @@
 
             htmlStr += `
             <div class="${cardClass}" onclick="openReceivingDetail(${idx})">
-                <div class="flex justify-between items-start mb-1">
-                    <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">PO: ${group.poNumber || '-'}</span>
+                <div class="gr-bill-card__header flex justify-between items-start mb-1">
+                    <span class="gr-bill-card__po text-[11px] font-bold text-gray-500 uppercase tracking-wider">PO: ${group.poNumber || '-'}</span>
                     ${statusBadge}
                 </div>
                 ${statusSplitNote}
                 ${productsHtml}
                 <div class="mb-2">${deliveryPlanBadge(group)}</div>
                 ${billRemarkHtml}
-                <div class="mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
+                <div class="gr-bill-card__footer mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
                     <div>
                         <p class="font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5"><i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i> <span class="truncate max-w-[120px]">${group.vendor}</span></p>
                         <p class="text-gray-400">สั่งเมื่อ: ${group.poDate}</p>
                     </div>
                     <div class="flex flex-col items-end gap-2">
                         ${getWarehouseBadge(group.warehouse)}
-                        <span class="${isPendingReview ? 'text-brand-orange' : (isCompleted ? 'text-emerald-600' : 'text-brand-blue')} font-bold flex items-center bg-white px-2 py-0.5 rounded border shadow-sm">เปิดบิล <i data-lucide="chevron-right" class="w-3 h-3 ml-0.5"></i></span>
+                        <span class="gr-bill-card__open ${isPendingReview ? 'text-brand-orange' : (isCompleted ? 'text-emerald-600' : 'text-brand-blue')} font-bold flex items-center bg-white px-2 py-0.5 rounded border shadow-sm">เปิดบิล <i data-lucide="chevron-right" class="w-3 h-3 ml-0.5"></i></span>
                     </div>
                 </div>
             </div>`;
