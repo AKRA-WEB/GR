@@ -292,6 +292,15 @@
     .gr-view-subtitle, #form-receiving p, #form-receiving label, #form-receiving input, #form-receiving select, #form-receiving textarea { line-height: 1.5; }
     .gr-count-block span, .gr-bill-card__po, #form-receiving .po-qty, #form-receiving .po-qty2 { font-variant-numeric: tabular-nums; }
 
+    /* Bill queue grid refinement: equal-width cards, unchanged order and click behavior. */
+    .gr-bill-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px !important; }
+    .gr-bill-grid > .gr-bento-card,
+    .gr-bill-grid > .gr-bento-card:nth-child(4n + 1),
+    .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: auto; min-width: 0; }
+    @media (max-width: 640px) {
+      .gr-bill-grid { grid-template-columns: 1fr; gap: 12px !important; }
+    }
+
   </style>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
@@ -621,7 +630,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260913.07';
+    const CURRENT_VERSION = '20260914.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
