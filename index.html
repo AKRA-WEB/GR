@@ -75,7 +75,6 @@
     .gr-topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--gr-orange), transparent); opacity: .7; }
     .gr-topbar > div { max-width: 1440px !important; }
     .gr-brand-lockup { display: grid; gap: 1px; }
-    .gr-brand-lockup .gr-brand-kicker { color: var(--gr-orange); font-family: var(--gr-display); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
     .gr-brand-lockup h1 { color: var(--gr-ink); font-family: var(--gr-display); font-size: 17px; font-weight: 700; letter-spacing: -.04em; }
     .gr-topbar nav, .gr-topbar button { color: var(--gr-muted); }
     .gr-topbar button { border: 1px solid var(--gr-line); background: rgba(255,255,255,.035) !important; border-radius: 9px; transition: transform .2s ease, border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease; }
@@ -186,8 +185,7 @@
       .gr-filter-bento input { grid-column: auto; }
       .gr-bill-grid > .gr-bento-card, .gr-bill-grid > .gr-bento-card:nth-child(4n + 1), .gr-bill-grid > .gr-bento-card:nth-child(4n + 2) { grid-column: 1 / -1; }
       #delivery-plan-calendar-body > .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .gr-brand-lockup .gr-brand-kicker { font-size: 8px; }
-      .gr-brand-lockup h1 { font-size: 15px; }
+      .gr-brand-lockup h1 { font-size: 14px; }
       body.gr-shell { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
       .gr-warehouse-chips { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
       #wh-chips button { min-height: 44px; padding: 0 13px !important; }
@@ -291,6 +289,29 @@
     .gr-view-title, .gr-view-heading h2 { letter-spacing: -.04em; }
     .gr-view-subtitle, #form-receiving p, #form-receiving label, #form-receiving input, #form-receiving select, #form-receiving textarea { line-height: 1.5; }
     .gr-count-block span, .gr-bill-card__po, #form-receiving .po-qty, #form-receiving .po-qty2 { font-variant-numeric: tabular-nums; }
+
+    /* Shared top navbar alignment: match PO shell geometry while keeping GR actions intact. */
+    .gr-topbar { min-height: 72px; }
+    .gr-topbar > div { width: min(1440px, calc(100% - 44px)); max-width: none !important; margin: 0 auto; padding: 0 !important; }
+    .gr-topbar > div > div { height: 72px; }
+    .gr-topbar > div > div > div:first-child { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .gr-topbar__app-icon { width: 38px; height: 38px; display: grid; flex: 0 0 auto; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.26); border-radius: 11px; background: linear-gradient(145deg, rgba(255,120,79,.92), rgba(255,120,79,.4)); box-shadow: 0 0 26px rgba(255,120,79,.2), inset 0 1px 0 rgba(255,255,255,.24); }
+    .gr-topbar__app-icon svg { width: 20px; height: 20px; }
+    .gr-brand-lockup { min-width: 0; }
+    .gr-brand-lockup h1 { color: #f4f7fb !important; font-size: 16px; font-weight: 700; letter-spacing: -.045em; line-height: 1.2; white-space: nowrap; }
+    .gr-topbar > div > div > .space-x-2 { display: flex; align-items: center; gap: 16px; }
+    .gr-topbar > div > div > .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; }
+    .gr-topbar > div > div > .space-x-2 > p { white-space: nowrap; }
+    .gr-topbar > div > div > .space-x-2 > button { min-height: 36px; padding: 0 12px !important; white-space: nowrap; }
+    @media (max-width: 720px) {
+      .gr-topbar { min-height: 64px; }
+      .gr-topbar > div { width: calc(100% - 24px); }
+      .gr-topbar > div > div { height: 64px; }
+      .gr-topbar__app-icon { width: 34px; height: 34px; }
+      .gr-brand-lockup h1 { font-size: 14px; }
+      .gr-topbar > div > div > .space-x-2 { gap: 4px; }
+      .gr-topbar > div > div > .space-x-2 > button { min-height: 34px; padding: 0 8px !important; font-size: 10px; }
+    }
 
     /* Bill queue grid refinement: equal-width cards, unchanged order and click behavior. */
     .gr-bill-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px !important; }
@@ -488,8 +509,8 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div class="flex justify-between items-center h-16">
             <div class="flex-shrink-0 flex items-center">
-              <i data-lucide="box" class="w-6 h-6 mr-2"></i>
-              <div class="gr-brand-lockup"><span class="gr-brand-kicker">AKRA OPS / INBOUND CONTROL</span><h1>ระบบรับสินค้า (GR)</h1><span id="local-preview-badge" class="hidden text-[9px] font-bold tracking-[0.16em] text-white/70">LOCAL PREVIEW · ไม่บันทึกข้อมูล</span></div>
+              <div class="gr-topbar__app-icon"><i data-lucide="box" class="w-5 h-5 text-white"></i></div>
+              <div class="gr-brand-lockup"><h1>ระบบรับสินค้า (GR)</h1><span id="local-preview-badge" class="hidden text-[9px] font-bold tracking-[0.16em] text-white/70">LOCAL PREVIEW · ไม่บันทึกข้อมูล</span></div>
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
               <p class="text-sm text-white/90 font-light hidden sm:block">ผู้รับของ: <span id="display-username" class="font-medium text-white">-</span></p>
@@ -792,7 +813,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260914.06';
+    const CURRENT_VERSION = '20260914.07';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
