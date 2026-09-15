@@ -84,11 +84,9 @@
     .gr-topbar #logout-btn { color: #ff9aa2; border-color: rgba(255, 111, 121, .25); background: rgba(255, 111, 121, .07) !important; }
     .gr-main { position: relative; z-index: 1; max-width: 1440px !important; padding: 32px clamp(16px, 4vw, 52px) 72px !important; }
     .gr-view-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 4px 0 22px; }
-    .gr-eyebrow { display: block; margin-bottom: 7px; color: var(--gr-orange); font-family: var(--gr-display); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
     .gr-view-title { color: var(--gr-ink) !important; font-family: var(--gr-display); font-size: clamp(26px, 3vw, 42px) !important; font-weight: 700 !important; letter-spacing: -.065em; line-height: 1 !important; }
     .gr-view-subtitle { max-width: 640px; margin-top: 8px; color: var(--gr-muted); font-size: 13px; }
     .gr-count-block { display: grid; justify-items: end; gap: 2px; min-width: 104px; padding: 13px 16px; border: 1px solid var(--gr-line-strong); border-radius: 12px; background: linear-gradient(145deg, rgba(255, 120, 79, .14), rgba(121, 199, 255, .04)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
-    .gr-count-block small { color: var(--gr-muted); font-family: var(--gr-display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
     .gr-count-block span { color: var(--gr-orange) !important; background: transparent !important; border: 0 !important; padding: 0 !important; font-family: var(--gr-display); font-size: 27px !important; line-height: 1; }
     .gr-filter-bento { display: grid !important; grid-template-columns: minmax(0, 1.6fr) minmax(190px, .7fr) minmax(190px, .7fr); gap: 8px !important; margin: 0 0 14px !important; padding: 9px; border: 1px solid var(--gr-line); border-radius: 14px; background: rgba(14, 20, 29, .74); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
     .gr-control-field { min-height: 44px; }
@@ -490,6 +488,95 @@
     }
 
   </style>
+  <style id="gr-enterprise-ui">
+    :root { --gr-bg: #f5f7fa; --gr-orange: #2563eb; --gr-orange-soft: #eff6ff; --gr-ink: #172033; --gr-muted: #475569; --gr-line: #e2e8f0; }
+    body.gr-shell { background: var(--gr-bg) !important; letter-spacing: 0; }
+    .gr-shell ::selection { background: #bfdbfe; color: #172033; }
+    .gr-shell input, .gr-shell textarea { caret-color: #2563eb; }
+    .gr-shell :focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+    .gr-shell { scrollbar-color: #cbd5e1 #f5f7fa; scrollbar-width: thin; }
+    .gr-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; width: 240px; padding: 24px 16px; background: #0e1729; color: #cbd5e1; display: flex; flex-direction: column; gap: 28px; }
+    .gr-sidebar__brand { display: flex; align-items: center; gap: 12px; padding: 0 10px; min-height: 34px; color: #fff; font-size: 16px; font-weight: 700; }
+    .gr-sidebar__brand svg { width: 22px; height: 22px; color: #93c5fd; }
+    .gr-sidebar__menu { display: grid; gap: 8px; }
+    .gr-sidebar__menu button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 12px; border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600; color: #cbd5e1; background: transparent; transition: background .16s ease, color .16s ease; }
+    .gr-sidebar__menu button svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .gr-sidebar__menu button:hover { background: #1c2b43; color: #fff; }
+    #app-content:has(#receiving-list-view:not(.hidden)) .gr-nav-receiving,
+    #app-content:has(#receiving-detail-view:not(.hidden)) .gr-nav-receiving,
+    #app-content:has(#product-history-view:not(.hidden)) .gr-nav-product,
+    #app-content:has(#vendor-leadtime-view:not(.hidden)) .gr-nav-vendor { background: #2563eb; color: #fff; }
+    .gr-topbar { margin-left: 240px; width: calc(100% - 240px); min-height: 76px; flex-shrink: 0; background: #fff !important; border-bottom: 1px solid #e2e8f0; box-shadow: none !important; backdrop-filter: none; }
+    .gr-topbar::after { display: none; }
+    .gr-topbar > div { width: calc(100% - 48px); }
+    .gr-topbar > div > div { height: 76px; }
+    .gr-topbar, .gr-topbar .text-white, .gr-topbar .text-white\/90, .gr-topbar .gr-brand-lockup h1 { color: #172033 !important; }
+    .gr-topbar .gr-brand-lockup h1 { letter-spacing: -.02em; line-height: 1.4; }
+    .gr-topbar__app-icon { background: #eff6ff; border: none; box-shadow: none; }
+    .gr-topbar .gr-topbar__app-icon svg { color: #2563eb !important; }
+    .gr-topbar button { color: #475569 !important; background: #f1f5f9 !important; border-color: transparent !important; box-shadow: none; }
+    .gr-topbar button:hover { color: #1d4ed8 !important; background: #eff6ff !important; }
+    .gr-topbar #logout-btn { color: #b42318 !important; background: #fff1f2 !important; }
+    .gr-topbar #local-preview-badge { font-size: 10px; color: #475569 !important; letter-spacing: 0; }
+    .gr-topbar #local-preview-badge:not(.hidden) { display: block !important; }
+    .gr-main { width: calc(100% - 240px); max-width: none !important; margin: 0 0 0 240px; min-height: 0; padding: 28px 28px 48px !important; scrollbar-color: #cbd5e1 #f5f7fa; scrollbar-width: thin; }
+    .gr-view-heading { margin-bottom: 22px; }
+    .gr-view-heading h2 { font-size: 25px !important; letter-spacing: -.025em; line-height: 1.4 !important; }
+    .gr-view-subtitle { font-size: 13px; }
+    .gr-count-block { min-width: auto; padding: 10px 14px; background: #eff6ff; border: none; box-shadow: none; }
+    .gr-count-block span { font-size: 20px !important; font-weight: 700; }
+    .gr-filter-bento { padding: 14px; border: 1px solid #e2e8f0; border-radius: 14px; }
+    .gr-shell .glass-card, .gr-filter-bento, #delivery-plan-summary > div, #form-receiving > div, #form-receiving > section { box-shadow: none !important; }
+    .gr-shell .gr-bill-card, .gr-shell .gr-bill-card:hover { background: #fff !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; transform: none; }
+    .gr-bill-card::before { display: none; }
+    .gr-bill-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px !important; }
+    .gr-bill-card__header { grid-template-columns: minmax(0, 1fr); }
+    .gr-bill-card__top { flex-wrap: wrap; }
+    .gr-bill-card__identity { max-width: 100%; }
+    .gr-bill-card.status-card--review .gr-bill-card__top,
+    .gr-bill-card.status-card--draft .gr-bill-card__top { padding: 12px; border-radius: 10px; }
+    .gr-bill-card.status-card--review .gr-bill-card__top { background: #b45309; }
+    .gr-bill-card.status-card--draft .gr-bill-card__top { background: #1d4ed8; }
+    .gr-bill-card:is(.status-card--review, .status-card--draft) .gr-bill-card__top :is(.gr-bill-card__vendor, .gr-bill-card__vendor svg, .gr-bill-card__po) { color: #fff !important; }
+    .gr-bill-card:is(.status-card--review, .status-card--draft) .gr-status-badge { background: #fff !important; color: #172033 !important; border: none !important; font-size: 12px !important; box-shadow: none !important; }
+    @media (min-width: 1200px) { .gr-bill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (min-width: 1600px) { .gr-bill-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    .gr-bill-card__vendor { font-size: 14px; }
+    .gr-bill-card__po { letter-spacing: 0; }
+    .gr-shell .input-field::placeholder { color: #475569; }
+    .gr-shell .input-field:focus { border-color: #2563eb !important; box-shadow: 0 0 0 2px #dbeafe !important; }
+    @media (min-width: 769px) and (max-width: 1100px) {
+      .gr-sidebar { width: 220px; padding-inline: 12px; }
+      .gr-topbar, .gr-main { width: calc(100% - 220px); margin-left: 220px; }
+      .gr-topbar > div > div > .space-x-2 > p { display: none; }
+      .gr-main { padding: 24px 20px 40px !important; }
+    }
+    @media (max-width: 768px) {
+      .gr-sidebar { position: static; order: 1; width: 100%; padding: 10px 12px; gap: 0; flex-shrink: 0; }
+      .gr-sidebar__brand { display: none; }
+      .gr-sidebar__menu { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .gr-sidebar__menu button { flex-direction: column; justify-content: center; gap: 5px; min-height: 62px; padding: 8px 4px; font-size: 11px; text-align: center; }
+      .gr-topbar { order: 0; width: 100%; margin-left: 0; min-height: 64px; }
+      .gr-topbar > div { width: calc(100% - 24px); }
+      .gr-topbar > div > div { height: 64px; }
+      .gr-topbar > div > div > .space-x-2 { gap: 4px; }
+      .gr-topbar > div > div > .space-x-2 > p, .gr-topbar .space-x-2 button span { display: none; }
+      .gr-topbar > div > div > .space-x-2 > button { width: 44px; min-width: 44px; min-height: 44px; justify-content: center; }
+      .gr-topbar .gr-brand-lockup h1 { font-size: 14px; }
+      .gr-topbar #local-preview-badge { font-size: 8px; }
+      .gr-main { order: 2; width: 100%; margin-left: 0; padding: 20px 12px 32px !important; }
+      .gr-view-heading { gap: 8px; margin-bottom: 16px; }
+      .gr-view-heading h2 { font-size: 21px !important; }
+      .gr-count-block { padding: 8px 10px; }
+      .gr-count-block span { font-size: 17px !important; }
+      .gr-filter-bento { padding: 10px; }
+      .gr-bill-grid { grid-template-columns: minmax(0, 1fr); }
+      .gr-warehouse-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow: visible; padding-bottom: 0; }
+      #wh-chips button { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 0 6px !important; font-size: 11px; }
+    }
+    @media (max-width: 359px) { .gr-warehouse-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (prefers-reduced-motion: reduce) { .gr-sidebar__menu button { transition: none; } }
+  </style>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -510,6 +597,14 @@
 
   <!-- App Content -->
   <div id="app-content" class="hidden flex-1 flex flex-col h-screen w-full">
+      <aside class="gr-sidebar" aria-label="เมนูระบบรับสินค้า">
+        <div class="gr-sidebar__brand"><i data-lucide="package-check"></i><span>งานรับสินค้า</span></div>
+        <nav class="gr-sidebar__menu" aria-label="ส่วนงาน GR">
+          <button type="button" class="gr-nav-receiving" onclick="showView('receiving-list-view')"><i data-lucide="inbox"></i><span>รายการรับสินค้า</span></button>
+          <button type="button" class="gr-nav-product" onclick="openProductHistory()" aria-label="เปิดประวัติสินค้า"><i data-lucide="history"></i><span>ประวัติสินค้า</span></button>
+          <button type="button" class="gr-nav-vendor" onclick="openVendorLeadtimeDashboard()" aria-label="เปิดประวัติและ Leadtime ของ Vendor"><i data-lucide="trending-up"></i><span>Leadtime & ประวัติ</span></button>
+        </nav>
+      </aside>
       <nav class="gr-topbar bg-brand-orange text-white shadow-md sticky top-0 z-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div class="flex justify-between items-center h-16">
@@ -519,12 +614,6 @@
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
               <p class="text-sm text-white/90 font-light hidden sm:block">ผู้รับของ: <span id="display-username" class="font-medium text-white">-</span></p>
-              <button type="button" onclick="openVendorLeadtimeDashboard()" aria-label="เปิดประวัติและ Leadtime ของ Vendor" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
-                <i data-lucide="trending-up" class="w-4 h-4"></i> <span class="hidden sm:inline">Leadtime & ประวัติ</span>
-              </button>
-              <button type="button" onclick="openProductHistory()" aria-label="เปิดประวัติสินค้า" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
-                <i data-lucide="history" class="w-4 h-4"></i> <span class="hidden sm:inline">ประวัติสินค้า</span>
-              </button>
               <button type="button" onclick="openReceiving(true)" aria-label="รีเฟรชข้อมูลรับสินค้า" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm transition">
                 <i data-lucide="refresh-cw" class="w-4 h-4"></i> <span class="hidden sm:inline">รีเฟรช</span>
               </button>
@@ -536,12 +625,12 @@
         </div>
       </nav>
 
-      <main class="gr-main flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-6xl mx-auto pb-10">
+      <main id="gr-main" class="gr-main flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-6xl mx-auto pb-10">
         
         <section id="receiving-list-view" class="block">
           <div class="gr-view-heading px-1">
-            <div><span class="gr-eyebrow">Inbound control / today</span><h2 class="gr-view-title text-lg font-semibold text-brand-orange">รายการบิลรอรับสินค้า</h2><p class="gr-view-subtitle">จัดลำดับบิลตามสถานะ แผนส่ง และคลังรับเข้า เพื่อเปิดงานต่อได้ทันที</p></div>
-            <div class="gr-count-block"><small>active queue</small><span id="pending-count">0 บิล</span></div>
+            <div><h2 class="gr-view-title text-lg font-semibold text-brand-orange">รายการบิลรอรับสินค้า</h2><p class="gr-view-subtitle">จัดลำดับบิลตามสถานะ แผนส่ง และคลังรับเข้า เพื่อเปิดงานต่อได้ทันที</p></div>
+            <div class="gr-count-block"><span id="pending-count">0 บิล</span></div>
           </div>
 
           <div class="gr-filter-bento mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
@@ -818,7 +907,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260914.08';
+    const CURRENT_VERSION = '20260915.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1620,6 +1709,7 @@
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         document.querySelectorAll('main > section').forEach(div => div.classList.add('hidden'));
         document.getElementById(viewId).classList.remove('hidden');
+        document.getElementById('gr-main').scrollTop = 0;
         window.scrollTo(0, 0);
         if (viewId === 'receiving-list-view' && grDeliveryPlanRenderPending) {
             grDeliveryPlanRenderPending = false;

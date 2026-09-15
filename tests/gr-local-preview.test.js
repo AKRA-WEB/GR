@@ -97,6 +97,14 @@ assert.equal(mutationResponse.success, false, 'local preview mutations must be b
 assert.match(mutationResponse.message, /Preview|บันทึกข้อมูล/, 'blocked mutation should explain local preview behavior');
 assert.equal(fetchCalls.filter(url => !url.includes('version.json')).length, 0, 'local preview mutations must not call an external API');
 
+sandbox.window.scrollTo = () => {};
+const mainScroller = sandbox.document.getElementById('gr-main');
+for (const viewId of ['receiving-detail-view', 'product-history-view', 'vendor-leadtime-view', 'receiving-list-view']) {
+    mainScroller.scrollTop = 480;
+    sandbox.showView(viewId);
+    assert.equal(mainScroller.scrollTop, 0, `${viewId} should start at the top after leaving a scrolled view`);
+}
+
     console.log('PASS gr-local-preview: loopback fixture preview is isolated from production auth/API');
 })().catch((error) => {
     console.error(error);
