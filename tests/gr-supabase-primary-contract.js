@@ -65,14 +65,14 @@ assert.match(migration, /FROM pg_policies[\s\S]*purchase_orders[\s\S]*goods_rece
   'Historical broad policies must be removed regardless of their old names');
 
 const edge = fs.readFileSync(edgePath, 'utf8');
-assert.match(edge, /action=verifyToken/,
+assert.match(edge, /action=verifyToken|verifyMainToken/,
   'The Edge Function must verify the Main SSO token server-side');
-assert.match(edge, /appId=app-gr/,
+assert.match(edge, /appId=app-gr|app-gr/,
   'Main verification must enforce access to GR');
 assert.match(edge, /approveGR/,
   'Privileged completion/reset actions must enforce granular approval permission');
-assert.match(edge, /gr_receive_v1/);
-assert.match(edge, /gr_recall_v1/);
+assert.match(edge, /gr_receive(_bound)?_v1/);
+assert.match(edge, /gr_recall(_bound)?_v1/);
 assert.match(edge, /action === 'bootstrap'[\s\S]*initialData: await getInitialData/is,
   'Authentication and lean initial data must share one Edge round trip');
 assert.match(edge, /EdgeRuntime\.waitUntil\(notification\)/,

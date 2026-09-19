@@ -15,7 +15,7 @@
 }(typeof self !== 'undefined' ? self : this, function () {
 
     const API_URL = 'https://hgxrrskztbpejirrdpbq.supabase.co/functions/v1/gr-api';
-    const READ_ACTIONS = new Set(['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory']);
+    const READ_ACTIONS = new Set(['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics']);
 
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -87,6 +87,7 @@
         getProductReceiptHistory: (data, token) => request('getProductReceiptHistory', data, token),
         getVendorLeadtimeInsights: (data, token) => request('getVendorLeadtimeInsights', data, token),
         getVendorReceiptHistory: (data, token) => request('getVendorReceiptHistory', data, token),
+        getGrDashboardAnalytics: (data, token) => request('getGrDashboardAnalytics', data, token),
         API_URL
     };
 }));
