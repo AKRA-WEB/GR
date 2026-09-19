@@ -16,6 +16,7 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', 'Noto Sans Thai', 'Noto Sans', Arial, sans-serif; background-color: #f3f4f6; letter-spacing: 0.2px; }
     .glass-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.3); }
@@ -539,6 +540,80 @@
     .gr-bill-card.status-card--draft .gr-bill-card__top { background: #1d4ed8; }
     .gr-bill-card:is(.status-card--review, .status-card--draft) .gr-bill-card__top :is(.gr-bill-card__vendor, .gr-bill-card__vendor svg, .gr-bill-card__po) { color: #fff !important; }
     .gr-bill-card:is(.status-card--review, .status-card--draft) .gr-status-badge { background: #fff !important; color: #172033 !important; border: none !important; font-size: 12px !important; box-shadow: none !important; }
+    /* Dashboard bars keep a readable width even when the selected period has one day. */
+    .chart-day-bar { flex: 0 0 56px; width: 56px; min-width: 56px; max-width: 56px; }
+    @media (max-width: 640px) { .chart-day-bar { flex-basis: 44px; width: 44px; min-width: 44px; max-width: 44px; } }
+
+    /* Dashboard preview alignment: keep the GR shell, mirror the preview's light operational surface. */
+    .dashboard-preview-surface { --dashboard-slate-50: #f8fafc; --dashboard-slate-100: #f1f5f9; --dashboard-slate-200: #e2e8f0; --dashboard-slate-400: #94a3b8; --dashboard-slate-500: #64748b; --dashboard-slate-700: #334155; --dashboard-slate-900: #0f172a; --dashboard-orange: #f97316; --dashboard-blue: #3b82f6; --dashboard-green: #10b981; font-family: 'Prompt', 'Noto Sans Thai', sans-serif; color: var(--dashboard-slate-700); }
+    .dashboard-preview-surface .dashboard-preview-header,
+    .dashboard-preview-surface .dashboard-preview-filter,
+    .dashboard-preview-surface .dashboard-preview-kpi-card,
+    .dashboard-preview-surface .dashboard-preview-panel,
+    .dashboard-preview-surface .dashboard-preview-bills { border: 1px solid var(--dashboard-slate-200) !important; border-radius: 16px !important; background: #fff !important; box-shadow: 0 4px 18px rgba(15, 23, 42, .045) !important; }
+    .dashboard-preview-surface .dashboard-preview-header { padding: 20px !important; gap: 16px; flex-direction: column !important; align-items: stretch !important; }
+    .dashboard-preview-surface .dashboard-preview-header .dashboard-preview-heading-block { min-width: 0; }
+    .dashboard-preview-surface .dashboard-preview-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dashboard-slate-500); font-size: 12px; font-weight: 500; }
+    .dashboard-preview-surface .dashboard-preview-kicker strong { border-radius: 999px; background: #ffedd5; color: #9a3412; padding: 3px 10px; font-weight: 600; }
+    .dashboard-preview-surface .dashboard-preview-live { display: inline-flex; align-items: center; gap: 5px; color: #059669; }
+    .dashboard-preview-surface .dashboard-preview-live::before { content: ''; width: 7px; height: 7px; border-radius: 999px; background: #10b981; }
+    .dashboard-preview-surface .dashboard-preview-header h2 { margin-top: 4px; color: var(--dashboard-slate-900) !important; font-size: 24px !important; line-height: 1.25 !important; letter-spacing: -.025em !important; }
+    .dashboard-preview-surface .dashboard-preview-header p { color: var(--dashboard-slate-500) !important; font-size: 13px; }
+    .dashboard-preview-surface .dashboard-preview-tabs { align-self: stretch !important; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0 2px; border: 0 !important; border-top: 1px solid var(--dashboard-slate-200) !important; background: transparent !important; }
+    .dashboard-preview-surface .dashboard-preview-tabs button { border-radius: 10px !important; font-family: inherit; }
+    .dashboard-preview-surface .dashboard-preview-tabs button.bg-white { background: var(--dashboard-orange) !important; color: #fff !important; box-shadow: 0 3px 8px rgba(249, 115, 22, .18) !important; }
+    .dashboard-preview-surface .dashboard-preview-tabs button:not(.bg-white) { color: var(--dashboard-slate-500) !important; }
+    .dashboard-preview-surface .dashboard-preview-filter { padding: 9px 12px !important; border-radius: 12px !important; box-shadow: none !important; background: rgba(241,245,249,.78) !important; }
+    .dashboard-preview-surface .dashboard-preview-filter button { border-radius: 9px !important; font-family: inherit; }
+    .dashboard-preview-surface .dashboard-preview-filter button.bg-brand-orange { background: #fff !important; color: #ea580c !important; box-shadow: 0 1px 3px rgba(15,23,42,.08) !important; }
+    .dashboard-preview-surface .dashboard-preview-filter button:not(.bg-brand-orange) { color: var(--dashboard-slate-600, #475569) !important; background: transparent !important; }
+    .dashboard-preview-surface .dashboard-preview-kpis { gap: 16px !important; }
+    .dashboard-preview-surface .dashboard-preview-kpi-card { min-height: 158px; padding: 20px !important; display: flex; flex-direction: column; justify-content: space-between; border-left-width: 1px !important; }
+    .dashboard-preview-surface .dashboard-preview-kpi-card > p:first-child { color: var(--dashboard-slate-500) !important; letter-spacing: .05em; }
+    .dashboard-preview-surface .dashboard-preview-kpi-card [id^="kpi-"] { font-size: 30px !important; line-height: 1.1; }
+    .dashboard-preview-surface .dashboard-preview-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; color: var(--dashboard-slate-400); font-size: 11px; }
+    .dashboard-preview-surface .dashboard-preview-card-footer strong { color: var(--dashboard-orange); }
+    .dashboard-preview-surface .dashboard-preview-panel { padding: 20px !important; }
+    .dashboard-preview-surface .dashboard-preview-panel h3,
+    .dashboard-preview-surface .dashboard-preview-bills h3 { color: var(--dashboard-slate-900) !important; }
+    .dashboard-preview-surface .dashboard-preview-panel p,
+    .dashboard-preview-surface .dashboard-preview-bills p { color: var(--dashboard-slate-500) !important; }
+    .dashboard-preview-surface .dashboard-wh-content { display: flex; flex: 1; flex-direction: column; align-items: stretch; }
+    .dashboard-preview-surface .dashboard-wh-donut { width: 160px; height: 160px; margin: 24px auto; display: grid; place-items: center; border-radius: 50%; }
+    .dashboard-preview-surface .dashboard-wh-donut-hole { width: 112px; height: 112px; display: grid; place-items: center; align-content: center; border-radius: 50%; background: #fff; text-align: center; }
+    .dashboard-preview-surface .dashboard-wh-donut-hole strong { color: var(--dashboard-slate-900); font-size: 24px; line-height: 1; }
+    .dashboard-preview-surface .dashboard-wh-donut-hole span { color: var(--dashboard-slate-400); font-size: 10px; margin-top: 5px; }
+    .dashboard-preview-surface .dashboard-wh-list { padding-top: 12px; border-top: 1px solid #f1f5f9; display: grid; gap: 10px; }
+    .dashboard-preview-surface .dashboard-wh-list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+    .dashboard-preview-surface .dashboard-wh-list-label { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--dashboard-slate-700); font-weight: 600; }
+    .dashboard-preview-surface .dashboard-wh-list-value { color: var(--dashboard-slate-900); font-weight: 700; white-space: nowrap; }
+    .dashboard-preview-surface .text-slate-400 { color: var(--dashboard-slate-400) !important; }
+    .dashboard-preview-surface .text-slate-600 { color: var(--dashboard-slate-500) !important; }
+    .dashboard-preview-surface .dashboard-wh-swatch { width: 12px; height: 12px; flex: 0 0 auto; border-radius: 999px; }
+    .dashboard-preview-surface .dashboard-preview-daily-chart { display: grid !important; align-items: end; gap: 8px !important; min-height: 192px; margin: 24px 0 !important; overflow-x: auto; }
+    .dashboard-preview-surface .dashboard-chart-day { width: 56px; justify-self: center; }
+    .dashboard-preview-surface .dashboard-chart-bar { width: 100%; max-width: 32px; border-radius: 8px 8px 2px 2px; background: #e2e8f0; transition: background .2s ease, box-shadow .2s ease; }
+    .dashboard-preview-surface .dashboard-chart-day:hover .dashboard-chart-bar { background: #60a5fa; }
+    .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-bar { background: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
+    .dashboard-preview-surface .dashboard-chart-amount { color: var(--dashboard-slate-400); font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-amount { color: #2563eb; }
+    .dashboard-preview-surface .dashboard-chart-day-label { color: var(--dashboard-slate-500); font-size: 10px; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-day-label { color: var(--dashboard-slate-900); font-weight: 700; }
+    .dashboard-preview-surface .dashboard-chart-bill-label { border-radius: 4px; background: #f1f5f9; color: var(--dashboard-slate-600, #475569); padding: 1px 4px; font-size: 9px; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-bill-label { background: #ffedd5; color: #c2410c; font-weight: 700; }
+    .dashboard-preview-surface .dashboard-chart-bill-dot { width: 8px; height: 8px; margin-bottom: 5px; border-radius: 999px; background: #fb923c; }
+    .dashboard-preview-surface .dashboard-preview-bills { overflow: hidden; }
+    .dashboard-preview-surface .dashboard-preview-bills > div:first-child { background: rgba(248,250,252,.7) !important; border-bottom-color: var(--dashboard-slate-200) !important; padding: 20px !important; }
+    .dashboard-preview-surface .dashboard-preview-bills table { color: var(--dashboard-slate-700); }
+    .dashboard-preview-surface .dashboard-preview-bills thead { background: var(--dashboard-slate-100) !important; color: var(--dashboard-slate-500) !important; }
+    .dashboard-preview-surface .dashboard-preview-bills tbody tr { min-height: 62px; }
+    .dashboard-preview-surface .dashboard-preview-bills tbody td { padding-top: 13px !important; padding-bottom: 13px !important; }
+    .dashboard-preview-surface .dashboard-preview-bills > div:last-child { background: rgba(248,250,252,.72) !important; border-top-color: var(--dashboard-slate-200) !important; }
+    @media (max-width: 640px) {
+      .dashboard-preview-surface .dashboard-preview-header h2 { font-size: 21px !important; }
+      .dashboard-preview-surface .dashboard-preview-kpi-card { min-height: 142px; }
+      .dashboard-preview-surface .dashboard-preview-panel { padding: 16px !important; }
+    }
     @media (min-width: 1200px) { .gr-bill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (min-width: 1600px) { .gr-bill-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
     .gr-bill-card__vendor { font-size: 14px; }
@@ -686,15 +761,19 @@
         </section>
 
         <!-- Comprehensive GR Dashboard & Analytics Section -->
-        <section id="vendor-leadtime-view" class="gr-secondary-view hidden" aria-labelledby="vendor-leadtime-title">
+        <section id="vendor-leadtime-view" class="gr-secondary-view hidden dashboard-preview-surface" aria-labelledby="vendor-leadtime-title">
           <div class="flex flex-col gap-4">
             
             <!-- Dashboard Header -->
-            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
-              <div>
+            <div class="dashboard-preview-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
+              <div class="dashboard-preview-heading-block">
                 <button type="button" onclick="showView('receiving-list-view')" class="text-sm font-medium text-gray-500 flex items-center mb-2 hover:text-brand-orange transition">
                   <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารับสินค้า
                 </button>
+                <div class="dashboard-preview-kicker">
+                  <strong>ระบบตรวจรับสินค้า (GR)</strong>
+                  <span class="dashboard-preview-live">ข้อมูลอัปเดตแบบเรียลไทม์</span>
+                </div>
                 <h2 id="vendor-leadtime-title" class="text-xl font-bold text-gray-900">
                   Dashboard ภาพรวมการรับสินค้าเข้าคลัง
                 </h2>
@@ -702,7 +781,7 @@
               </div>
               
               <!-- Tab Navigation -->
-              <div class="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 self-start sm:self-auto">
+              <div class="dashboard-preview-tabs flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 self-start sm:self-auto">
                 <button type="button" id="tab-btn-dashboard-overview" onclick="switchVendorLeadtimeTab('overview')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition bg-white text-brand-orange shadow-sm">
                   ภาพรวมและบิลรับเข้า
                 </button>
@@ -719,11 +798,11 @@
             <div id="vendor-leadtime-tab-overview" class="flex flex-col gap-4">
               
               <!-- Filter Controls Toolbar -->
-              <div class="glass-card p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div class="dashboard-preview-filter glass-card p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-1.5">
                   <span class="text-xs font-medium text-gray-500 mr-1">ช่วงเวลา:</span>
                   <button type="button" id="btn-preset-today" onclick="setDashboardPreset('today')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-brand-orange text-white shadow-sm">
-                    วันนี้
+                    วันนี้ (Today)
                   </button>
                   <button type="button" id="btn-preset-7d" onclick="setDashboardPreset('7d')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition bg-gray-100 text-gray-600 hover:bg-gray-200">
                     7 วันล่าสุด
@@ -750,45 +829,49 @@
               </div>
 
               <!-- 4 Top KPI Stat Cards -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div class="dashboard-preview-kpis grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 
                 <!-- Card 1: บิลที่อนุมัติรับลงสินค้า -->
-                <div class="glass-card p-4 border-l-4 border-l-brand-orange">
+                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-brand-orange">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">บิลที่อนุมัติรับลงสินค้า</p>
                   <div class="flex items-baseline gap-2 mt-1">
                     <p id="kpi-approved-bills" class="text-2xl font-black text-gray-900">-</p>
                     <span class="text-xs font-medium text-gray-500">บิล</span>
                   </div>
                   <p class="text-[11px] text-emerald-600 font-medium mt-0.5">นับเฉพาะบิลที่อนุมัติรับแล้ว (GR Completed)</p>
+                  <div class="dashboard-preview-card-footer"><span>ไม่นับบิลซ้ำตามรายการ</span><strong>บิลตามช่วง</strong></div>
                 </div>
 
                 <!-- Card 2: ยอดรวมจำนวนลังสินค้า -->
-                <div class="glass-card p-4 border-l-4 border-l-brand-blue">
+                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-brand-blue">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">จำนวนสินค้าทั้งหมด</p>
                   <div class="flex items-baseline gap-2 mt-1">
                     <p id="kpi-total-crates" class="text-2xl font-black text-brand-blue">-</p>
                     <span class="text-xs font-medium text-gray-500">ลัง / หน่วย</span>
                   </div>
                   <p id="kpi-total-items-sub" class="text-[11px] text-gray-400 mt-0.5">รวมสินค้าทุกรายการที่รับลง</p>
+                  <div class="dashboard-preview-card-footer"><span>ยอดรับเข้าจริง</span><strong>รวมทุกรายการ</strong></div>
                 </div>
 
                 <!-- Card 3: สัดส่วนคลังหลักที่รับเข้า -->
-                <div class="glass-card p-4 border-l-4 border-l-emerald-500">
+                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-emerald-500">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">คลังที่รับเข้าหลัก</p>
                   <div class="flex items-baseline gap-2 mt-1">
                     <p id="kpi-top-warehouse" class="text-2xl font-black text-emerald-600">-</p>
                   </div>
                   <p id="kpi-wh-breakdown-sub" class="text-[11px] text-gray-400 mt-0.5">สัดส่วนการกระจายคลังสินค้า</p>
+                  <div class="dashboard-preview-card-footer"><span>คลังปลายทาง</span><strong>แยกตามโลเคชั่น</strong></div>
                 </div>
 
                 <!-- Card 4: ระยะเวลาส่งมอบเฉลี่ย (Lead Time) -->
-                <div class="glass-card p-4 border-l-4 border-l-purple-500">
+                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-purple-500">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Lead Time เฉลี่ยรอบส่ง</p>
                   <div class="flex items-baseline gap-2 mt-1">
                     <p id="kpi-avg-leadtime" class="text-2xl font-black text-purple-700">-</p>
                     <span class="text-xs font-medium text-gray-500">วัน</span>
                   </div>
                   <p id="kpi-ontime-rate-sub" class="text-[11px] text-gray-400 mt-0.5">นับจากวันสั่งซื้อถึงวันรับจริง</p>
+                  <div class="dashboard-preview-card-footer"><span>PO ถึง ATA</span><strong>Leadtime รอบนี้</strong></div>
                 </div>
 
               </div>
@@ -797,7 +880,7 @@
               <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 
                 <!-- Box 1: Warehouse Allocation Breakdown -->
-                <div class="glass-card p-4 sm:p-5 flex flex-col justify-between">
+                <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between">
                   <div>
                     <div class="flex items-center justify-between pb-2 border-b border-gray-100">
                       <h3 class="font-bold text-gray-900 text-sm">ลงคลังไหน อะไร เท่าไหร่</h3>
@@ -817,7 +900,7 @@
                 </div>
 
                 <!-- Box 2: Daily Inbound Volume Bar Chart -->
-                <div class="glass-card p-4 sm:p-5 flex flex-col justify-between lg:col-span-2">
+                <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between lg:col-span-2">
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
                     <div>
                       <h3 class="font-bold text-gray-900 text-sm">สถิติการรับสินค้าแยกตามวัน (Daily Inbound Volume)</h3>
@@ -830,7 +913,7 @@
                   </div>
 
                   <!-- Daily Bars Container -->
-                  <div id="dashboard-daily-chart" class="my-4 flex items-end justify-between gap-2 h-44 pt-4 px-1 overflow-x-auto custom-scrollbar">
+                  <div id="dashboard-daily-chart" class="dashboard-preview-daily-chart my-4 grid grid-cols-7 gap-2 items-end h-48 pt-4 px-2 overflow-x-auto custom-scrollbar">
                     <div class="w-full text-xs text-gray-400 text-center py-10">กำลังโหลดสถิติรายวัน...</div>
                   </div>
 
@@ -845,7 +928,7 @@
               </div>
 
               <!-- Filterable Inbound Bills Table -->
-              <div class="glass-card overflow-hidden border border-gray-200">
+              <div class="dashboard-preview-bills glass-card overflow-hidden border border-gray-200">
                 <div class="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
                   <div>
                     <h3 class="font-bold text-gray-900 text-sm">รายการบิลรับสินค้าเข้าคลังที่อนุมัติแล้ว (Approved GR Bills)</h3>
@@ -886,7 +969,13 @@
                 </div>
 
                 <div class="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
-                  <span id="dashboard-bills-count-label">แสดง 0 บิล</span>
+                  <div class="flex items-center gap-3">
+                    <span id="dashboard-bills-count-label">แสดง 0 บิล</span>
+                    <span id="dashboard-bills-progress" class="text-[11px] text-gray-400"></span>
+                  </div>
+                  <button type="button" id="dashboard-bills-load-more" onclick="loadGrDashboardMore()" class="hidden px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:border-brand-orange hover:text-brand-orange font-semibold transition">
+                    โหลดบิลเก่าเพิ่ม
+                  </button>
                   <span class="text-[11px] text-gray-400">ฐานข้อมูล Supabase PostgreSQL Authoritative</span>
                 </div>
               </div>
@@ -1134,7 +1223,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260919.03';
+    const CURRENT_VERSION = '20260919.05';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1473,6 +1562,7 @@
     var isDeliveryPlanVisible = false;
     var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
     const PRODUCT_HISTORY_PAGE_SIZE = 50;
+    const GR_DASHBOARD_PAGE_SIZE = 50;
     var productHistoryRequestGeneration = 0;
     var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
     var vendorLeadtimeInsights = null;
@@ -1485,10 +1575,16 @@
         dateTo: null,
         warehouse: '',
         search: '',
+        offset: 0,
+        limit: GR_DASHBOARD_PAGE_SIZE,
+        total: 0,
+        hasMore: false,
         loading: false,
+        loadingMore: false,
         loaded: false,
         analytics: null,
-        selectedDay: null
+        selectedDay: null,
+        renderedBillGroups: []
     };
     var vendorReceiptHistoryState = {
         bills: [],
@@ -2705,6 +2801,9 @@
         grDashboardState.preset = preset;
         grDashboardState.exactDate = null;
         grDashboardState.selectedDay = null;
+        grDashboardState.offset = 0;
+        grDashboardState.total = 0;
+        grDashboardState.hasMore = false;
 
         const presets = ['today', '7d', '1m', 'custom'];
         presets.forEach(p => {
@@ -2746,19 +2845,56 @@
         }
     }
 
-    async function loadGrDashboardAnalytics(force = false) {
+    function renderGrDashboardBillsLoading(append = false) {
+        const tbody = document.getElementById('dashboard-bills-tbody');
+        if (!tbody) return;
+        if (append) {
+            updateGrDashboardLoadMoreState(true);
+            return;
+        }
+        tbody.innerHTML = Array.from({ length: 4 }, () => `
+            <tr class="dashboard-bill-skeleton animate-pulse">
+                <td colspan="9" class="py-4 px-4">
+                    <div class="grid grid-cols-3 gap-4">
+                        <span class="h-3 rounded bg-gray-200"></span>
+                        <span class="h-3 rounded bg-gray-200"></span>
+                        <span class="h-3 rounded bg-gray-200"></span>
+                    </div>
+                </td>
+            </tr>`).join('');
+    }
+
+    function updateGrDashboardLoadMoreState(isLoading = false) {
+        const button = document.getElementById('dashboard-bills-load-more');
+        const progress = document.getElementById('dashboard-bills-progress');
+        const loadedCount = grDashboardState.analytics?.bills?.length || 0;
+        const total = Number(grDashboardState.total || 0);
+        if (progress) progress.innerText = total > 0 ? `โหลดแล้ว ${loadedCount.toLocaleString()} จาก ${total.toLocaleString()} บิล` : '';
+        if (!button) return;
+        button.classList.toggle('hidden', !grDashboardState.hasMore);
+        button.disabled = isLoading || grDashboardState.loading;
+        button.innerText = isLoading ? 'กำลังโหลดบิลเก่า...' : 'โหลดบิลเก่าเพิ่ม';
+    }
+
+    function mergeGrDashboardBills(existing, incoming) {
+        const byId = new Map((Array.isArray(existing) ? existing : []).map(b => [String(b.grId), b]));
+        (Array.isArray(incoming) ? incoming : []).forEach(b => byId.set(String(b.grId), b));
+        return Array.from(byId.values());
+    }
+
+    async function loadGrDashboardAnalytics(force = false, append = false) {
         if (grDashboardState.loading) return;
         grDashboardState.loading = true;
+        grDashboardState.loadingMore = Boolean(append);
 
         const billsTbody = document.getElementById('dashboard-bills-tbody');
-        if (billsTbody) {
-            billsTbody.innerHTML = `
-                <tr>
-                    <td colspan="9" class="py-10 text-center text-gray-500">
-                        <div class="inline-block animate-spin rounded-full h-7 w-7 border-2 border-brand-orange border-t-transparent mb-2"></div>
-                        <p class="text-xs">กำลังประมวลผลข้อมูล Dashboard GR...</p>
-                    </td>
-                </tr>`;
+        renderGrDashboardBillsLoading(append);
+
+        const offset = append ? Number(grDashboardState.offset || 0) : 0;
+        if (!append) {
+            grDashboardState.offset = 0;
+            grDashboardState.total = 0;
+            grDashboardState.hasMore = false;
         }
 
         const payload = {
@@ -2766,29 +2902,40 @@
             exactDate: grDashboardState.exactDate,
             dateFrom: grDashboardState.dateFrom,
             dateTo: grDashboardState.dateTo,
-            warehouse: document.getElementById('dashboard-bill-wh')?.value || '',
-            search: (document.getElementById('dashboard-bill-search')?.value || '').trim()
+            offset,
+            limit: grDashboardState.limit
         };
 
         try {
             const res = await apiCall('getGrDashboardAnalytics', payload);
             if (res && res.success) {
-                grDashboardState.analytics = res;
+                const bills = mergeGrDashboardBills(append ? grDashboardState.analytics?.bills : [], res.bills);
+                grDashboardState.analytics = { ...res, bills };
+                grDashboardState.offset = offset + (Array.isArray(res.bills) ? res.bills.length : 0);
+                grDashboardState.total = Number(res.total || 0);
+                grDashboardState.hasMore = grDashboardState.offset < grDashboardState.total;
                 grDashboardState.loaded = true;
                 applyGrDashboardSummary(res.summary, res.warehouseBreakdown);
                 renderGrWarehouseBreakdown(res.warehouseBreakdown, res.summary?.totalCrates);
                 renderGrDailyChart(res.dailyStats);
-                renderGrDashboardBillsTable(res.bills);
-            } else if (billsTbody) {
+                renderGrDashboardBillsTable(getDashboardFilteredBills());
+            } else if (billsTbody && !append) {
                 billsTbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-red-600 text-xs">${esc(res?.message || 'ไม่สามารถโหลดข้อมูล Dashboard ได้')}</td></tr>`;
             }
         } catch (err) {
-            if (billsTbody) {
+            if (billsTbody && !append) {
                 billsTbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-red-600 text-xs">เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard</td></tr>`;
             }
         } finally {
             grDashboardState.loading = false;
+            grDashboardState.loadingMore = false;
+            updateGrDashboardLoadMoreState(false);
         }
+    }
+
+    function loadGrDashboardMore() {
+        if (!grDashboardState.hasMore || grDashboardState.loading) return;
+        loadGrDashboardAnalytics(false, true);
     }
 
     function applyGrDashboardSummary(summary, warehouseBreakdown) {
@@ -2824,8 +2971,10 @@
         if (!container) return;
 
         const list = Array.isArray(breakdown) ? breakdown : [];
+        const colors = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#f59e0b', '#64748b'];
+        const total = Number(totalCrates || list.reduce((sum, item) => sum + Number(item.totalCrates || 0), 0));
         if (totalLabel) {
-            totalLabel.innerText = `รวม ${Number(totalCrates || 0).toLocaleString()} ลัง`;
+            totalLabel.innerText = `รวม ${total.toLocaleString()} ลัง`;
         }
 
         if (list.length === 0) {
@@ -2833,26 +2982,33 @@
             return;
         }
 
-        container.innerHTML = list.map(w => {
+        let cursor = 0;
+        const segments = list.map((w, index) => {
+            const pct = Math.max(0, Number(w.percentage || 0));
+            const start = cursor;
+            cursor += pct;
+            return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+        });
+        const donutStyle = `background: conic-gradient(${segments.join(', ')})`;
+        const rows = list.map((w, index) => {
             const pct = Number(w.percentage || 0);
             return `
-                <div class="space-y-1">
-                    <div class="flex items-center justify-between text-xs">
-                        <div class="flex items-center gap-1.5">
-                            ${getWarehouseBadge(w.warehouse)}
-                            <span class="font-bold text-gray-800">คลัง ${esc(w.warehouse)}</span>
-                            <span class="text-gray-400 text-[11px]">(${esc(w.billCount)} บิล)</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="font-bold text-gray-900">${Number(w.totalCrates).toLocaleString()} ลัง</span>
-                            <span class="text-gray-400 text-[11px] ml-1">${pct}%</span>
-                        </div>
+                <div class="dashboard-wh-list-row">
+                    <div class="dashboard-wh-list-label">
+                        <span class="dashboard-wh-swatch" style="background:${colors[index % colors.length]}"></span>
+                        <span>คลัง ${esc(w.warehouse)} <span class="text-slate-400 font-normal">(${esc(w.billCount)} บิล)</span></span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div class="bg-brand-orange h-2 rounded-full transition-all duration-300" style="width: ${Math.min(100, Math.max(2, pct))}%"></div>
-                    </div>
+                    <div class="dashboard-wh-list-value">${Number(w.totalCrates || 0).toLocaleString()} ลัง <span class="text-slate-400 font-normal">(${pct}%)</span></div>
                 </div>`;
         }).join('');
+
+        container.innerHTML = `
+            <div class="dashboard-wh-content">
+                <div class="dashboard-wh-donut" style="${donutStyle}" role="img" aria-label="สัดส่วนจำนวนลังตามคลัง">
+                    <div class="dashboard-wh-donut-hole"><strong>${total.toLocaleString()}</strong><span>ลังทั้งหมด</span></div>
+                </div>
+                <div class="dashboard-wh-list">${rows}</div>
+            </div>`;
     }
 
     function renderGrDailyChart(dailyStats) {
@@ -2861,9 +3017,12 @@
 
         const list = Array.isArray(dailyStats) ? dailyStats : [];
         if (list.length === 0) {
+            if (container.style) container.style.gridTemplateColumns = '';
             container.innerHTML = `<div class="w-full text-xs text-gray-400 text-center py-10">ไม่มีสถิติรายวันในช่วงเวลานี้</div>`;
             return;
         }
+
+        if (container.style) container.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(0, 1fr))`;
 
         let maxCrates = 1;
         list.forEach(d => {
@@ -2875,16 +3034,17 @@
             const crates = Number(d.totalCrates || 0);
             const bills = Number(d.billCount || 0);
             const dateStr = d.date || '';
-            const heightPx = Math.max(14, Math.round((crates / maxCrates) * 110));
+            const heightPx = Math.max(8, Math.round((crates / maxCrates) * 150));
             const isSelected = grDashboardState.selectedDay === dateStr;
 
             return `
-                <div onclick="selectDashboardDailyFilter('${esc(dateStr)}')" class="chart-day-bar flex-1 min-w-[40px] max-w-[56px] flex flex-col items-center gap-1 cursor-pointer group" title="${esc(dateStr)}: ${crates} ลัง, ${bills} บิล">
-                    <span class="text-[10px] font-bold text-gray-500 group-hover:text-brand-orange transition truncate">${crates}</span>
-                    <div class="w-full ${isSelected ? 'bg-brand-orange ring-2 ring-brand-orangeLight' : 'bg-brand-blue group-hover:bg-blue-600'} rounded-t-md transition relative flex flex-col justify-end items-center" style="height: ${heightPx}px;">
-                        <span class="text-[9px] text-white font-bold mb-0.5">${bills}</span>
+                <div onclick="selectDashboardDailyFilter('${esc(dateStr)}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDashboardDailyFilter('${esc(dateStr)}'); }" class="chart-day-bar dashboard-chart-day ${isSelected ? 'is-selected' : ''} flex flex-col items-center gap-1.5 cursor-pointer group" title="${esc(dateStr)}: ${crates} ลัง, ${bills} บิล" role="button" tabindex="0">
+                    <span class="dashboard-chart-amount">${crates ? `${crates} ลัง` : '0'}</span>
+                    <div class="dashboard-chart-bar flex flex-col justify-end items-center" style="height: ${heightPx}px;">
+                        ${bills > 0 ? `<span class="dashboard-chart-bill-dot" title="${bills} บิล"></span>` : ''}
                     </div>
-                    <span class="text-[10px] ${isSelected ? 'font-bold text-brand-orange' : 'text-gray-500'} truncate">${esc(dateStr.slice(5))}</span>
+                    <span class="dashboard-chart-day-label">${esc(dateStr.slice(5))}</span>
+                    <span class="dashboard-chart-bill-label">${bills > 0 ? `${bills} บิล` : '-'}</span>
                 </div>`;
         }).join('');
     }
@@ -2917,7 +3077,7 @@
         renderGrDashboardBillsTable(grDashboardState.analytics?.bills || []);
     }
 
-    function filterDashboardBillsTable() {
+    function getDashboardFilteredBills() {
         const query = (document.getElementById('dashboard-bill-search')?.value || '').trim().toLowerCase();
         const wh = document.getElementById('dashboard-bill-wh')?.value || '';
         let list = grDashboardState.analytics?.bills || [];
@@ -2940,7 +3100,47 @@
             });
         }
 
-        renderGrDashboardBillsTable(list);
+        return list;
+    }
+
+    function filterDashboardBillsTable() {
+        renderGrDashboardBillsTable(getDashboardFilteredBills());
+    }
+
+    function dashboardBillGroupKey(bill) {
+        return [
+            bill.poId || bill.poNumber || bill.grId || '',
+            bill.ataDate || bill.grDate || '',
+            bill.warehouse || '',
+            bill.receiver || '',
+            bill.approver || ''
+        ].map(value => String(value).trim()).join('|');
+    }
+
+    function groupGrDashboardBills(bills) {
+        const groups = new Map();
+        (Array.isArray(bills) ? bills : []).forEach(bill => {
+            const key = dashboardBillGroupKey(bill);
+            let group = groups.get(key);
+            if (!group) {
+                group = {
+                    ...bill,
+                    grId: `dashboard-group-${groups.size + 1}`,
+                    grIds: [],
+                    grNumbers: [],
+                    items: [],
+                    itemCount: 0,
+                    totalCrates: 0
+                };
+                groups.set(key, group);
+            }
+            if (bill.grId !== undefined && bill.grId !== null && !group.grIds.includes(bill.grId)) group.grIds.push(bill.grId);
+            if (bill.grNumber && !group.grNumbers.includes(bill.grNumber)) group.grNumbers.push(bill.grNumber);
+            group.totalCrates += Number(bill.totalCrates || 0);
+            group.itemCount += Number(bill.itemCount || (Array.isArray(bill.items) ? bill.items.length : 0));
+            group.items.push(...(Array.isArray(bill.items) ? bill.items : []));
+        });
+        return Array.from(groups.values());
     }
 
     function renderGrDashboardBillsTable(bills) {
@@ -2948,10 +3148,15 @@
         const countLabel = document.getElementById('dashboard-bills-count-label');
         if (!tbody) return;
 
-        const list = Array.isArray(bills) ? bills : [];
+        const sourceList = Array.isArray(bills) ? bills : [];
+        const list = groupGrDashboardBills(sourceList);
+        grDashboardState.renderedBillGroups = list;
         if (countLabel) {
-            countLabel.innerText = `แสดง ${list.length.toLocaleString()} บิล`;
+            countLabel.innerText = list.length === sourceList.length
+                ? `แสดง ${list.length.toLocaleString()} บิล`
+                : `แสดง ${list.length.toLocaleString()} รอบรับเข้า (${sourceList.length.toLocaleString()} บิล)`;
         }
+        updateGrDashboardLoadMoreState(false);
 
         if (list.length === 0) {
             tbody.innerHTML = `<tr><td colspan="9" class="py-10 text-center text-gray-400 text-xs">ไม่พบบิลรับเข้าตามเงื่อนไขที่เลือก</td></tr>`;
@@ -2960,7 +3165,8 @@
 
         tbody.innerHTML = list.map(b => {
             const grId = b.grId || '';
-            const grNum = b.grNumber || '-';
+            const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
+            const grNum = sourceGrNumbers[0] || '-';
             const poNum = b.poNumber || '-';
             const vendor = b.vendor || '-';
             const ata = b.ataDate || b.grDate || '-';
@@ -2975,6 +3181,7 @@
                 <tr class="hover:bg-gray-50/80 transition cursor-pointer" onclick="openGrBillDetailModal('${esc(grId)}')">
                     <td class="py-3 px-4">
                         <div class="font-bold text-gray-900">${esc(grNum)}</div>
+                        ${sourceGrNumbers.length > 1 ? `<div class="text-[10px] text-brand-orange font-semibold">รวม ${sourceGrNumbers.length} บิลในรอบเดียวกัน</div><div class="text-[10px] text-gray-400">${esc(sourceGrNumbers.join(', '))}</div>` : ''}
                         <div class="text-[10px] text-gray-400">PO: ${esc(poNum)}</div>
                     </td>
                     <td class="py-3 px-4">
@@ -3011,7 +3218,9 @@
 
     function openGrBillDetailModal(grId) {
         const bills = grDashboardState.analytics?.bills || [];
-        const b = bills.find(x => String(x.grId) === String(grId)) || bills[0];
+        const b = grDashboardState.renderedBillGroups.find(x => String(x.grId) === String(grId))
+            || bills.find(x => String(x.grId) === String(grId))
+            || bills[0];
         if (!b) return;
 
         const grEl = document.getElementById('modal-bill-gr');
@@ -3028,7 +3237,8 @@
         const remarkEl = document.getElementById('modal-bill-remark');
         const itemsBody = document.getElementById('modal-items-body');
 
-        if (grEl) grEl.innerText = b.grNumber || '-';
+        const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
+        if (grEl) grEl.innerText = sourceGrNumbers.length > 1 ? `${sourceGrNumbers[0]} (รวม ${sourceGrNumbers.length} บิล)` : sourceGrNumbers[0];
         if (poEl) poEl.innerText = `PO: ${b.poNumber || '-'} | วันที่สั่ง: ${b.poDate || '-'}`;
         if (vendorEl) vendorEl.innerText = b.vendor || '-';
         if (ataEl) ataEl.innerText = b.ataDate || b.grDate || '-';
