@@ -22,6 +22,27 @@
     }
 
     async function request(action, data, token) {
+        const bridge = typeof window !== 'undefined' && window.AkraModule?.embedded ? window.AkraModule : null;
+        if (bridge) token = bridge.getToken();
+        const session = typeof window !== 'undefined' ? window.appSession : undefined;
+        const operation = async () => {
+            const result = await transportRequest(action, data, token);
+            let current = typeof window === 'undefined' || window.appSession === session;
+            try { if (bridge && bridge.getToken() !== token) current = false; } catch (_) { current = false; }
+            if (!current) {
+                const error = new Error('บัญชีหรือเซสชันเปลี่ยนแล้ว กรุณาตรวจสอบผลรายการจาก Main ก่อนทำซ้ำ');
+                error.reason = 'session_changed';
+                throw error;
+            }
+            if (bridge && !READ_ACTIONS.has(action) && result && result.success !== false && result.status !== 'error') {
+                bridge.markSaved?.();
+            }
+            return result;
+        };
+        return bridge && !READ_ACTIONS.has(action) ? bridge.runMutation(operation) : operation();
+    }
+
+    async function transportRequest(action, data, token) {
         if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
         const isRead = READ_ACTIONS.has(action);
         const attempts = isRead ? 2 : 1;

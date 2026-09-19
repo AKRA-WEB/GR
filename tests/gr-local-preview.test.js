@@ -42,7 +42,7 @@ const sandbox = {
     AbortController,
     navigator: { onLine: true },
     window: {
-        location: { hostname: '127.0.0.1', search: '' },
+        location: { hostname: '127.0.0.1', search: '?demo=1' },
         addEventListener() {}
     },
     document: {
@@ -74,7 +74,12 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(scriptMatch[1], sandbox, { filename: 'GR/index.html' });
 
-assert.equal(sandbox.isLocalPreviewMode(), true, 'loopback host should enable local preview mode');
+assert.equal(sandbox.isLocalPreviewMode(), true, 'explicit loopback demo should enable isolated preview');
+sandbox.window.location.search = '';
+assert.equal(sandbox.isLocalPreviewMode(), false, 'ordinary loopback auth must not silently turn into demo');
+sandbox.window.location.search = '?demo=1&sso=fixture-token';
+assert.equal(sandbox.isLocalPreviewMode(), false, 'an SSO request must not fall back to demo');
+sandbox.window.location.search = '?demo=1';
 sandbox.window.location.hostname = 'akra-web.github.io';
 assert.equal(sandbox.isLocalPreviewMode(), false, 'production host must never enable local preview mode');
 sandbox.window.location.hostname = '127.0.0.1';

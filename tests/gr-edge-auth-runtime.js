@@ -66,7 +66,7 @@ const context = vm.createContext({
       assert.equal(options.headers.get('apikey'), 'server-only-key');
       assert.equal(options.headers.has('Authorization'), false, 'Modern sb_secret keys must never be sent as bearer JWTs');
       rpcCalls.push({ target, body: JSON.parse(options.body) });
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ success: true, valid: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -101,6 +101,11 @@ function invoke(body, origin = 'https://akra-web.github.io') {
     id: 'A1',
     name: 'Approver',
     roles: ['SUPERVISOR'],
+    identityId: '10000000-0000-4000-8000-000000000001',
+    tokenVersion: 2,
+    sessionVersion: 1,
+    authorizationRevision: 'fixture',
+    apps: ['app-gr'],
     perms: { 'app-gr': ['approveGR'] },
     exp: Math.floor(Date.now() / 1000) + 3600
   }, TEST_SECRET);
@@ -109,6 +114,11 @@ function invoke(body, origin = 'https://akra-web.github.io') {
     id: 'S1',
     name: 'Empty Supervisor',
     roles: ['SUPERVISOR'],
+    identityId: '10000000-0000-4000-8000-000000000002',
+    tokenVersion: 2,
+    sessionVersion: 1,
+    authorizationRevision: 'fixture',
+    apps: ['app-gr'],
     perms: { 'app-gr': [] },
     exp: Math.floor(Date.now() / 1000) + 3600
   }, TEST_SECRET);
@@ -117,6 +127,11 @@ function invoke(body, origin = 'https://akra-web.github.io') {
     id: 'R1',
     name: 'Receiver',
     roles: ['WAREHOUSE'],
+    identityId: '10000000-0000-4000-8000-000000000003',
+    tokenVersion: 2,
+    sessionVersion: 1,
+    authorizationRevision: 'fixture',
+    apps: ['app-gr'],
     perms: { 'app-gr': ['receiveGR'] },
     exp: Math.floor(Date.now() / 1000) + 3600
   }, TEST_SECRET);
@@ -127,7 +142,7 @@ function invoke(body, origin = 'https://akra-web.github.io') {
     data: { targetStatus: 'Pending Review', items: [{ uid: 'PO-1', expectedStatus: 'Pending GR', grQty: 1 }] }
   });
   assert.equal(response.status, 200);
-  assert.match(rpcCalls.at(-1).target, /\/rpc\/gr_receive_v1$/);
+  assert.match(rpcCalls.at(-1).target, /\/rpc\/gr_receive_bound_v1$/);
   assert.equal(rpcCalls.at(-1).body.p_actor.id, 'R1');
 
   const beforeDenied = rpcCalls.length;
@@ -153,7 +168,7 @@ function invoke(body, origin = 'https://akra-web.github.io') {
     data: { actionType: 'reset', poUids: ['PO-1'] }
   });
   assert.equal(response.status, 200);
-  assert.match(rpcCalls.at(-1).target, /\/rpc\/gr_recall_v1$/);
+  assert.match(rpcCalls.at(-1).target, /\/rpc\/gr_recall_bound_v1$/);
 
   response = await invoke({
     action: 'bulkReceivePO',

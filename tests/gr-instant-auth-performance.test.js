@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-console.log("=== RUNNING GR INSTANT AUTH & PERFORMANCE TESTS ===\n");
+console.log("=== RUNNING GR VERIFIED STARTUP REGRESSION ===\n");
 
 const htmlPath = path.join(__dirname, "..", "index.html");
 const versionPath = path.join(__dirname, "..", "version.json");
@@ -12,7 +12,7 @@ const versionJson = JSON.parse(fs.readFileSync(versionPath, "utf8"));
 
 // 1. Version Parity Check
 console.log("[Test 1] Version Parity Check...");
-const versionMatch = html.match(/const CURRENT_VERSION = "(.*?)";/);
+const versionMatch = html.match(/const CURRENT_VERSION = ['"](.*?)['"];/);
 assert.ok(versionMatch, "CURRENT_VERSION must exist in index.html");
 assert.strictEqual(versionMatch[1], versionJson.version);
 console.log("  -> PASS: Version is " + versionJson.version);
@@ -69,11 +69,12 @@ const expiredToken = makeJwt({ id: "u-2", name: "Expired", roles: ["ADMIN"], exp
 assert.strictEqual(sandbox.decodeJwtPayload(expiredToken), null);
 console.log("  -> PASS: Expired token returns null");
 
-// 3. Simulated AuthGuard.init Instant vs Fallback Flow
-console.log("\n[Test 3] Simulated AuthGuard.init Instant Flow...");
+// 3. Actual entrypoint must use Main's answer, never decoded identity as authorization.
+console.log("\n[Test 3] Verified AuthGuard.init flow...");
 let shownAppName = null;
 let openReceivingCalled = false;
 let bootstrapCalled = false;
+let mainVerifications = 0;
 
 const mockAuthGuardContext = {
   document: { title: "GR", getElementById: () => null },
@@ -89,7 +90,12 @@ const mockAuthGuardContext = {
   },
   window: {
     location: { search: "?sso=" + validToken, pathname: "/GR/" },
-    history: { replaceState: () => {} }
+    history: { replaceState: () => {} },
+    addEventListener() {},
+    AkraModule: { embedded:false, getToken:()=>'', verifySession:async (appId, token)=>{
+      assert.equal(appId,'app-gr'); assert.equal(token,validToken); mainVerifications++;
+      return { id:'u-1', name:'Verified Main', roles:['WAREHOUSE'], identityId:'10000000-0000-4000-8000-000000000011', sessionVersion:1, authorizationRevision:'fixture' };
+    } }
   },
   localStorage: {
     _d: {},
@@ -98,7 +104,8 @@ const mockAuthGuardContext = {
     removeItem(k) { delete this._d[k]; }
   },
   APP_CONFIG: { STORAGE_KEY: "gr_session", PORTAL_URL: "https://portal" },
-  buildAppSession: (user, token) => ({ name: user.name, id: user.id, roles: user.roles, token }),
+  buildAppSession: (user, token) => ({ ...user, token }),
+  isLocalPreviewMode: () => false,
   hasGrAccess: (s) => true,
   AuthGuard: { bindEvents: () => {} },
   openReceiving: async () => { openReceivingCalled = true; },
@@ -121,17 +128,14 @@ vm.createContext(mockAuthGuardContext);
 vm.runInContext(authGuardCode, mockAuthGuardContext);
 
 (async () => {
-  const t0 = Date.now();
   await mockAuthGuardContext.AuthGuard.init();
-  const duration = Date.now() - t0;
-  
-  assert.strictEqual(mockAuthGuardContext.window.currentUser, "Somchai");
+  assert.strictEqual(mockAuthGuardContext.window.currentUser, "Verified Main");
+  assert.equal(mainVerifications,1);
   assert.strictEqual(openReceivingCalled, true, "openReceiving must be called");
-  assert.strictEqual(bootstrapCalled, false, "Instant auth must NOT block on remote bootstrap");
-  assert.ok(duration < 50, "Instant auth must complete in < 50ms (took " + duration + "ms)");
-  console.log("  -> PASS: Instant Auth initialized in " + duration + "ms with zero remote bootstrap blocking!");
+  assert.strictEqual(bootstrapCalled, false, "Main verification replaces the old bootstrap auth fallback");
+  console.log("  -> PASS: Main identity verified before UI; no decode-only authorization or latency claim");
   
-  console.log("\n=== ALL GR INSTANT AUTH & PERFORMANCE TESTS PASSED! ===\n");
+  console.log("\n=== GR VERIFIED STARTUP REGRESSION PASSED ===\n");
 })().catch(err => {
   console.error("Test failed:", err);
   process.exit(1);

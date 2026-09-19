@@ -2,16 +2,16 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="js/akra-shell-bridge.js?v=20260919.02"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <title>ระบบรับสินค้า (GR)</title>
 
   <link rel="stylesheet" href="tailwind.css">
-  <script src="js/supabase-gr-client.js" defer></script>
+  <script src="js/supabase-gr-client.js?v=20260919.02" defer></script>
   <script src="js/gr-expiry.js" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
@@ -591,7 +591,7 @@
           <i data-lucide="shield-alert" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
           <h2 class="text-xl font-bold text-gray-800 mb-2">ปฏิเสธการเข้าถึง</h2>
           <p id="error-message" class="text-gray-600 mb-6">คุณไม่มีสิทธิ์เข้าใช้งานแอปพลิเคชันนี้</p>
-          <button onclick="window.location.href=APP_CONFIG.PORTAL_URL" class="px-6 py-2.5 bg-[#171C8F] text-white rounded-lg font-medium hover:bg-[#11146B] transition shadow-md">กลับไปหน้าหลัก (Portal)</button>
+          <button onclick="window.AkraModule.home(APP_CONFIG.PORTAL_URL)" class="px-6 py-2.5 bg-[#171C8F] text-white rounded-lg font-medium hover:bg-[#11146B] transition shadow-md">กลับไปหน้าหลัก (Portal)</button>
       </div>
   </div>
 
@@ -907,7 +907,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260915.02';
+    const CURRENT_VERSION = '20260919.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1045,10 +1045,11 @@
     };
 
     function isLocalPreviewMode() {
+        if (window.AkraModule?.embedded) return false;
         const host = String((window.location && window.location.hostname) || '').toLowerCase();
         if (!['localhost', '127.0.0.1', '::1'].includes(host)) return false;
         const params = new URLSearchParams((window.location && window.location.search) || '');
-        return params.get('preview') !== '0';
+        return params.get('demo') === '1' && !params.get('sso');
     }
 
     function getLocalPreviewSession() {
@@ -1158,7 +1159,8 @@
         return { success: false, message: 'Local Preview เปิดดูได้อย่างเดียว ไม่บันทึกข้อมูล' };
     }
 
-    var DATA_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzN9bIC6gxWGMR4tbj96E0yzWbHrrZ9NeYLtJR_Al7mRW_4L_sALC1rU4nCizVn3I/exec";
+    // Unknown actions fail closed; canonical GR actions are routed above to Supabase.
+    var DATA_SCRIPT_URL = '';
     
     var appData = { products: [], pendingPOs: [] };
     var grActiveDataRendered = false;
@@ -1203,7 +1205,7 @@
 
     var UI = {
         showLoading: () => { document.body.classList.add('loading-active'); document.getElementById('auth-loading').classList.remove('hidden'); document.getElementById('auth-error').classList.add('hidden'); document.getElementById('app-content').classList.add('hidden'); },
-        showError: (message) => { document.body.classList.remove('loading-active'); document.getElementById('auth-loading').classList.add('hidden'); const errorSection = document.getElementById('auth-error'); errorSection.classList.remove('hidden'); document.getElementById('error-message').innerText = message; },
+        showError: (message) => { document.body.classList.remove('loading-active'); document.getElementById('app-content').classList.add('hidden'); document.getElementById('auth-loading').classList.add('hidden'); const errorSection = document.getElementById('auth-error'); errorSection.classList.remove('hidden'); document.getElementById('error-message').innerText = message; },
         showApp: (username) => { document.body.classList.remove('loading-active'); document.getElementById('auth-loading').classList.add('hidden'); document.getElementById('app-content').classList.remove('hidden'); document.getElementById('display-username').innerText = username; const previewBadge = document.getElementById('local-preview-badge'); if (previewBadge) previewBadge.classList.toggle('hidden', !isLocalPreviewMode()); }
     };
 
@@ -1223,6 +1225,7 @@
 
     function buildAppSession(user, token) {
         return {
+            ...user,
             name: user.name,
             id: user.id,
             roles: normalizeRoles(user.roles),
@@ -1284,6 +1287,17 @@
             lucide.createIcons();
             UI.showLoading();
             try {
+                if (window.AkraModule?.embedded) {
+                    const user = await window.AkraModule.verifySession('app-gr');
+                    window.appSession = buildAppSession({ ...user, tokenVersion: 2 }, window.AkraModule.getToken());
+                    if (!hasGrAccess(window.appSession)) throw new Error('permission_denied');
+                    window.currentUser = user.name;
+                    initialDataPrefetch = readApiCall('getInitialData', { includeProducts: false, includeCompleted: false, includeDeliveryPlanning: false, perf: PERF_MODE });
+                    UI.showApp(user.name);
+                    AuthGuard.bindEvents();
+                    await openReceiving();
+                    return;
+                }
                 if (isLocalPreviewMode()) {
                     const previewData = getLocalPreviewData();
                     appData = previewData;
@@ -1297,7 +1311,7 @@
                     return;
                 }
                 const urlParams = new URLSearchParams(window.location.search);
-                const ssoToken  = urlParams.get('sso');
+                const ssoToken = window.AkraModule?.getToken() || urlParams.get('sso');
                 const cachedRaw = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
                 let cachedSession = null;
                 try { if (cachedRaw) cachedSession = JSON.parse(cachedRaw); } catch(e) {}
@@ -1313,7 +1327,14 @@
                     return;
                 }
 
-                // Start active initial data prefetch immediately!
+                // Verify current Main identity/access before domain prefetch or cached rendering.
+                const user = await window.AkraModule.verifySession('app-gr', tokenToVerify);
+                if (localStorage.getItem(APP_CONFIG.STORAGE_KEY) !== cachedRaw) throw new Error('session_changed');
+                const session = buildAppSession({ ...user, tokenVersion: 2 }, tokenToVerify);
+                if (user.mustChangePassword === true || !hasGrAccess(session)) throw new Error('permission_denied');
+                window.appSession = session;
+                window.currentUser = session.name;
+                try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
                 initialDataPrefetch = readApiCall('getInitialData', {
                     includeCompleted: false,
                     includeProducts: false,
@@ -1321,56 +1342,11 @@
                     perf: PERF_MODE
                 });
 
-                // 1. Instant JWT SSO (<1ms) - Render UI & cached data immediately
-                const jwtUser = decodeJwtPayload(tokenToVerify);
-                if (jwtUser && jwtUser.mustChangePassword !== true) {
-                    const session = buildAppSession(jwtUser, tokenToVerify);
-                    if (hasGrAccess(session)) {
-                        try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
-                        window.appSession = session;
-                        window.currentUser = session.name;
-                        UI.showApp(session.name);
-                        AuthGuard.bindEvents();
-                        await openReceiving();
-                        return;
-                    }
-                }
-
-                // 2. Fallback: Edge bootstrap verifies Main SSO and loads projection
-                if (typeof window.AkraSupabaseGR === 'undefined') throw new Error('GR_CLIENT_MISSING');
-                const result = await AkraSupabaseGR.request('bootstrap', {
-                    includeProducts: false,
-                    includeCompleted: false,
-                    includeDeliveryPlanning: false
-                }, tokenToVerify);
-                if (!result.valid) {
-                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                    const authMessage = result.reason === 'mandatory_password_change_required'
-                        ? 'กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน'
-                        : 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
-                    UI.showError(authMessage);
-                    return;
-                }
-                if (result.user && result.user.mustChangePassword === true) {
-                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                    UI.showError('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน');
-                    console.warn('mandatory_password_change_required');
-                    return;
-                }
-                const session = buildAppSession(result.user, tokenToVerify);
-                if (!hasGrAccess(session)) {
-                    localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
-                    UI.showError("คุณไม่มีสิทธิ์เข้าถึง");
-                    return;
-                }
-                try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
-                window.appSession = session;
-                window.currentUser = session.name;
-                initialDataPrefetch = Promise.resolve(result.initialData);
                 UI.showApp(session.name);
                 AuthGuard.bindEvents();
                 await openReceiving();
             } catch (error) {
+                window.appSession = null;
                 console.error("Auth Error:", error);
                 if (error && error.reason === 'mandatory_password_change_required') {
                     localStorage.removeItem(APP_CONFIG.STORAGE_KEY);
@@ -1381,8 +1357,18 @@
             }
         },
         bindEvents: () => {
+            window.AkraModule?.watchSession?.({appId:'app-gr', user:window.appSession, token:window.appSession?.token,
+                invalidated:() => { window.appSession = null; UI.showError('เซสชัน Main เปลี่ยนแล้ว กรุณาเปิดแอปจาก Main ใหม่'); },
+                refreshed:token => { if (window.appSession) window.appSession.token = token; }
+            });
+            if (!window.AkraModule?.embedded) window.addEventListener('storage', event => {
+                if (event.key !== null && event.key !== APP_CONFIG.STORAGE_KEY) return;
+                if (event.key !== null && event.oldValue === event.newValue) return;
+                window.appSession = null;
+                UI.showError('บัญชีในแท็บอื่นเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่ผ่าน Main');
+            });
             const logoutBtn = document.getElementById('logout-btn');
-            if (logoutBtn) { logoutBtn.addEventListener('click', () => { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); window.location.href = APP_CONFIG.PORTAL_URL; }); }
+            if (logoutBtn) { logoutBtn.addEventListener('click', () => { window.appSession = null; localStorage.removeItem(APP_CONFIG.STORAGE_KEY); window.AkraModule.home(APP_CONFIG.PORTAL_URL); }); }
         }
     };
     document.addEventListener('DOMContentLoaded', AuthGuard.init);
@@ -1402,18 +1388,8 @@
     }
 
     function getSessionToken() {
-        if (window.appSession && window.appSession.token) return window.appSession.token;
-        const urlParams = new URLSearchParams(window.location.search);
-        const ssoToken = urlParams.get('sso');
-        if (ssoToken) return ssoToken;
-        const cachedRaw = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
-        try {
-            if (cachedRaw) {
-                const parsed = JSON.parse(cachedRaw);
-                return parsed.token || (parsed.user && parsed.user.token) || "";
-            }
-        } catch(e) {}
-        return "";
+        if (window.AkraModule?.embedded) return window.AkraModule.getToken();
+        return window.appSession?.token || "";
     }
 
     function canReceiveGR() {
@@ -1462,10 +1438,32 @@
     const GR_CACHE_TTL = 60 * 1000;
     const GR_PRODUCTS_CACHE_TTL = 2 * 60 * 60 * 1000;
     var grProductsLoaded = false;
-    function getCache(key, ttlMs) { try { const raw = localStorage.getItem(key); if (!raw) return null; const w = JSON.parse(raw); if (Date.now() - (w._ts||0) > ttlMs) { localStorage.removeItem(key); return null; } return w._d; } catch(e) { localStorage.removeItem(key); return null; } }
-    function setCache(key, data) {
+    function cacheStorageKey(key) {
+        const user = window.appSession;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(user?.identityId || '') ||
+            !Number.isSafeInteger(user.sessionVersion) || user.sessionVersion < 1 || !user.authorizationRevision) return null;
+        return key + '::identity:' + user.identityId + '::session:' + user.sessionVersion + '::authorization:' + encodeURIComponent(user.authorizationRevision);
+    }
+    function removeCache(key) {
+        const scoped = cacheStorageKey(key);
+        try { if (scoped) localStorage.removeItem(scoped); } catch (_) { /* Optional read cache. */ }
+    }
+    function getCache(key, ttlMs) {
+        const scoped = cacheStorageKey(key);
+        if (!scoped) return null;
         try {
-            localStorage.setItem(key, JSON.stringify({ _ts: Date.now(), _d: data }));
+            const raw = localStorage.getItem(scoped);
+            if (!raw) return null;
+            const value = JSON.parse(raw);
+            if (Date.now() - (value._ts || 0) > ttlMs) { removeCache(key); return null; }
+            return value._d;
+        } catch (_) { removeCache(key); return null; }
+    }
+    function setCache(key, data) {
+        const scoped = cacheStorageKey(key);
+        if (!scoped) return false;
+        try {
+            localStorage.setItem(scoped, JSON.stringify({ _ts: Date.now(), _d: data }));
             return true;
         } catch (e) {
             console.warn('Cache write skipped:', e);
@@ -1473,8 +1471,8 @@
         }
     }
     function clearReceivingCaches() {
-        localStorage.removeItem('CACHE_GR_ACTIVE_DATA_V2');
-        localStorage.removeItem('CACHE_GR_FULL_DATA_V2');
+        removeCache('CACHE_GR_ACTIVE_DATA_V2');
+        removeCache('CACHE_GR_FULL_DATA_V2');
     }
     async function loadGRProductsBackground() {
         if (grProductsLoaded) return;
@@ -2061,6 +2059,10 @@
           console.error('Supabase GR request failed:', { action, reason: error && error.reason });
           return { success: false, message: error && error.message ? error.message : 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
         }
+      }
+
+      if (!DATA_SCRIPT_URL) {
+        return { success: false, error: 'unsupported_legacy_action' };
       }
 
       const maxAttempts = isReadApiAction(action) ? 2 : 1;
