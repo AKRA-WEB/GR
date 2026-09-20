@@ -132,4 +132,20 @@ const tableHtml = element('dashboard-bills-tbody').innerHTML;
 assert.match(tableHtml, /รวม 7 รายการในรอบเดียวกัน/, 'same-round row must describe seven items, not three bills');
 assert.doesNotMatch(tableHtml, /รวม 3 บิลในรอบเดียวกัน/, 'same-round row must not mislabel source receipts as item count');
 
+sandbox.grDashboardState.analytics = {
+    bills: [{
+        grId: 'gr-detail', grNumber: 'GR-DETAIL', poNumber: 'PO-DETAIL', vendor: 'Vendor',
+        ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen',
+        totalCrates: 25, itemCount: 1,
+        items: [{ sku: 'SKU-DETAIL', product: 'สินค้า Detail', grQty: 25, unit: 'ลัง', locIn: 'W3-A1', expDate: '2027-09-19', oldStock: 12 }]
+    }]
+};
+sandbox.grDashboardState.renderedBillGroups = sandbox.groupGrDashboardBills(sandbox.grDashboardState.analytics.bills);
+sandbox.openGrBillDetailModal('gr-detail');
+const detailHtml = element('modal-items-body').innerHTML;
+assert.match(html, /<th[^>]*>สต๊อกสินค้าเก่า<\/th>/, 'bill detail must expose the old stock column');
+assert.match(detailHtml, />12\s/, 'bill detail must render the item old stock value');
+assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: 0, unit: 'ลัง' }), '0 ลัง', 'zero old stock must remain visible');
+assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: '', unit: 'ลัง' }), '-', 'blank old stock must remain a dash');
+
 console.log('PASS gr-dashboard-followup: chart sizing, same-round grouping, pagination contract, and historical approver contract are covered');

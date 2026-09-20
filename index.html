@@ -1109,14 +1109,15 @@
                   <span id="modal-total-crates" class="text-brand-orange font-bold text-xs">รวม 0 ลัง</span>
                 </div>
                 
-                <div class="border border-gray-200 rounded-xl overflow-hidden">
-                  <table class="w-full text-left text-xs text-gray-700">
+                <div class="border border-gray-200 rounded-xl overflow-x-auto custom-scrollbar">
+                  <table class="w-full min-w-[760px] text-left text-xs text-gray-700">
                     <thead class="bg-gray-100 text-gray-600 font-bold text-[11px] border-b border-gray-200">
                       <tr>
                         <th class="py-2 px-3">#</th>
                         <th class="py-2 px-3">SKU</th>
                         <th class="py-2 px-3">ชื่อสินค้า</th>
                         <th class="py-2 px-3 text-center">จำนวนรับ</th>
+                        <th class="py-2 px-3 text-center">สต๊อกสินค้าเก่า</th>
                         <th class="py-2 px-3">โลเคชั่นจัดเก็บ</th>
                         <th class="py-2 px-3">วันหมดอายุ (EXP)</th>
                       </tr>
@@ -1224,7 +1225,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.01';
+    const CURRENT_VERSION = '20260920.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -3294,7 +3295,7 @@
 
         if (itemsBody) {
             if (items.length === 0) {
-                itemsBody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-gray-400 text-xs">ไม่มีข้อมูลรายการย่อย</td></tr>`;
+                itemsBody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-400 text-xs">ไม่มีข้อมูลรายการย่อย</td></tr>`;
             } else {
                 itemsBody.innerHTML = items.map((it, idx) => `
                     <tr class="hover:bg-gray-50 text-xs">
@@ -3302,6 +3303,7 @@
                         <td class="py-2 px-3 font-mono font-medium text-gray-600">${esc(it.sku || '-')}</td>
                         <td class="py-2 px-3 font-semibold text-gray-800">${esc(it.product || it.product_name || '-')}</td>
                         <td class="py-2 px-3 text-center font-bold text-brand-blue">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ลัง')}</td>
+                        <td class="py-2 px-3 text-center font-semibold text-slate-700">${esc(formatGrDashboardOldStock(it))}</td>
                         <td class="py-2 px-3 text-gray-600">${esc(it.locIn || it.location_in || '-')}</td>
                         <td class="py-2 px-3 text-gray-600">${esc(it.expDate || it.exp_date || it.expRaw || '-')}</td>
                     </tr>
@@ -3311,6 +3313,14 @@
 
         const modal = document.getElementById('gr-bill-detail-modal');
         if (modal) modal.classList.remove('hidden');
+    }
+
+    function formatGrDashboardOldStock(item) {
+        const raw = item?.oldStock ?? item?.old_stock;
+        if (raw === null || raw === undefined || String(raw).trim() === '') return '-';
+        const numeric = Number(raw);
+        const value = Number.isFinite(numeric) ? numeric.toLocaleString() : String(raw);
+        return item?.unit ? `${value} ${item.unit}` : value;
     }
 
     function closeGrBillDetailModal() {
