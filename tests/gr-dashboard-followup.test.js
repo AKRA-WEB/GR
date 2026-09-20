@@ -107,6 +107,21 @@ assert.deepEqual(Array.from(sameRound.grNumbers), ['GR-1', 'GR-2'], 'grouped row
 assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'สอน' }), 'ไม่ระบุ', 'receiver-derived approver must not be shown as an approval');
 assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'Chen' }), 'Chen', 'authenticated Chen approval must remain visible');
 
+const warehouseBadgeClasses = {
+    W1: 'bg-yellow-50', W2: 'bg-orange-500', W3: 'bg-yellow-400', W4: 'bg-green-500',
+    W5: 'bg-gray-500', C1: 'bg-sky-200', C2: 'bg-blue-700'
+};
+Object.entries(warehouseBadgeClasses).forEach(([warehouse, expectedClass]) => {
+    assert.match(sandbox.getWarehouseBadge(warehouse), new RegExp(expectedClass), `${warehouse} badge must use its warehouse color`);
+});
+sandbox.renderGrWarehouseBreakdown([
+    { warehouse: 'C2', totalCrates: 60, percentage: 60, billCount: 1 },
+    { warehouse: 'W1', totalCrates: 40, percentage: 40, billCount: 1 }
+], 100);
+const warehouseBreakdownHtml = element('dashboard-wh-breakdown').innerHTML;
+assert.match(warehouseBreakdownHtml, /#1d4ed8/, 'C2 breakdown color must remain dark blue regardless of result order');
+assert.match(warehouseBreakdownHtml, /#fef3c7/, 'W1 breakdown color must remain light yellow regardless of result order');
+
 sandbox.renderGrDailyChart([{ date: '2026-09-19', billCount: 3, itemCount: 7, totalCrates: 351 }]);
 const chartHtml = element('dashboard-daily-chart').innerHTML;
 assert.match(chartHtml, />3 บิล</, 'daily chart must label the number of receipt bills');

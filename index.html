@@ -1225,7 +1225,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.02';
+    const CURRENT_VERSION = '20260920.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2114,16 +2114,29 @@
     }
 
     function getWarehouseBadge(warehouse) {
-        switch(warehouse) {
-            case 'W1': return `<span class="bg-white text-gray-700 border border-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">W1</span>`;
-            case 'W2': return `<span class="bg-brand-orange text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">W2</span>`;
-            case 'W3': return `<span class="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">W3</span>`;
-            case 'W4': return `<span class="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">W4</span>`;
-            case 'W5': return `<span class="bg-gray-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">W5</span>`;
-            case 'C1': return `<span class="bg-sky-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">C1</span>`;
-            case 'C2': return `<span class="bg-brand-blue text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">C2</span>`;
-            default: return `<span class="bg-gray-200 text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide">${warehouse}</span>`;
-        }
+        const base = 'text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide';
+        const classes = {
+            W1: 'bg-yellow-50 text-yellow-900 border border-yellow-300',
+            W2: 'bg-orange-500 text-white',
+            W3: 'bg-yellow-400 text-yellow-900',
+            W4: 'bg-green-500 text-white',
+            W5: 'bg-gray-500 text-white',
+            C1: 'bg-sky-200 text-sky-900 border border-sky-300',
+            C2: 'bg-blue-700 text-white'
+        }[warehouse] || 'bg-gray-200 text-gray-700';
+        return `<span class="${classes} ${base}">${esc(warehouse)}</span>`;
+    }
+
+    function getWarehouseColor(warehouse) {
+        return {
+            W1: '#fef3c7',
+            W2: '#f97316',
+            W3: '#facc15',
+            W4: '#22c55e',
+            W5: '#6b7280',
+            C1: '#7dd3fc',
+            C2: '#1d4ed8'
+        }[warehouse] || '#94a3b8';
     }
 
     // ===== Warehouse-locked location helpers (Conductor 20260613-001) =====
@@ -2973,7 +2986,6 @@
         if (!container) return;
 
         const list = Array.isArray(breakdown) ? breakdown : [];
-        const colors = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#f59e0b', '#64748b'];
         const total = Number(totalCrates || list.reduce((sum, item) => sum + Number(item.totalCrates || 0), 0));
         if (totalLabel) {
             totalLabel.innerText = `รวม ${total.toLocaleString()} ลัง`;
@@ -2989,7 +3001,7 @@
             const pct = Math.max(0, Number(w.percentage || 0));
             const start = cursor;
             cursor += pct;
-            return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+            return `${getWarehouseColor(w.warehouse)} ${start}% ${cursor}%`;
         });
         const donutStyle = `background: conic-gradient(${segments.join(', ')})`;
         const rows = list.map((w, index) => {
@@ -2997,7 +3009,7 @@
             return `
                 <div class="dashboard-wh-list-row">
                     <div class="dashboard-wh-list-label">
-                        <span class="dashboard-wh-swatch" style="background:${colors[index % colors.length]}"></span>
+                        <span class="dashboard-wh-swatch" style="background:${getWarehouseColor(w.warehouse)}"></span>
                         <span>คลัง ${esc(w.warehouse)} <span class="text-slate-400 font-normal">(${esc(w.billCount)} บิล)</span></span>
                     </div>
                     <div class="dashboard-wh-list-value">${Number(w.totalCrates || 0).toLocaleString()} ลัง <span class="text-slate-400 font-normal">(${pct}%)</span></div>
