@@ -1051,7 +1051,7 @@
 
         <!-- Bill Details Drill-Down Modal -->
         <div id="gr-bill-detail-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden">
+          <div class="bg-white rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden">
             
             <!-- Modal Header -->
             <div class="p-4 border-b border-gray-200 flex items-start justify-between bg-gray-50">
@@ -1110,16 +1110,16 @@
                 </div>
                 
                 <div class="border border-gray-200 rounded-xl overflow-x-auto custom-scrollbar">
-                  <table class="w-full min-w-[760px] text-left text-xs text-gray-700">
+                  <table class="w-full min-w-[1080px] text-left text-xs text-gray-700">
                     <thead class="bg-gray-100 text-gray-600 font-bold text-[11px] border-b border-gray-200">
                       <tr>
                         <th class="py-2 px-3">#</th>
                         <th class="py-2 px-3">SKU</th>
                         <th class="py-2 px-3">ชื่อสินค้า</th>
-                        <th class="py-2 px-3 text-center">จำนวนรับ</th>
-                        <th class="py-2 px-3 text-center">สต๊อกสินค้าเก่า</th>
-                        <th class="py-2 px-3">โลเคชั่นจัดเก็บ</th>
-                        <th class="py-2 px-3">วันหมดอายุ (EXP)</th>
+                        <th class="py-2 px-3 text-center whitespace-nowrap">จำนวนรับ</th>
+                        <th class="py-2 px-3 text-center whitespace-nowrap">สต๊อกสินค้าเก่า</th>
+                        <th class="py-2 px-3 whitespace-nowrap">โลเคชั่นจัดเก็บ</th>
+                        <th class="py-2 px-3 whitespace-nowrap">วันหมดอายุ (EXP)</th>
                       </tr>
                     </thead>
                     <tbody id="modal-items-body" class="divide-y divide-gray-100">
@@ -1225,7 +1225,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.04';
+    const CURRENT_VERSION = '20260920.05';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -3318,12 +3318,12 @@
                 itemsBody.innerHTML = items.map((it, idx) => `
                     <tr class="hover:bg-gray-50 text-xs">
                         <td class="py-2 px-3 text-gray-400 w-8">${idx + 1}</td>
-                        <td class="py-2 px-3 font-mono font-medium text-gray-600">${esc(it.sku || '-')}</td>
-                        <td class="py-2 px-3 font-semibold text-gray-800">${esc(it.product || it.product_name || '-')}</td>
-                        <td class="py-2 px-3 text-center font-bold text-brand-blue">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ลัง')}</td>
-                        <td class="py-2 px-3 text-center font-semibold text-slate-700">${esc(formatGrDashboardOldStock(it))}</td>
-                        <td class="py-2 px-3 text-gray-600">${esc(it.locIn || it.location_in || '-')}</td>
-                        <td class="py-2 px-3 text-gray-600">${esc(it.expDate || it.exp_date || it.expRaw || '-')}</td>
+                        <td class="py-2 px-3 font-mono font-medium text-gray-600 whitespace-nowrap">${esc(it.sku || '-')}</td>
+                        <td class="py-2 px-3 font-semibold text-gray-800 min-w-[280px]">${esc(it.product || it.product_name || '-')}</td>
+                        <td class="py-2 px-3 text-center font-bold text-brand-blue whitespace-nowrap">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ลัง')}</td>
+                        <td class="py-2 px-3 text-center font-semibold text-slate-700 whitespace-nowrap">${esc(formatGrDashboardOldStock(it))}</td>
+                        <td class="py-2 px-3 text-gray-600 min-w-[220px]">${esc(it.locIn || it.location_in || '-')}</td>
+                        <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(it.expDate || it.exp_date || it.expRaw || '-')}</td>
                     </tr>
                 `).join('');
             }

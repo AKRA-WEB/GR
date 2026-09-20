@@ -20,6 +20,8 @@ assert.match(script, /function\s+groupGrDashboardBills\s*\(/, 'dashboard must gr
 assert.match(script, /function\s+getGrDashboardApprover\s*\(/, 'dashboard must normalize untrusted receiver-derived approvers');
 assert.match(script, /dashboard-chart-item-label/, 'daily chart must expose item totals separately from bill totals');
 assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(56px, 1fr\)\)`/, 'daily chart must keep historical dates horizontally accessible');
+assert.match(html, /max-w-6xl/, 'bill detail modal must use a wider desktop layout');
+assert.match(html, /min-w-\[1080px\]/, 'bill detail table must reserve enough desktop width for all columns');
 
 const elements = new Map();
 function element(id) {
