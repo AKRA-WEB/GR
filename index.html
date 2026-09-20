@@ -3037,7 +3037,7 @@
         container.innerHTML = list.map(d => {
             const crates = Number(d.totalCrates || 0);
             const bills = Number(d.billCount || 0);
-            const items = Number(d.itemCount || 0);
+            const items = getGrDashboardDailyItemCount(d);
             const dateStr = d.date || '';
             const heightPx = Math.max(8, Math.round((bills / maxBills) * 150));
             const isSelected = grDashboardState.selectedDay === dateStr;
@@ -3053,6 +3053,16 @@
                     <span class="dashboard-chart-item-label">${items > 0 ? `${items} รายการ` : '0 รายการ'}</span>
                 </div>`;
         }).join('');
+    }
+
+    function getGrDashboardDailyItemCount(dailyStat) {
+        if (dailyStat && dailyStat.itemCount !== undefined && dailyStat.itemCount !== null) {
+            return Number(dailyStat.itemCount || 0);
+        }
+        const dateStr = dailyStat?.date || '';
+        return (grDashboardState.analytics?.bills || [])
+            .filter(b => (b.ataDate || b.grDate || '') === dateStr)
+            .reduce((sum, b) => sum + Number(b.itemCount || (Array.isArray(b.items) ? b.items.length : 0)), 0);
     }
 
     async function selectDashboardDailyFilter(dateStr) {

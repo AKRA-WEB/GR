@@ -113,6 +113,16 @@ assert.match(chartHtml, />3 บิล</, 'daily chart must label the number of r
 assert.match(chartHtml, />7 รายการ</, 'daily chart must label item count separately');
 assert.match(chartHtml, /height:\s*150px/, 'daily chart bar height must be based on bill count for the highest-volume day');
 
+sandbox.grDashboardState.analytics = {
+    bills: [
+        { ataDate: '2026-09-19', itemCount: 3 },
+        { ataDate: '2026-09-19', itemCount: 2 },
+        { ataDate: '2026-09-19', itemCount: 2 }
+    ]
+};
+sandbox.renderGrDailyChart([{ date: '2026-09-19', billCount: 3, totalCrates: 351 }]);
+assert.match(element('dashboard-daily-chart').innerHTML, />7 รายการ</, 'legacy RPC responses must derive item count from loaded bills during migration rollout');
+
 sandbox.renderGrDashboardBillsTable([
     { grId: 'gr-1', grNumber: 'GR-1', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 100, itemCount: 1, items: [{ sku: 'A', product: 'A', grQty: 100 }] },
     { grId: 'gr-2', grNumber: 'GR-2', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 50, itemCount: 2, items: [{ sku: 'B', product: 'B', grQty: 25 }, { sku: 'C', product: 'C', grQty: 25 }] },
