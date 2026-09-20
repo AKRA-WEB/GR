@@ -590,7 +590,7 @@
     .dashboard-preview-surface .text-slate-400 { color: var(--dashboard-slate-400) !important; }
     .dashboard-preview-surface .text-slate-600 { color: var(--dashboard-slate-500) !important; }
     .dashboard-preview-surface .dashboard-wh-swatch { width: 12px; height: 12px; flex: 0 0 auto; border-radius: 999px; }
-    .dashboard-preview-surface .dashboard-preview-daily-chart { display: grid !important; align-items: end; gap: 8px !important; min-height: 192px; margin: 24px 0 !important; overflow-x: auto; }
+    .dashboard-preview-surface .dashboard-preview-daily-chart { display: grid !important; align-items: end; grid-auto-columns: minmax(56px, 1fr); gap: 8px !important; min-height: 192px; margin: 24px 0 !important; overflow-x: auto; }
     .dashboard-preview-surface .dashboard-chart-day { width: 56px; justify-self: center; }
     .dashboard-preview-surface .dashboard-chart-bar { width: 100%; max-width: 32px; border-radius: 8px 8px 2px 2px; background: #e2e8f0; transition: background .2s ease, box-shadow .2s ease; }
     .dashboard-preview-surface .dashboard-chart-day:hover .dashboard-chart-bar { background: #60a5fa; }
@@ -601,6 +601,7 @@
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-day-label { color: var(--dashboard-slate-900); font-weight: 700; }
     .dashboard-preview-surface .dashboard-chart-bill-label { border-radius: 4px; background: #f1f5f9; color: var(--dashboard-slate-600, #475569); padding: 1px 4px; font-size: 9px; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-bill-label { background: #ffedd5; color: #c2410c; font-weight: 700; }
+    .dashboard-preview-surface .dashboard-chart-item-label { color: var(--dashboard-slate-400); font-size: 9px; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-bill-dot { width: 8px; height: 8px; margin-bottom: 5px; border-radius: 999px; background: #fb923c; }
     .dashboard-preview-surface .dashboard-preview-bills { overflow: hidden; }
     .dashboard-preview-surface .dashboard-preview-bills > div:first-child { background: rgba(248,250,252,.7) !important; border-bottom-color: var(--dashboard-slate-200) !important; padding: 20px !important; }
@@ -1223,7 +1224,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260919.05';
+    const CURRENT_VERSION = '20260920.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1481,12 +1482,12 @@
                     { warehouse: 'W5', billCount: 2, totalCrates: 174, percentage: 45.3 }
                 ],
                 dailyStats: [
-                    { date: '2026-09-13', billCount: 2, totalCrates: 140 },
-                    { date: '2026-09-14', billCount: 1, totalCrates: 80 },
-                    { date: '2026-09-15', billCount: 3, totalCrates: 220 },
-                    { date: '2026-09-16', billCount: 2, totalCrates: 160 },
-                    { date: '2026-09-18', billCount: 3, totalCrates: 290 },
-                    { date: '2026-09-19', billCount: 4, totalCrates: 384 }
+                    { date: '2026-09-13', billCount: 2, itemCount: 3, totalCrates: 140 },
+                    { date: '2026-09-14', billCount: 1, itemCount: 2, totalCrates: 80 },
+                    { date: '2026-09-15', billCount: 3, itemCount: 5, totalCrates: 220 },
+                    { date: '2026-09-16', billCount: 2, itemCount: 4, totalCrates: 160 },
+                    { date: '2026-09-18', billCount: 3, itemCount: 6, totalCrates: 290 },
+                    { date: '2026-09-19', billCount: 4, itemCount: 7, totalCrates: 384 }
                 ],
                 total: 4,
                 bills: [
@@ -3022,39 +3023,51 @@
             return;
         }
 
-        if (container.style) container.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(0, 1fr))`;
+        if (container.style) {
+            container.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(56px, 1fr))`;
+            container.style.minWidth = list.length > 1 ? `${list.length * 64}px` : '100%';
+        }
 
-        let maxCrates = 1;
+        let maxBills = 1;
         list.forEach(d => {
-            const q = Number(d.totalCrates || 0);
-            if (q > maxCrates) maxCrates = q;
+            const q = Number(d.billCount || 0);
+            if (q > maxBills) maxBills = q;
         });
 
         container.innerHTML = list.map(d => {
             const crates = Number(d.totalCrates || 0);
             const bills = Number(d.billCount || 0);
+            const items = Number(d.itemCount || 0);
             const dateStr = d.date || '';
-            const heightPx = Math.max(8, Math.round((crates / maxCrates) * 150));
+            const heightPx = Math.max(8, Math.round((bills / maxBills) * 150));
             const isSelected = grDashboardState.selectedDay === dateStr;
 
             return `
-                <div onclick="selectDashboardDailyFilter('${esc(dateStr)}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDashboardDailyFilter('${esc(dateStr)}'); }" class="chart-day-bar dashboard-chart-day ${isSelected ? 'is-selected' : ''} flex flex-col items-center gap-1.5 cursor-pointer group" title="${esc(dateStr)}: ${crates} ลัง, ${bills} บิล" role="button" tabindex="0">
-                    <span class="dashboard-chart-amount">${crates ? `${crates} ลัง` : '0'}</span>
+                <div onclick="selectDashboardDailyFilter('${esc(dateStr)}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDashboardDailyFilter('${esc(dateStr)}'); }" class="chart-day-bar dashboard-chart-day ${isSelected ? 'is-selected' : ''} flex flex-col items-center gap-1.5 cursor-pointer group" title="${esc(dateStr)}: ${bills} บิล, ${items} รายการ, ${crates} ลัง" role="button" tabindex="0">
+                    <span class="dashboard-chart-amount">${bills ? `${bills} บิล` : '0 บิล'}</span>
                     <div class="dashboard-chart-bar flex flex-col justify-end items-center" style="height: ${heightPx}px;">
                         ${bills > 0 ? `<span class="dashboard-chart-bill-dot" title="${bills} บิล"></span>` : ''}
                     </div>
                     <span class="dashboard-chart-day-label">${esc(dateStr.slice(5))}</span>
                     <span class="dashboard-chart-bill-label">${bills > 0 ? `${bills} บิล` : '-'}</span>
+                    <span class="dashboard-chart-item-label">${items > 0 ? `${items} รายการ` : '0 รายการ'}</span>
                 </div>`;
         }).join('');
     }
 
-    function selectDashboardDailyFilter(dateStr) {
+    async function selectDashboardDailyFilter(dateStr) {
         grDashboardState.selectedDay = dateStr;
         const statusEl = document.getElementById('dashboard-chart-filter-status');
         const resetBtn = document.getElementById('dashboard-btn-reset-day');
         if (statusEl) statusEl.innerHTML = `กำลังแสดง: <strong>วันที่ ${esc(dateStr)}</strong>`;
         if (resetBtn) resetBtn.classList.remove('hidden');
+
+        const dayStat = (grDashboardState.analytics?.dailyStats || []).find(d => d.date === dateStr);
+        while (dayStat && grDashboardState.hasMore && !(grDashboardState.analytics?.bills || []).some(b => (b.ataDate || b.grDate) === dateStr)) {
+            const beforeOffset = Number(grDashboardState.offset || 0);
+            await loadGrDashboardAnalytics(false, true);
+            if (Number(grDashboardState.offset || 0) <= beforeOffset) break;
+        }
 
         renderGrDailyChart(grDashboardState.analytics?.dailyStats);
 
@@ -3113,8 +3126,15 @@
             bill.ataDate || bill.grDate || '',
             bill.warehouse || '',
             bill.receiver || '',
-            bill.approver || ''
+            getGrDashboardApprover(bill)
         ].map(value => String(value).trim()).join('|');
+    }
+
+    function getGrDashboardApprover(bill) {
+        const approver = String(bill?.approver || '').trim();
+        const receiver = String(bill?.receiver || '').trim();
+        if (!approver || (receiver && approver.localeCompare(receiver, undefined, { sensitivity: 'accent' }) === 0)) return 'ไม่ระบุ';
+        return approver;
     }
 
     function groupGrDashboardBills(bills) {
@@ -3130,7 +3150,8 @@
                     grNumbers: [],
                     items: [],
                     itemCount: 0,
-                    totalCrates: 0
+                    totalCrates: 0,
+                    approver: getGrDashboardApprover(bill)
                 };
                 groups.set(key, group);
             }
@@ -3154,7 +3175,7 @@
         if (countLabel) {
             countLabel.innerText = list.length === sourceList.length
                 ? `แสดง ${list.length.toLocaleString()} บิล`
-                : `แสดง ${list.length.toLocaleString()} รอบรับเข้า (${sourceList.length.toLocaleString()} บิล)`;
+                : `แสดง ${list.length.toLocaleString()} รอบรับเข้า (${list.reduce((sum, row) => sum + Number(row.itemCount || 0), 0).toLocaleString()} รายการ)`;
         }
         updateGrDashboardLoadMoreState(false);
 
@@ -3174,14 +3195,14 @@
             const crates = Number(b.totalCrates || 0);
             const itemsCount = Number(b.itemCount || (b.items ? b.items.length : 0));
             const receiver = b.receiver || '-';
-            const approver = b.approver || '-';
+            const approver = getGrDashboardApprover(b);
             const lead = b.leadtimeDays !== undefined ? `${b.leadtimeDays} วัน` : '-';
 
             return `
                 <tr class="hover:bg-gray-50/80 transition cursor-pointer" onclick="openGrBillDetailModal('${esc(grId)}')">
                     <td class="py-3 px-4">
                         <div class="font-bold text-gray-900">${esc(grNum)}</div>
-                        ${sourceGrNumbers.length > 1 ? `<div class="text-[10px] text-brand-orange font-semibold">รวม ${sourceGrNumbers.length} บิลในรอบเดียวกัน</div><div class="text-[10px] text-gray-400">${esc(sourceGrNumbers.join(', '))}</div>` : ''}
+                        ${sourceGrNumbers.length > 1 ? `<div class="text-[10px] text-brand-orange font-semibold">รวม ${itemsCount} รายการในรอบเดียวกัน</div><div class="text-[10px] text-gray-400">อ้างอิง ${esc(sourceGrNumbers.join(', '))}</div>` : ''}
                         <div class="text-[10px] text-gray-400">PO: ${esc(poNum)}</div>
                     </td>
                     <td class="py-3 px-4">
@@ -3238,14 +3259,15 @@
         const itemsBody = document.getElementById('modal-items-body');
 
         const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
-        if (grEl) grEl.innerText = sourceGrNumbers.length > 1 ? `${sourceGrNumbers[0]} (รวม ${sourceGrNumbers.length} บิล)` : sourceGrNumbers[0];
+        const groupedItemCount = Number(b.itemCount || (Array.isArray(b.items) ? b.items.length : 0));
+        if (grEl) grEl.innerText = sourceGrNumbers.length > 1 ? `${sourceGrNumbers[0]} (รวม ${groupedItemCount} รายการ)` : sourceGrNumbers[0];
         if (poEl) poEl.innerText = `PO: ${b.poNumber || '-'} | วันที่สั่ง: ${b.poDate || '-'}`;
         if (vendorEl) vendorEl.innerText = b.vendor || '-';
         if (ataEl) ataEl.innerText = b.ataDate || b.grDate || '-';
         if (whEl) whEl.innerText = `คลัง ${b.warehouse || 'W1'}`;
         if (leadEl) leadEl.innerText = b.leadtimeDays !== undefined ? `${b.leadtimeDays} วัน` : '-';
         if (receiverEl) receiverEl.innerText = b.receiver || '-';
-        if (approverEl) approverEl.innerText = b.approver || '-';
+        if (approverEl) approverEl.innerText = getGrDashboardApprover(b);
 
         const items = b.items || [];
         if (countEl) countEl.innerText = items.length;

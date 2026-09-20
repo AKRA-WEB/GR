@@ -17,6 +17,9 @@ assert.match(html, /dashboard-preview-kpis/, 'dashboard KPI grid needs the previ
 assert.match(script, /dashboard-wh-donut/, 'warehouse breakdown must retain the preview donut visual');
 assert.match(script, /function\s+loadGrDashboardMore\s*\(/, 'dashboard must expose paged historical loading');
 assert.match(script, /function\s+groupGrDashboardBills\s*\(/, 'dashboard must group same-round receipt rows');
+assert.match(script, /function\s+getGrDashboardApprover\s*\(/, 'dashboard must normalize untrusted receiver-derived approvers');
+assert.match(script, /dashboard-chart-item-label/, 'daily chart must expose item totals separately from bill totals');
+assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(56px, 1fr\)\)`/, 'daily chart must keep historical dates horizontally accessible');
 
 const elements = new Map();
 function element(id) {
@@ -100,5 +103,23 @@ const sameRound = grouped.find(row => row.receiver === 'Receiver');
 assert.equal(sameRound.totalCrates, 150, 'grouped receiving round must sum crates');
 assert.equal(sameRound.itemCount, 2, 'grouped receiving round must sum item count');
 assert.deepEqual(Array.from(sameRound.grNumbers), ['GR-1', 'GR-2'], 'grouped row must retain source GR numbers');
+
+assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'สอน' }), 'ไม่ระบุ', 'receiver-derived approver must not be shown as an approval');
+assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'Chen' }), 'Chen', 'authenticated Chen approval must remain visible');
+
+sandbox.renderGrDailyChart([{ date: '2026-09-19', billCount: 3, itemCount: 7, totalCrates: 351 }]);
+const chartHtml = element('dashboard-daily-chart').innerHTML;
+assert.match(chartHtml, />3 บิล</, 'daily chart must label the number of receipt bills');
+assert.match(chartHtml, />7 รายการ</, 'daily chart must label item count separately');
+assert.match(chartHtml, /height:\s*150px/, 'daily chart bar height must be based on bill count for the highest-volume day');
+
+sandbox.renderGrDashboardBillsTable([
+    { grId: 'gr-1', grNumber: 'GR-1', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 100, itemCount: 1, items: [{ sku: 'A', product: 'A', grQty: 100 }] },
+    { grId: 'gr-2', grNumber: 'GR-2', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 50, itemCount: 2, items: [{ sku: 'B', product: 'B', grQty: 25 }, { sku: 'C', product: 'C', grQty: 25 }] },
+    { grId: 'gr-3', grNumber: 'GR-3', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 25, itemCount: 4, items: [{ sku: 'D', product: 'D', grQty: 25 }] }
+]);
+const tableHtml = element('dashboard-bills-tbody').innerHTML;
+assert.match(tableHtml, /รวม 7 รายการในรอบเดียวกัน/, 'same-round row must describe seven items, not three bills');
+assert.doesNotMatch(tableHtml, /รวม 3 บิลในรอบเดียวกัน/, 'same-round row must not mislabel source receipts as item count');
 
 console.log('PASS gr-dashboard-followup: chart sizing, same-round grouping, pagination contract, and historical approver contract are covered');
