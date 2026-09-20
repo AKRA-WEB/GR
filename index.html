@@ -937,7 +937,7 @@
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <input type="text" id="dashboard-bill-search" oninput="filterDashboardBillsTable()" placeholder="ค้นหา PO, GR, Vendor, สินค้า..." class="text-xs bg-white border border-gray-300 rounded-lg px-3 py-1.5 w-60 focus:outline-none focus:ring-1 focus:ring-brand-orange">
+                    <input type="text" id="dashboard-bill-search" oninput="filterDashboardBillsTable()" placeholder="ค้นหา Vendor, PO, GR, SKU, สินค้า..." class="text-xs bg-white border border-gray-300 rounded-lg px-3 py-1.5 w-60 focus:outline-none focus:ring-1 focus:ring-brand-orange">
                     <select id="dashboard-bill-wh" onchange="filterDashboardBillsTable()" class="text-xs bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-orange">
                       <option value="">ทุกคลัง</option>
                       <option value="W1">คลัง W1</option><option value="W2">คลัง W2</option><option value="W3">คลัง W3</option>
@@ -1225,7 +1225,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.05';
+    const CURRENT_VERSION = '20260920.06';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1564,8 +1564,10 @@
     var isDeliveryPlanVisible = false;
     var GR_WAREHOUSES = ['W1', 'W2', 'W3', 'W4', 'W5', 'C1', 'C2'];
     const PRODUCT_HISTORY_PAGE_SIZE = 50;
-    const GR_DASHBOARD_PAGE_SIZE = 50;
+    const GR_DASHBOARD_PAGE_SIZE = 20;
+    const GR_DASHBOARD_SEARCH_PAGE_SIZE = 100;
     var productHistoryRequestGeneration = 0;
+    var grDashboardSearchTimer = null;
     var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
     var vendorLeadtimeInsights = null;
     var vendorLeadtimeLoaded = false;
@@ -1583,6 +1585,7 @@
         hasMore: false,
         loading: false,
         loadingMore: false,
+        reloadAfterLoad: false,
         loaded: false,
         analytics: null,
         selectedDay: null,
@@ -2894,7 +2897,9 @@
         if (!button) return;
         button.classList.toggle('hidden', !grDashboardState.hasMore);
         button.disabled = isLoading || grDashboardState.loading;
-        button.innerText = isLoading ? 'กำลังโหลดบิลเก่า...' : 'โหลดบิลเก่าเพิ่ม';
+        button.innerText = isLoading
+            ? (grDashboardState.search ? 'กำลังค้นหาบิล...' : 'กำลังโหลดบิลเก่า...')
+            : (grDashboardState.search ? 'โหลดผลค้นหาเพิ่ม' : 'โหลดบิลเก่าเพิ่ม');
     }
 
     function mergeGrDashboardBills(existing, incoming) {
@@ -2923,8 +2928,10 @@
             exactDate: grDashboardState.exactDate,
             dateFrom: grDashboardState.dateFrom,
             dateTo: grDashboardState.dateTo,
+            warehouse: grDashboardState.warehouse,
+            search: grDashboardState.search,
             offset,
-            limit: grDashboardState.limit
+            limit: grDashboardState.search ? GR_DASHBOARD_SEARCH_PAGE_SIZE : grDashboardState.limit
         };
 
         try {
@@ -2951,6 +2958,10 @@
             grDashboardState.loading = false;
             grDashboardState.loadingMore = false;
             updateGrDashboardLoadMoreState(false);
+            if (grDashboardState.reloadAfterLoad) {
+                grDashboardState.reloadAfterLoad = false;
+                loadGrDashboardAnalytics(true);
+            }
         }
     }
 
@@ -3119,9 +3130,13 @@
         renderGrDashboardBillsTable(grDashboardState.analytics?.bills || []);
     }
 
+    function normalizeDashboardSearchText(value) {
+        return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+    }
+
     function getDashboardFilteredBills() {
-        const query = (document.getElementById('dashboard-bill-search')?.value || '').trim().toLowerCase();
-        const wh = document.getElementById('dashboard-bill-wh')?.value || '';
+        const query = normalizeDashboardSearchText(grDashboardState.search || document.getElementById('dashboard-bill-search')?.value || '');
+        const wh = grDashboardState.warehouse || document.getElementById('dashboard-bill-wh')?.value || '';
         let list = grDashboardState.analytics?.bills || [];
 
         if (grDashboardState.selectedDay) {
@@ -3134,10 +3149,10 @@
 
         if (query) {
             list = list.filter(b => {
-                const po = (b.poNumber || '').toLowerCase();
-                const gr = (b.grNumber || '').toLowerCase();
-                const vendor = (b.vendor || '').toLowerCase();
-                const itemsStr = (b.items || []).map(i => `${i.sku} ${i.product}`).join(' ').toLowerCase();
+                const po = normalizeDashboardSearchText(b.poNumber);
+                const gr = normalizeDashboardSearchText(b.grNumber);
+                const vendor = normalizeDashboardSearchText(b.vendor);
+                const itemsStr = normalizeDashboardSearchText((b.items || []).map(i => `${i.sku} ${i.product}`).join(' '));
                 return po.includes(query) || gr.includes(query) || vendor.includes(query) || itemsStr.includes(query);
             });
         }
@@ -3146,7 +3161,24 @@
     }
 
     function filterDashboardBillsTable() {
+        const searchInput = document.getElementById('dashboard-bill-search');
+        const warehouseInput = document.getElementById('dashboard-bill-wh');
+        const nextSearch = normalizeDashboardSearchText(searchInput?.value || '');
+        const nextWarehouse = warehouseInput?.value || '';
+        const changed = nextSearch !== grDashboardState.search || nextWarehouse !== grDashboardState.warehouse;
+        grDashboardState.search = nextSearch;
+        grDashboardState.warehouse = nextWarehouse;
         renderGrDashboardBillsTable(getDashboardFilteredBills());
+        if (!changed) return;
+        if (grDashboardSearchTimer) clearTimeout(grDashboardSearchTimer);
+        grDashboardSearchTimer = setTimeout(() => {
+            grDashboardSearchTimer = null;
+            if (grDashboardState.loading) {
+                grDashboardState.reloadAfterLoad = true;
+                return;
+            }
+            loadGrDashboardAnalytics(true);
+        }, 300);
     }
 
     function dashboardBillGroupKey(bill) {

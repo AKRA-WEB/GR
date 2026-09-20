@@ -20,6 +20,10 @@ assert.match(script, /function\s+groupGrDashboardBills\s*\(/, 'dashboard must gr
 assert.match(script, /function\s+getGrDashboardApprover\s*\(/, 'dashboard must normalize untrusted receiver-derived approvers');
 assert.match(script, /dashboard-chart-item-label/, 'daily chart must expose item totals separately from bill totals');
 assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(56px, 1fr\)\)`/, 'daily chart must keep historical dates horizontally accessible');
+assert.match(script, /const GR_DASHBOARD_PAGE_SIZE = 20/, 'dashboard must load the 20 latest bills first');
+assert.match(script, /search:\s*grDashboardState\.search/, 'dashboard bill search must be sent to the server for all matching bills');
+assert.match(script, /GR_DASHBOARD_SEARCH_PAGE_SIZE = 100/, 'dashboard search must request a broad result page instead of filtering only loaded bills');
+assert.match(script, /normalizeDashboardSearchText/, 'dashboard search must normalize partial Thai/vendor input');
 assert.match(html, /max-w-6xl/, 'bill detail modal must use a wider desktop layout');
 assert.match(html, /min-w-\[1080px\]/, 'bill detail table must reserve enough desktop width for all columns');
 
