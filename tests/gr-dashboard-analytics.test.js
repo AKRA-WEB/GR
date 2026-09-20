@@ -27,7 +27,7 @@ const versionJson = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
 const versionMatch = htmlContent.match(/const\s+CURRENT_VERSION\s*=\s*["']([^"']+)["']/);
 assert(versionMatch, 'CURRENT_VERSION must exist in index.html');
 assert.strictEqual(versionMatch[1], versionJson.version, `index.html version (${versionMatch[1]}) must match version.json (${versionJson.version})`);
-assert.strictEqual(versionJson.version, '20260920.03', 'Version must be locked at 20260920.03');
+assert.strictEqual(versionJson.version, '20260920.04', 'Version must be locked at 20260920.04');
 console.log(`✅ Version parity verified: ${versionJson.version}`);
 
 // 2. Strict User Rule Invariant: No decorative emojis/icons in dashboard

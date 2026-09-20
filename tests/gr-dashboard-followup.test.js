@@ -114,6 +114,9 @@ const warehouseBadgeClasses = {
 Object.entries(warehouseBadgeClasses).forEach(([warehouse, expectedClass]) => {
     assert.match(sandbox.getWarehouseBadge(warehouse), new RegExp(expectedClass), `${warehouse} badge must use its warehouse color`);
 });
+assert.match(sandbox.getWarehouseBadge('C2'), /background-color:#1d4ed8/, 'C2 badge must carry its explicit dark-blue color');
+assert.match(sandbox.getWarehouseChipStyle('W1', true), /background-color:#fef3c7/, 'W1 filter chip must use its warehouse color');
+assert.match(sandbox.getWarehouseChipStyle('C2', true), /background-color:#1d4ed8/, 'C2 filter chip must use its warehouse color');
 sandbox.renderGrWarehouseBreakdown([
     { warehouse: 'C2', totalCrates: 60, percentage: 60, billCount: 1 },
     { warehouse: 'W1', totalCrates: 40, percentage: 40, billCount: 1 }
@@ -160,6 +163,7 @@ sandbox.openGrBillDetailModal('gr-detail');
 const detailHtml = element('modal-items-body').innerHTML;
 assert.match(html, /<th[^>]*>สต๊อกสินค้าเก่า<\/th>/, 'bill detail must expose the old stock column');
 assert.match(detailHtml, />12\s/, 'bill detail must render the item old stock value');
+assert.match(element('modal-bill-wh').innerHTML, /background-color:#facc15/, 'bill detail destination warehouse must use the warehouse color');
 assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: 0, unit: 'ลัง' }), '0 ลัง', 'zero old stock must remain visible');
 assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: '', unit: 'ลัง' }), '-', 'blank old stock must remain a dash');
 

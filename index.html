@@ -1084,7 +1084,7 @@
                 </div>
                 <div>
                   <span class="text-gray-400 block text-[11px]">คลังปลายทาง:</span>
-                  <span id="modal-bill-wh" class="font-bold text-brand-blue block mt-0.5">-</span>
+                  <span id="modal-bill-wh" class="font-bold block mt-0.5">-</span>
                 </div>
                 <div>
                   <span class="text-gray-400 block text-[11px]">Lead Time:</span>
@@ -1225,7 +1225,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.03';
+    const CURRENT_VERSION = '20260920.04';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2113,30 +2113,27 @@
         }
     }
 
+    function getWarehousePalette(warehouse) {
+        return {
+            W1: { background: '#fef3c7', text: '#78350f', textOnLight: '#78350f', border: '#f59e0b', badgeClass: 'bg-yellow-50 text-yellow-900 border border-yellow-300' },
+            W2: { background: '#f97316', text: '#ffffff', textOnLight: '#c2410c', border: '#f97316', badgeClass: 'bg-orange-500 text-white' },
+            W3: { background: '#facc15', text: '#713f12', textOnLight: '#713f12', border: '#eab308', badgeClass: 'bg-yellow-400 text-yellow-900' },
+            W4: { background: '#22c55e', text: '#ffffff', textOnLight: '#15803d', border: '#22c55e', badgeClass: 'bg-green-500 text-white' },
+            W5: { background: '#6b7280', text: '#ffffff', textOnLight: '#4b5563', border: '#6b7280', badgeClass: 'bg-gray-500 text-white' },
+            C1: { background: '#7dd3fc', text: '#075985', textOnLight: '#075985', border: '#38bdf8', badgeClass: 'bg-sky-200 text-sky-900 border border-sky-300' },
+            C2: { background: '#1d4ed8', text: '#ffffff', textOnLight: '#1d4ed8', border: '#1d4ed8', badgeClass: 'bg-blue-700 text-white' }
+        }[warehouse] || { background: '#e5e7eb', text: '#374151', textOnLight: '#374151', border: '#d1d5db', badgeClass: 'bg-gray-200 text-gray-700' };
+    }
+
     function getWarehouseBadge(warehouse) {
+        const palette = getWarehousePalette(warehouse);
         const base = 'text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm inline-flex items-center tracking-wide';
-        const classes = {
-            W1: 'bg-yellow-50 text-yellow-900 border border-yellow-300',
-            W2: 'bg-orange-500 text-white',
-            W3: 'bg-yellow-400 text-yellow-900',
-            W4: 'bg-green-500 text-white',
-            W5: 'bg-gray-500 text-white',
-            C1: 'bg-sky-200 text-sky-900 border border-sky-300',
-            C2: 'bg-blue-700 text-white'
-        }[warehouse] || 'bg-gray-200 text-gray-700';
-        return `<span class="${classes} ${base}">${esc(warehouse)}</span>`;
+        const style = `background-color:${palette.background};color:${palette.text};border-color:${palette.border};`;
+        return `<span class="${palette.badgeClass} ${base}" style="${style}">${esc(warehouse)}</span>`;
     }
 
     function getWarehouseColor(warehouse) {
-        return {
-            W1: '#fef3c7',
-            W2: '#f97316',
-            W3: '#facc15',
-            W4: '#22c55e',
-            W5: '#6b7280',
-            C1: '#7dd3fc',
-            C2: '#1d4ed8'
-        }[warehouse] || '#94a3b8';
+        return getWarehousePalette(warehouse).background;
     }
 
     // ===== Warehouse-locked location helpers (Conductor 20260613-001) =====
@@ -2202,10 +2199,14 @@
             </div>`;
     }
 
-    function chipCls(active) {
-        return active
-            ? 'px-3 py-1.5 rounded-full text-xs font-bold bg-brand-orange text-white shadow-sm border border-brand-orange whitespace-nowrap transition active:scale-95'
-            : 'px-3 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-brand-orange/50 shadow-sm whitespace-nowrap transition active:scale-95';
+    function chipCls(active, warehouse) {
+        const base = 'px-3 py-1.5 rounded-full text-xs font-bold shadow-sm whitespace-nowrap transition active:scale-95';
+        if (!warehouse) {
+            return active
+                ? `${base} bg-brand-orange text-white border border-brand-orange`
+                : `${base} bg-white text-gray-600 border border-gray-200 hover:border-brand-orange/50`;
+        }
+        return `${base} border`;
     }
     function renderWarehouseChips() {
         var container = document.getElementById('wh-chips');
@@ -2223,9 +2224,14 @@
         var badge = function (n) { return `<span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] bg-black/10">${n}</span>`; };
         var html = `<button type="button" onclick="setWarehouseFilter('')" class="${chipCls(active === '')}">ทั้งหมด${badge(total)}</button>`;
         GR_WAREHOUSES.forEach(function (w) {
-            html += `<button type="button" onclick="setWarehouseFilter('${w}')" class="${chipCls(active === w)}">${w}${badge(counts[w] || 0)}</button>`;
+            html += `<button type="button" onclick="setWarehouseFilter('${w}')" class="${chipCls(active === w, w)}" style="${getWarehouseChipStyle(w, active === w)}">${w}${badge(counts[w] || 0)}</button>`;
         });
         container.innerHTML = html;
+    }
+
+    function getWarehouseChipStyle(warehouse, active) {
+        const palette = getWarehousePalette(warehouse);
+        return `background-color:${active ? palette.background : '#ffffff'};color:${active ? palette.text : palette.textOnLight};border-color:${palette.border};`;
     }
     function setWarehouseFilter(w) {
         document.getElementById('r-warehouse-filter').value = w;
@@ -3287,7 +3293,7 @@
         if (poEl) poEl.innerText = `PO: ${b.poNumber || '-'} | วันที่สั่ง: ${b.poDate || '-'}`;
         if (vendorEl) vendorEl.innerText = b.vendor || '-';
         if (ataEl) ataEl.innerText = b.ataDate || b.grDate || '-';
-        if (whEl) whEl.innerText = `คลัง ${b.warehouse || 'W1'}`;
+        if (whEl) whEl.innerHTML = getWarehouseBadge(b.warehouse || 'W1');
         if (leadEl) leadEl.innerText = b.leadtimeDays !== undefined ? `${b.leadtimeDays} วัน` : '-';
         if (receiverEl) receiverEl.innerText = b.receiver || '-';
         if (approverEl) approverEl.innerText = getGrDashboardApprover(b);
