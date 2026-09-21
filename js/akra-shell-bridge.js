@@ -6,6 +6,7 @@
         if (window.parent !== window && window.parent.location.origin === window.location.origin && ['/Main/','/Main/index.html'].includes(window.parent.location.pathname)) shell = window.parent.AkraShell;
     } catch (_) { /* Standalone/cross-origin pages keep their normal entrypoint. */ }
     let dirty = false, busy = 0, leaving = false;
+    const SESSION_VERIFY_TIMEOUT_MS = 10000;
     const MAIN_SESSION = 'akra_main_session', MAIN_TOKEN = 'akra_session_token';
     let watched = null, watchGeneration = 0;
     function stored(key) {
@@ -95,11 +96,28 @@
             const stamp = sessionStamp();
             const token = shell ? window.AkraModule.getToken() : standaloneToken;
             if (!token) throw new Error('no_token');
-            const response = await fetch('https://hgxrrskztbpejirrdpbq.supabase.co/functions/v1/auth-api', {
-                method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
-                body:JSON.stringify({action:'verifyToken',appId,token})
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            let timeoutId;
+            const timeout = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    controller?.abort();
+                    reject(Object.assign(new Error('session_verify_timeout'), { code: 'session_verify_timeout' }));
+                }, SESSION_VERIFY_TIMEOUT_MS);
             });
-            const result = await response.json();
+            let response, result;
+            try {
+                const request = (async () => {
+                    const nextResponse = await fetch('https://hgxrrskztbpejirrdpbq.supabase.co/functions/v1/auth-api', {
+                        method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
+                        ...(controller ? {signal:controller.signal} : {}),
+                        body:JSON.stringify({action:'verifyToken',appId,token})
+                    });
+                    return {response:nextResponse,result:await nextResponse.json()};
+                })();
+                ({response, result} = await Promise.race([request, timeout]));
+            } finally {
+                clearTimeout(timeoutId);
+            }
             if (!shell && stamp !== sessionStamp()) throw new Error('session_changed');
             if (!response.ok || result.valid !== true || !result.user?.id) throw new Error(result.reason || 'invalid_session');
             return result.user;
