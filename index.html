@@ -643,6 +643,45 @@
     }
     @media (max-width: 359px) { .gr-warehouse-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (prefers-reduced-motion: reduce) { .gr-sidebar__menu button { transition: none; } }
+
+    /* Receiving item readability: keep ordered qty beside the field it explains. */
+    #form-receiving .po-product-name {
+      min-width: 0;
+      flex: 1 1 auto;
+      padding: 3px 7px;
+      border: 1px solid rgba(37, 88, 166, .12);
+      border-radius: 7px;
+      background: #f5f8fc;
+      color: var(--gr-ink);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+    #form-receiving .po-ordered-qty {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+      min-height: 19px;
+      padding: 2px 6px;
+      border: 1px solid rgba(37, 88, 166, .16);
+      border-radius: 6px;
+      background: #f5f8fc;
+      color: var(--gr-muted);
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    #form-receiving .po-ordered-qty strong {
+      color: var(--gr-ink);
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+    @media (max-width: 640px) {
+      #form-receiving .po-ordered-qty { padding-inline: 5px; font-size: 8px; }
+      #form-receiving .po-ordered-qty strong { font-size: 9px; }
+    }
   </style>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
@@ -1187,7 +1226,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260922.01';
+    const CURRENT_VERSION = '20260922.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -3886,7 +3925,7 @@
             const itemQtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : (item.poQty || 0);
             const itemSpeechText = showOrderedQuantity ? `${item.product} จำนวน ${itemQtyVal} ${item.unit || ''}` : item.product;
             const orderedQtyBadge = showOrderedQuantity
-                ? `<span class="text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md whitespace-nowrap border border-gray-200">สั่งมา: <span class="font-bold text-gray-800 text-sm ml-1">${itemQtyVal}</span> ${item.unit || ''}</span>`
+                ? `<span class="po-ordered-qty" aria-label="สั่งมา ${itemQtyVal} ${item.unit || ''}">สั่งมา: <strong>${itemQtyVal}</strong> ${item.unit || ''}</span>`
                 : '';
             const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
             const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
@@ -3897,17 +3936,17 @@
                     <div class="font-bold text-gray-800 flex-1 pr-2">
                         <div class="flex items-center gap-2 text-sm">
                             <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
-                            <span>${esc(item.product)}</span>
+                            <span class="po-product-name">${esc(item.product)}</span>
                             <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
                                 <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
                         ${itemRemarkHtml}
                     </div>
-                    <div class="flex flex-col items-end gap-1 flex-shrink-0">${orderedQtyBadge}${itemPlanBadge(item)}</div>
+                    <div class="flex flex-col items-end gap-1 flex-shrink-0">${itemPlanBadge(item)}</div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
-                    <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">${isSplitActive ? 'จำนวน (คลังที่ 1)' : 'จำนวนรับจริง'}</label>
+                    <div class="po-qty-field min-w-0"><div class="flex items-center justify-between gap-1.5 flex-wrap mb-1"><label class="block text-[10px] text-gray-500 font-medium m-0">${isSplitActive ? 'จำนวน (คลังที่ 1)' : 'จำนวนรับจริง'}</label>${orderedQtyBadge}</div>
                     <input type="number" class="input-field po-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${itemQty1}"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                     <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
