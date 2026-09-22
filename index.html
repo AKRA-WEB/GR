@@ -1226,7 +1226,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260922.02';
+    const CURRENT_VERSION = '20260922.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2400,15 +2400,6 @@
             <span>${esc(group.plannedDate)}</span>
             <span class="font-medium opacity-80"> · ${esc(metaText)}</span>
         </div>`;
-    }
-    function itemPlanBadge(item) {
-        if (item.planSource === 'confirmed' && item.expectedDate) {
-            return `<span class="text-[10px] font-bold whitespace-nowrap rounded-md border px-1.5 py-0.5 bg-red-50 text-red-700 border-red-100">ยืนยัน ${esc(item.expectedDate)}</span>`;
-        }
-        if (item.plannedDate) {
-            return `<span class="text-[10px] font-bold whitespace-nowrap rounded-md border px-1.5 py-0.5 bg-blue-50 text-brand-blue border-brand-blueLight">คาด ~${esc(item.plannedDate)}</span>`;
-        }
-        return '';
     }
     function cleanDirectPoRemark(text) {
         if (!text) return '';
@@ -3758,7 +3749,7 @@
                 const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
                 const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
                 const itemRemarkHtml = itemRemarkText ? `<span class="block text-[11px] text-amber-800 font-normal pl-4 italic">↳ หมายเหตุ: ${esc(itemRemarkText)}</span>` : '';
-                productsHtml += `<div class="gr-bill-card__item"><div class="flex items-center justify-between gap-2"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate flex-1"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemPlanBadge(item)}</div>${itemRemarkHtml}</div>`;
+                productsHtml += `<div class="gr-bill-card__item"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemRemarkHtml}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
@@ -3932,9 +3923,9 @@
             const itemRemarkHtml = itemRemarkText ? `<span class="block text-xs text-amber-800 font-normal mt-0.5 italic">↳ หมายเหตุจาก PO: ${esc(itemRemarkText)}</span>` : '';
             htmlStr += `
             <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}">
-                <div class="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
-                    <div class="font-bold text-gray-800 flex-1 pr-2">
-                        <div class="flex items-center gap-2 text-sm">
+                <div class="mb-3 border-b border-gray-100 pb-2">
+                    <div class="font-bold text-gray-800 w-full">
+                        <div class="flex items-start gap-2 text-sm">
                             <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
                             <span class="po-product-name">${esc(item.product)}</span>
                             <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
@@ -3943,7 +3934,6 @@
                         </div>
                         ${itemRemarkHtml}
                     </div>
-                    <div class="flex flex-col items-end gap-1 flex-shrink-0">${itemPlanBadge(item)}</div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
                     <div class="po-qty-field min-w-0"><div class="flex items-center justify-between gap-1.5 flex-wrap mb-1"><label class="block text-[10px] text-gray-500 font-medium m-0">${isSplitActive ? 'จำนวน (คลังที่ 1)' : 'จำนวนรับจริง'}</label>${orderedQtyBadge}</div>
