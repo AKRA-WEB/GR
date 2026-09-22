@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <script src="js/akra-shell-bridge.js?v=20260920.05"></script>
+    <script src="js/akra-shell-bridge.js?v=20260922.01"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
@@ -377,14 +377,6 @@
       outline: 3px solid rgba(71, 119, 169, .24);
       outline-offset: 2px;
     }
-    #product-history-submit {
-      background: linear-gradient(135deg, #d95f2b, #b7471d) !important;
-      border-color: #b7471d !important;
-      color: #ffffff !important;
-      box-shadow: 0 7px 16px rgba(183, 71, 29, .2) !important;
-    }
-    #product-history-submit:hover { background: linear-gradient(135deg, #c95325, #a73d19) !important; color: #ffffff !important; }
-
     #form-receiving > .sticky {
       border-color: #d9e0e8 !important;
       background: rgba(255,255,255,.98) !important;
@@ -505,7 +497,6 @@
     .gr-sidebar__menu button:hover { background: #1c2b43; color: #fff; }
     #app-content:has(#receiving-list-view:not(.hidden)) .gr-nav-receiving,
     #app-content:has(#receiving-detail-view:not(.hidden)) .gr-nav-receiving,
-    #app-content:has(#product-history-view:not(.hidden)) .gr-nav-product,
     #app-content:has(#vendor-leadtime-view:not(.hidden)) .gr-nav-vendor { background: #2563eb; color: #fff; }
     .gr-topbar { margin-left: 240px; width: calc(100% - 240px); min-height: 76px; flex-shrink: 0; background: #fff !important; border-bottom: 1px solid #e2e8f0; box-shadow: none !important; backdrop-filter: none; }
     .gr-topbar::after { display: none; }
@@ -677,7 +668,6 @@
         <div class="gr-sidebar__brand"><i data-lucide="package-check"></i><span>งานรับสินค้า</span></div>
         <nav class="gr-sidebar__menu" aria-label="ส่วนงาน GR">
           <button type="button" class="gr-nav-receiving" onclick="showView('receiving-list-view')"><i data-lucide="inbox"></i><span>รายการรับสินค้า</span></button>
-          <button type="button" class="gr-nav-product" onclick="openProductHistory()" aria-label="เปิดประวัติสินค้า"><i data-lucide="history"></i><span>ประวัติสินค้า</span></button>
           <button type="button" class="gr-nav-vendor" onclick="openVendorLeadtimeDashboard()" aria-label="เปิด Dashboard และ Leadtime"><i data-lucide="trending-up"></i><span>Dashboard GR</span></button>
         </nav>
       </aside>
@@ -731,34 +721,6 @@
           <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
 
           <div id="po-list-container" class="gr-bill-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-        </section>
-
-        <section id="product-history-view" class="gr-secondary-view hidden" aria-labelledby="product-history-title">
-          <div class="flex flex-col gap-4">
-            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 px-1">
-              <div>
-                <button type="button" onclick="showView('receiving-list-view')" class="text-sm font-medium text-gray-500 flex items-center mb-2 hover:text-brand-orange transition"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i> กลับไปหน้ารับสินค้า</button>
-                <h2 id="product-history-title" class="text-xl font-semibold text-brand-orange">ประวัติการรับสินค้า</h2>
-                <p class="text-sm text-gray-500 mt-1">เลือก SKU หรือชื่อสินค้า เพื่อดูรายการรับเข้าสำเร็จล่าสุดและย้อนหลัง</p>
-              </div>
-            </div>
-
-            <form id="product-history-form" class="glass-card p-4 sm:p-5" novalidate>
-              <label for="product-history-input" class="block text-sm font-medium text-gray-700">สินค้า <span class="text-red-500">*</span></label>
-              <p id="product-history-hint" class="text-xs text-gray-500 mt-1">พิมพ์ SKU หรือชื่อสินค้า แล้วเลือกรายการที่ตรงกัน</p>
-              <div class="mt-3 flex flex-col sm:flex-row gap-3">
-                <input type="search" id="product-history-input" list="product-history-options" aria-describedby="product-history-hint" required autocomplete="off" placeholder="เช่น SKU-001 หรือ ชื่อสินค้า" class="input-field m-0 flex-1 text-base bg-white border-gray-200">
-                <datalist id="product-history-options"></datalist>
-                <button type="submit" id="product-history-submit" class="btn sm:w-auto sm:min-w-[140px] bg-brand-orange hover:bg-[#CC4904] text-white font-bold shadow-md">ค้นหาประวัติ</button>
-              </div>
-              <p id="product-history-status" class="mt-3 min-h-5 text-sm text-gray-500" aria-live="polite"></p>
-            </form>
-
-            <div id="product-history-results">
-              <div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-5 py-10 text-center text-sm text-gray-500">เลือกสินค้าเพื่อเริ่มค้นหาประวัติการรับเข้า</div>
-            </div>
-            <button type="button" id="product-history-load-more" class="hidden mx-auto px-5 py-3 rounded-xl border border-brand-orange/30 bg-white text-brand-orange text-sm font-bold hover:bg-brand-orangeLight">โหลดประวัติเพิ่ม</button>
-          </div>
         </section>
 
         <!-- Comprehensive GR Dashboard & Analytics Section -->
@@ -1026,23 +988,24 @@
               </div>
 
               <!-- Product Search Card -->
-              <form id="dashboard-product-form" class="glass-card p-4 sm:p-5" onsubmit="event.preventDefault(); searchDashboardProductHistory();">
-                <label for="dashboard-product-input" class="block text-sm font-medium text-gray-700 mb-1.5">ค้นหาสินค้าตาม SKU หรือชื่อสินค้า</label>
+              <form id="dashboard-product-form" class="glass-card p-4 sm:p-5" onsubmit="event.preventDefault(); searchProductReceiptHistory(true);" novalidate>
+                <label for="dashboard-product-input" class="block text-sm font-medium text-gray-700 mb-1.5">สินค้า <span class="text-red-500">*</span></label>
+                <p id="dashboard-product-hint" class="text-xs text-gray-500 mt-1">พิมพ์ SKU หรือชื่อสินค้า แล้วเลือกรายการที่ตรงกัน</p>
                 <div class="flex flex-col sm:flex-row gap-3 mt-2">
-                  <input type="search" id="dashboard-product-input" list="product-history-options" autocomplete="off" placeholder="พิมพ์ SKU หรือชื่อสินค้า เช่น แป้งสาลี, ถั่วเขียว, นมสด..." class="input-field m-0 text-sm bg-white border-gray-200 flex-1">
+                  <input type="search" id="dashboard-product-input" list="product-history-options" aria-describedby="dashboard-product-hint" required autocomplete="off" placeholder="เช่น SKU-001 หรือ ชื่อสินค้า" class="input-field m-0 text-base bg-white border-gray-200 flex-1">
+                  <datalist id="product-history-options"></datalist>
                   <button type="submit" id="dashboard-product-submit" class="px-6 py-2.5 rounded-xl bg-brand-orange hover:bg-[#CC4904] text-white text-sm font-bold shadow-sm flex items-center justify-center shrink-0">
                     ค้นหาประวัติ
                   </button>
                 </div>
-                <p id="dashboard-product-status" class="mt-2 min-h-4 text-xs text-gray-500"></p>
+                <p id="dashboard-product-status" class="mt-3 min-h-5 text-sm text-gray-500" aria-live="polite"></p>
               </form>
 
               <!-- Product Inbound History Results -->
-              <div id="dashboard-product-results" class="glass-card overflow-hidden border border-gray-200">
-                <div class="p-8 text-center text-gray-400 text-xs">
-                  กรุณาพิมพ์ SKU หรือชื่อสินค้าด้านบนเพื่อค้นหาประวัติการรับเข้าย้อนหลัง
-                </div>
+              <div id="dashboard-product-results">
+                <div class="rounded-2xl border border-dashed border-gray-300 bg-white/60 px-5 py-10 text-center text-sm text-gray-500">เลือกสินค้าเพื่อเริ่มค้นหาประวัติการรับเข้า</div>
               </div>
+              <button type="button" id="product-history-load-more" class="hidden mx-auto px-5 py-3 rounded-xl border border-brand-orange/30 bg-white text-brand-orange text-sm font-bold hover:bg-brand-orangeLight">โหลดประวัติเพิ่ม</button>
             </div>
 
           </div>
@@ -1224,7 +1187,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260920.05';
+    const CURRENT_VERSION = '20260922.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2564,7 +2527,7 @@
 
         if (response.success) {
             const productsAlreadyLoaded = (appData && appData.products) || [];
-            const productHistoryIsOpen = !document.getElementById('product-history-view').classList.contains('hidden');
+            const receivingViewWasOpen = !document.getElementById('receiving-list-view').classList.contains('hidden');
             setCache('CACHE_GR_ACTIVE_DATA_V2', response);
             appData = response;
             appData.products = grProductsLoaded ? productsAlreadyLoaded : (cachedProducts ? (cachedProducts.products || []) : []);
@@ -2580,7 +2543,7 @@
             renderPOListForReceiving();
             grActiveDataRendered = true;
 
-            if (!cacheUsable && !isManualRefresh && !productHistoryIsOpen) showView('receiving-list-view');
+            if (!cacheUsable && !isManualRefresh && receivingViewWasOpen) showView('receiving-list-view');
             if (!grProductsLoaded) loadGRProductsBackground();
             if (!cacheUsable || isManualRefresh) hideDataLoading();
         } else if (!cacheUsable) {
@@ -2613,7 +2576,7 @@
     }
 
     function selectedProductHistoryProduct() {
-        const input = document.getElementById('product-history-input').value.trim();
+        const input = document.getElementById('dashboard-product-input').value.trim();
         const normalized = input.toLowerCase().replace(/\s+/g, ' ');
         return (appData.products || []).find(product => {
             const sku = String(product.sku || '').trim().toLowerCase();
@@ -2624,37 +2587,36 @@
         }) || null;
     }
 
-    async function openProductHistory() {
-        showView('product-history-view');
-        const status = document.getElementById('product-history-status');
+    async function prepareProductHistoryDashboard() {
+        const status = document.getElementById('dashboard-product-status');
         if (!grProductsLoaded) {
             status.textContent = 'กำลังโหลดรายชื่อสินค้า...';
             await loadGRProductsBackground();
         }
         renderProductHistoryOptions();
         status.textContent = grProductsLoaded ? '' : 'โหลดรายชื่อสินค้าไม่สำเร็จ กรุณากลับไปรีเฟรชแล้วลองใหม่';
-        document.getElementById('product-history-input').focus();
-        lucide.createIcons({ root: document.getElementById('product-history-view') });
+        document.getElementById('dashboard-product-input').focus();
+        lucide.createIcons({ root: document.getElementById('vendor-leadtime-tab-product') });
     }
 
     async function searchProductReceiptHistory(reset = true) {
         const product = reset ? selectedProductHistoryProduct() : productHistoryState.product;
-        const status = document.getElementById('product-history-status');
+        const status = document.getElementById('dashboard-product-status');
         if (!product) {
             status.textContent = 'กรุณาเลือกสินค้าจากรายการ SKU หรือชื่อสินค้าที่ตรงกัน';
-            document.getElementById('product-history-input').focus();
+            document.getElementById('dashboard-product-input').focus();
             return;
         }
 
         const generation = ++productHistoryRequestGeneration;
-        const submit = document.getElementById('product-history-submit');
+        const submit = document.getElementById('dashboard-product-submit');
         const loadMore = document.getElementById('product-history-load-more');
         submit.disabled = true;
         loadMore.disabled = true;
         status.textContent = reset ? 'กำลังค้นหาประวัติการรับสินค้า...' : 'กำลังโหลดประวัติเพิ่ม...';
         if (reset) {
             productHistoryState = { product, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
-            document.getElementById('product-history-results').innerHTML = '<div class="glass-card p-5 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/3 mb-4"></div><div class="h-3 bg-gray-100 rounded w-full mb-2"></div><div class="h-3 bg-gray-100 rounded w-2/3"></div></div>';
+            document.getElementById('dashboard-product-results').innerHTML = '<div class="glass-card p-5 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/3 mb-4"></div><div class="h-3 bg-gray-100 rounded w-full mb-2"></div><div class="h-3 bg-gray-100 rounded w-2/3"></div></div>';
             loadMore.classList.add('hidden');
         }
 
@@ -2709,7 +2671,7 @@
     }
 
     function renderProductReceiptHistory() {
-        const container = document.getElementById('product-history-results');
+        const container = document.getElementById('dashboard-product-results');
         const loadMore = document.getElementById('product-history-load-more');
         if (productHistoryState.error) {
             container.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-6 text-center"><p class="text-sm font-medium text-red-700">${esc(productHistoryState.error)}</p><button type="button" onclick="searchProductReceiptHistory(true)" class="mt-3 px-4 py-2 rounded-lg bg-white border border-red-200 text-sm font-bold text-red-700">ลองใหม่</button></div>`;
@@ -2770,7 +2732,7 @@
         lucide.createIcons({ root: container });
     }
 
-    document.getElementById('product-history-form').addEventListener('submit', event => {
+    document.getElementById('dashboard-product-form').addEventListener('submit', event => {
         event.preventDefault();
         searchProductReceiptHistory(true);
     });
@@ -2806,8 +2768,7 @@
         } else if (tab === 'benchmarks') {
             if (!vendorLeadtimeLoaded) loadVendorLeadtimeInsights();
         } else if (tab === 'product') {
-            const input = document.getElementById('dashboard-product-input');
-            if (input) input.focus();
+            prepareProductHistoryDashboard();
         }
         lucide.createIcons({ root: document.getElementById('vendor-leadtime-view') });
     }
@@ -3375,77 +3336,6 @@
     function closeGrBillDetailModal() {
         const modal = document.getElementById('gr-bill-detail-modal');
         if (modal) modal.classList.add('hidden');
-    }
-
-    async function searchDashboardProductHistory() {
-        const input = document.getElementById('dashboard-product-input');
-        const status = document.getElementById('dashboard-product-status');
-        const resultsContainer = document.getElementById('dashboard-product-results');
-        const query = (input?.value || '').trim();
-
-        if (!query) {
-            if (status) status.innerText = 'กรุณากรอก SKU หรือชื่อสินค้าก่อนค้นหา';
-            return;
-        }
-
-        if (status) status.innerText = `กำลังดึงข้อมูลประวัติจาก Supabase สำหรับ "${query}"...`;
-        if (resultsContainer) {
-            resultsContainer.innerHTML = `
-                <div class="p-8 text-center text-gray-500 text-xs space-y-2">
-                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-brand-orange border-t-transparent"></div>
-                    <div>กำลังโหลดประวัติการรับเข้าย้อนหลัง...</div>
-                </div>`;
-        }
-
-        try {
-            const res = await apiCall('getProductReceiptHistory', { sku: query, productName: query, limit: 50 });
-            if (res && res.success) {
-                const history = res.history || [];
-                if (status) status.innerText = `พบประวัติการรับเข้าทั้งหมด ${history.length} รายการ`;
-                if (history.length === 0) {
-                    resultsContainer.innerHTML = `<div class="p-8 text-center text-gray-400 text-xs">ไม่พบประวัติการรับเข้าของสินค้านี้ในระบบ</div>`;
-                    return;
-                }
-                resultsContainer.innerHTML = `
-                    <div class="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                        <span class="font-bold text-gray-800 text-xs">ผลการค้นหาประวัติ: ${esc(query)} (${history.length} รายการ)</span>
-                    </div>
-                    <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left text-xs text-gray-700 whitespace-nowrap">
-                            <thead class="bg-gray-100 text-gray-600 font-bold text-[11px] border-b border-gray-200">
-                                <tr>
-                                    <th class="py-2.5 px-3">วันที่รับเข้า</th>
-                                    <th class="py-2.5 px-3">เลขที่บิล PO/GR</th>
-                                    <th class="py-2.5 px-3">ผู้จัดจำหน่าย (Vendor)</th>
-                                    <th class="py-2.5 px-3 text-center">จำนวนรับ</th>
-                                    <th class="py-2.5 px-3">คลัง & โลเคชั่น</th>
-                                    <th class="py-2.5 px-3">วันหมดอายุ</th>
-                                    <th class="py-2.5 px-3">ผู้รับลงสินค้า</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 font-medium">
-                                ${history.map(h => `
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="py-2.5 px-3 font-bold text-gray-800">${esc(h.receiptDate || h.grDate || '-')}</td>
-                                        <td class="py-2.5 px-3 font-semibold text-brand-blue">${esc(h.poNumber || h.grUid || '-')}</td>
-                                        <td class="py-2.5 px-3">${esc(h.vendor || '-')}</td>
-                                        <td class="py-2.5 px-3 text-center font-bold text-brand-orange">${esc(h.quantity || 0)} ${esc(h.unit || 'ลัง')}</td>
-                                        <td class="py-2.5 px-3 font-mono">${esc(h.warehouse || '')} ${esc(h.location || '')}</td>
-                                        <td class="py-2.5 px-3">${esc(h.expDate || '-')}</td>
-                                        <td class="py-2.5 px-3">${esc(h.receiver || '-')}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>`;
-            } else {
-                if (status) status.innerText = res?.message || 'ค้นหาประวัติไม่สำเร็จ';
-                if (resultsContainer) resultsContainer.innerHTML = `<div class="p-8 text-center text-red-500 text-xs">${esc(res?.message || 'ค้นหาประวัติไม่สำเร็จ')}</div>`;
-            }
-        } catch (e) {
-            if (status) status.innerText = 'เกิดข้อผิดพลาดในการค้นหาประวัติ';
-            if (resultsContainer) resultsContainer.innerHTML = `<div class="p-8 text-center text-red-500 text-xs">เกิดข้อผิดพลาดในการค้นหาประวัติ</div>`;
-        }
     }
 
     async function loadVendorLeadtimeInsights(force = false) {

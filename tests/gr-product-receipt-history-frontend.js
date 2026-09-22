@@ -15,18 +15,19 @@ function functionSource(name, nextName) {
   return html.slice(start, end > start ? end : html.length);
 }
 
-assert.match(html, /id="product-history-view"/, 'separate product history view must exist');
-assert.match(html, /id="product-history-input"[^>]+list="product-history-options"/, 'product history input must use product suggestions');
-assert.match(html, /id="product-history-status"[^>]+aria-live="polite"/, 'result state must be announced accessibly');
-assert.match(html, /id="product-history-results"/, 'history result container must exist');
+assert.doesNotMatch(html, /id="product-history-view"/, 'separate product history view must not remain');
+assert.match(html, /id="dashboard-product-input"[^>]+list="product-history-options"/, 'Dashboard product history input must use product suggestions');
+assert.match(html, /id="dashboard-product-status"[^>]+aria-live="polite"/, 'result state must be announced accessibly');
+assert.match(html, /id="dashboard-product-results"/, 'history result container must exist in Dashboard');
 assert.match(html, /id="product-history-load-more"/, 'bounded pagination control must exist');
-assert.match(html, /openProductHistory\(\)/, 'navigation must expose the product history view');
+assert.match(html, /id="tab-btn-product-drilldown"[\s\S]*ค้นหาประวัติสินค้ารายตัว/, 'Dashboard navigation must expose product history');
 
 const openReceiving = functionSource('openReceiving', 'productHistoryOptionValue');
 assert.doesNotMatch(openReceiving, /getProductReceiptHistory/, 'normal startup must not fetch product history');
 
 const search = functionSource('searchProductReceiptHistory', 'loadMoreProductReceiptHistory');
 assert.match(search, /apiCall\(['"]getProductReceiptHistory['"]/, 'search must call the dedicated backend action');
+assert.match(search, /dashboard-product-input/, 'history search must read the Dashboard input');
 assert.match(search, /sku\s*:/, 'history request must include exact selected SKU');
 assert.match(search, /productName\s*:/, 'history request must include the selected product name fallback');
 assert.match(search, /offset\s*:/, 'history request must include pagination offset');
@@ -42,4 +43,4 @@ assert.match(render, /ไม่พบประวัติ/, 'empty state must b
 assert.match(html, /readActions:\s*\[[^\]]*['"]getProductReceiptHistory['"]/, 'version guard must recognize the history endpoint as a read action');
 assert.match(functionSource('isReadApiAction', 'delay'), /getProductReceiptHistory/, 'history requests must use read retry and timeout behavior');
 
-console.log('PASS gr-product-receipt-history-frontend: lazy view, request contract, states, safe rendering, pagination, and read guards');
+console.log('PASS gr-product-receipt-history-frontend: Dashboard single surface, request contract, states, safe rendering, pagination, and read guards');

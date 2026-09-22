@@ -61,34 +61,35 @@ async (page) => {
   await page.waitForSelector('#receiving-list-view:not(.hidden)');
   if (historyRequests.length !== 0) throw new Error('Product history was requested during normal startup');
 
-  await page.getByRole('button', { name: 'เปิดประวัติสินค้า' }).click();
-  await page.waitForSelector('#product-history-view:not(.hidden)');
+  await page.getByRole('button', { name: 'ตรวจรับเข้าสินค้า (GR): Dashboard GR' }).click();
+  await page.getByRole('button', { name: 'ค้นหาประวัติสินค้ารายตัว', exact: true }).click();
+  await page.waitForSelector('#vendor-leadtime-tab-product:not(.hidden)');
   await page.waitForFunction(() => document.querySelectorAll('#product-history-options option').length === 3);
   await page.waitForTimeout(600);
-  if (!(await page.locator('#product-history-view').isVisible())) throw new Error('Late startup response replaced the history view');
+  if (!(await page.locator('#vendor-leadtime-tab-product').isVisible())) throw new Error('Late startup response replaced the history view');
   if (await page.locator('#product-history-options option').count() !== 3) throw new Error('Late startup response cleared loaded products');
-  if (historyRequests.length !== 0) throw new Error('Opening the history view must not fetch receipt history');
+  if (historyRequests.length !== 0) throw new Error('Opening the Dashboard history tab must not fetch receipt history');
 
-  await page.locator('#product-history-input').fill('SKU-001');
-  await page.getByRole('button', { name: 'ค้นหาประวัติ' }).click();
+  await page.locator('#dashboard-product-input').fill('SKU-001 — สินค้าทดสอบชื่อยาวสำหรับตรวจสอบการแสดงผลบนหน้าจอขนาดเล็ก');
+  await page.locator('#dashboard-product-submit').click();
   await page.getByText('31/12/2026', { exact: true }).first().waitFor();
   if (historyRequests.length !== 1 || historyRequests[0].sku !== 'SKU-001' || historyRequests[0].offset !== 0 || historyRequests[0].limit !== 50) {
     throw new Error('Initial history request contract is incorrect');
   }
-  if (await page.locator('#product-history-results img').count()) throw new Error('Untrusted history text rendered as markup');
+  if (await page.locator('#dashboard-product-results img').count()) throw new Error('Untrusted history text rendered as markup');
   if (await page.evaluate(() => window.__historyXss === 1)) throw new Error('History payload executed script');
 
   await page.getByRole('button', { name: 'โหลดประวัติเพิ่ม' }).click();
   await page.getByText('หมายเหตุย้อนหลัง', { exact: true }).waitFor();
   if (historyRequests.length !== 2 || historyRequests[1].offset !== 1) throw new Error('History pagination did not use nextOffset');
-  if (await page.locator('#product-history-results ol > li').count() !== 2) throw new Error('History pages did not merge');
+  if (await page.locator('#dashboard-product-results ol > li').count() !== 2) throw new Error('History pages did not merge');
 
-  await page.locator('#product-history-input').fill('SKU-EMPTY');
-  await page.locator('#product-history-input').press('Enter');
+  await page.locator('#dashboard-product-input').fill('SKU-EMPTY — สินค้าไม่มีประวัติ');
+  await page.locator('#dashboard-product-input').press('Enter');
   await page.getByText('ไม่พบประวัติการรับเข้าสำเร็จของสินค้านี้', { exact: true }).first().waitFor();
 
-  await page.locator('#product-history-input').fill('SKU-ERROR');
-  await page.getByRole('button', { name: 'ค้นหาประวัติ' }).click();
+  await page.locator('#dashboard-product-input').fill('SKU-ERROR — สินค้าทดสอบลองใหม่');
+  await page.locator('#dashboard-product-submit').click();
   await page.getByText('Fixture history error', { exact: true }).first().waitFor();
   await page.getByRole('button', { name: 'ลองใหม่' }).click();
   await page.getByText('31/12/2026', { exact: true }).first().waitFor();
@@ -97,7 +98,7 @@ async (page) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   if (overflow > 1) throw new Error(`Mobile layout overflows horizontally by ${overflow}px`);
-  if (!(await page.getByRole('button', { name: 'เปิดประวัติสินค้า' }).isVisible())) throw new Error('Mobile history navigation is not visible');
-  if (!(await page.locator('#product-history-results ol > li').first().isVisible())) throw new Error('Mobile history result is not visible');
+  if (!(await page.getByRole('button', { name: 'เปิด Dashboard และ Leadtime' }).isVisible())) throw new Error('Mobile Dashboard navigation is not visible');
+  if (!(await page.locator('#dashboard-product-results ol > li').first().isVisible())) throw new Error('Mobile history result is not visible');
   if (consoleErrors.length > 0) throw new Error(`Browser console errors: ${consoleErrors.join(' | ')}`);
 }

@@ -28,7 +28,7 @@ const elements = new Map([
   ['pending-count', { innerText: '' }],
   ['po-list-container', { innerHTML: '' }],
   ['r-status-filter', { value: '' }],
-  ['product-history-view', { classList: classList(['hidden']) }]
+  ['receiving-list-view', { classList: classList(['hidden']) }]
 ]);
 const context = vm.createContext({ console, Date });
 Object.assign(context, {

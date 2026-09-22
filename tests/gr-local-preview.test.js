@@ -104,7 +104,7 @@ assert.equal(fetchCalls.filter(url => !url.includes('version.json')).length, 0, 
 
 sandbox.window.scrollTo = () => {};
 const mainScroller = sandbox.document.getElementById('gr-main');
-for (const viewId of ['receiving-detail-view', 'product-history-view', 'vendor-leadtime-view', 'receiving-list-view']) {
+for (const viewId of ['receiving-detail-view', 'vendor-leadtime-view', 'receiving-list-view']) {
     mainScroller.scrollTop = 480;
     sandbox.showView(viewId);
     assert.equal(mainScroller.scrollTop, 0, `${viewId} should start at the top after leaving a scrolled view`);
