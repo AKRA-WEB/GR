@@ -1226,7 +1226,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260924.02';
+    const CURRENT_VERSION = '20260924.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2757,7 +2757,7 @@
                 <div><dt class="text-xs text-gray-500">วันหมดอายุที่บันทึก</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.expDate)}</dd></div>
                 <div><dt class="text-xs text-gray-500">ผู้รับสินค้า</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.receiver)}</dd></div>
                 <div><dt class="text-xs text-gray-500">จำนวนรับ</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.quantity)} ${row.unit ? esc(row.unit) : ''}</dd></div>
-                <div><dt class="text-xs text-gray-500">คลัง / ตำแหน่ง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
+                <div><dt class="text-xs text-gray-500">คลังตาม PO / ตำแหน่งรับจริง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
                 <div><dt class="text-xs text-gray-500">Vendor</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.vendor)}</dd></div>
                 <div><dt class="text-xs text-gray-500">เลข PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poNumber)}</dd></div>
                 <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poDate)}</dd></div>
