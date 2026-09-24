@@ -118,4 +118,34 @@ const serialized = `${loc1} (${q1}${uStr}) | ${loc2} (${q2}${uStr})`;
 assert.strictEqual(serialized, 'W1-1F-Z1 (90 ลัง) | W5-1F-Z2 (10 ลัง)');
 console.log('[PASS] 4. Serialized format matches contract: ' + serialized);
 
+// A changed destination must never reuse a count checked for another warehouse.
+const firstCount = { value: '4', dataset: { warehouse: 'W1' }, classList: { remove() {} } };
+const secondCount = { value: '0', dataset: { warehouse: 'W5' }, classList: { remove() {} } };
+const firstWarehouse = { value: 'W1' };
+const secondWarehouse = { value: 'W5' };
+const secondLabel = { textContent: '' };
+let secondHidden = false;
+const splitControls = {
+    '.po-split': { classList: { contains: () => false } },
+    '.po-loc-wh': firstWarehouse,
+    '.po-loc-wh2': secondWarehouse,
+    '.po-old-stock': firstCount,
+    '.po-old-stock2': secondCount,
+    '.po-old-stock-label': { textContent: '' },
+    '.po-old-stock2-field': { classList: { toggle: (_name, hidden) => { secondHidden = hidden; } }, querySelector: () => secondLabel }
+};
+const splitRow = { querySelector: selector => splitControls[selector] };
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(firstCount.value, '4');
+assert.strictEqual(secondCount.value, '0');
+secondWarehouse.value = 'W2';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(secondCount.value, '', 'changing the second warehouse clears its previous count');
+assert.strictEqual(secondHidden, false);
+firstWarehouse.value = 'W2';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(firstCount.value, '', 'changing the first warehouse clears its previous count');
+assert.strictEqual(secondHidden, true, 'one warehouse needs only one count');
+console.log('[PASS] 5. Changing a destination clears its stale checked count');
+
 console.log('\n🌟 ALL GR SPLIT FRONTEND TESTS PASSED (100%)! 🌟');

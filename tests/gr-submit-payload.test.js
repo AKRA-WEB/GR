@@ -35,11 +35,15 @@ async function createTest() {
     async function runTestWithExpValue(expValue, options = {}) {
         lastNotification = null;
         const calls = [];
-        const errorMarks = { po: false, extra: false };
+        const errorMarks = { po: false, po2: false, extra: false };
         const poOldStock = createMockElement({ value: options.poOldStock ?? '5' });
+        const poOldStock2 = createMockElement({ value: options.poOldStock2 ?? '' });
         const extraOldStock = createMockElement({ value: options.extraOldStock ?? '3' });
         poOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.po = true; }, remove: () => {} };
+        poOldStock2.classList = { add: name => { if (name === 'input-error') errorMarks.po2 = true; }, remove: () => {} };
         extraOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.extra = true; }, remove: () => {} };
+        const splitWrap = createMockElement();
+        splitWrap.classList = { contains: name => name === 'hidden' && !options.split };
         
         const mockDoc = {
             getElementById: (id) => {
@@ -63,8 +67,14 @@ async function createTest() {
                             '.po-exp': createMockElement({ value: expValue }),
                             '.po-qty': createMockElement({ value: options.poQty ?? '10' }),
                             '.po-unit': createMockElement({ value: 'unit' }),
+                            '.po-loc-wh': createMockElement({ value: 'W1' }),
                             '.po-loc-floor': createMockElement({ value: '1' }),
-                            '.po-old-stock': poOldStock
+                            '.po-old-stock': poOldStock,
+                            '.po-old-stock2': poOldStock2,
+                            '.po-split': splitWrap,
+                            '.po-loc-wh2': createMockElement({ value: options.poWarehouse2 ?? 'W5' }),
+                            '.po-loc-floor2': createMockElement({ value: '1' }),
+                            '.po-qty2': createMockElement({ value: options.poQty2 ?? '' })
                         }
                     })];
                 }
@@ -75,6 +85,7 @@ async function createTest() {
                             '.ex-qty': createMockElement({ value: '10' }),
                             '.ex-product': createMockElement({ value: 'extra prod' }),
                             '.ex-unit': createMockElement({ value: 'unit' }),
+                            '.ex-loc-wh': createMockElement({ value: 'W1' }),
                             '.ex-loc-floor': createMockElement({ value: '1' }),
                             '.ex-old-stock': extraOldStock
                         }
@@ -194,10 +205,33 @@ async function createTest() {
     result = await runTestWithExpValue('', { poOldStock: '0', extraOldStock: '0' });
     assert.equal(result.calls.length, 1, 'zero old stock must be accepted');
     assert.equal(result.calls[0].payload.items[0].oldStock, '0');
+    assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W1, '0');
     assert.equal(result.calls[0].payload.extraItems[0].oldStock, '0');
+    assert.equal(result.calls[0].payload.extraItems[0].oldStockByWarehouse.W1, '0');
+
+    result = await runTestWithExpValue('', { split: true, poQty2: '2', poOldStock2: '' });
+    assert.equal(result.calls.length, 0, 'missing second receiving warehouse count must block API');
+    assert.equal(result.errorMarks.po2, true, 'second warehouse count must be marked');
+
+    result = await runTestWithExpValue('', { split: true, poQty2: '2', poOldStock: '0', poOldStock2: '7' });
+    assert.equal(result.calls.length, 1, 'split warehouse counts must reach API');
+    assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W1, '0');
+    assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W5, '7');
+
+    result = await runTestWithExpValue('', { split: true, poQty2: '2', poOldStock: '0', poWarehouse2: 'W1', poOldStock2: '' });
+    assert.equal(result.calls.length, 1, 'two locations in the same warehouse share one checked count');
+    assert.equal(Object.keys(result.calls[0].payload.items[0].oldStockByWarehouse).length, 1);
+
+    result = await runTestWithExpValue('', { split: true, poQty: '0', poQty2: '2', poOldStock: '0', poOldStock2: '0' });
+    assert.equal(result.calls.length, 0, 'a final split must receive a positive quantity in each warehouse');
 
     result = await runTestWithExpValue('', { poOldStock: '', extraOldStock: '', targetStatus: 'Draft GR' });
     assert.equal(result.calls.length, 1, 'draft must allow blank old stock');
+
+    result = await runTestWithExpValue('', { split: true, poQty2: '2', poOldStock: '', poOldStock2: '', targetStatus: 'Draft GR' });
+    assert.equal(result.calls.length, 1, 'draft split must allow both counts blank');
+    result = await runTestWithExpValue('', { split: true, poQty: '0', poQty2: '2', poOldStock: '', poOldStock2: '', targetStatus: 'Draft GR' });
+    assert.equal(result.calls.length, 1, 'draft split may still have an incomplete first quantity');
 
     result = await runTestWithExpValue('', { poQty: '', poOldStock: '', extraOldStock: '0' });
     assert.equal(result.calls.length, 1, 'unreceived PO row must not require old stock');

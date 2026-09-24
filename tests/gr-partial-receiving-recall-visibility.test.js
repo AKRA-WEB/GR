@@ -186,9 +186,10 @@ for (let i = 1; i <= 10; i++) {
         quantity: 10 * i,
         unit: 'ลัง',
         grQty: isDraft ? String(10 * i) : '',
-        locIn: isDraft ? 'W1-1F-Z1' : '',
+        locIn: i === 3 ? 'W1-1F-Z1 (20 ลัง) | W5-1F-Z2 (10 ลัง)' : (isDraft ? 'W1-1F-Z1' : ''),
         exp: isDraft ? '31/12/2026' : '',
-        oldStock: i === 1 ? 0 : '',
+        oldStock: i <= 3 ? (i === 3 ? 4 : 0) : '',
+        oldStockByWarehouse: i === 1 ? { W1: 0 } : (i === 2 ? {} : (i === 3 ? { W1: 4, W5: 0 } : null)),
         billRemark: 'หมายเหตุรวมทั้งบิล',
         itemRemark: ''
     });
@@ -230,6 +231,8 @@ assert.ok(itemsContainerHtml.includes('data-uid="item-1"'), 'Modal HTML must inc
 assert.ok(itemsContainerHtml.includes('data-uid="item-9"'), 'Modal HTML must include item 9');
 assert.ok(!itemsContainerHtml.includes('data-uid="item-10"'), 'Modal HTML must NOT include unreceived item 10');
 assert.match(itemsContainerHtml, /data-uid="item-1"[\s\S]*?po-old-stock[^>]*value="0"/, 'Saved zero old stock must be visible when the draft bill reopens');
+assert.match(itemsContainerHtml, /data-uid="item-2"[\s\S]*?po-old-stock[^>]*value=""/, 'Unchecked draft old stock must remain blank on reopen');
+assert.match(itemsContainerHtml, /data-uid="item-3"[\s\S]*?po-old-stock[^>]*value="4"[\s\S]*?po-old-stock2[^>]*value="0"/, 'Both warehouse counts must reopen on a split draft');
 console.log('[PASS] 5. openReceivingDetail renders only 9 item rows into modal');
 
 // 6. Test handleRecallOrReset scoping
