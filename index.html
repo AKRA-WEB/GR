@@ -1120,7 +1120,7 @@
                         <th class="py-2 px-3 text-center whitespace-nowrap">จำนวนรับ</th>
                         <th class="py-2 px-3 text-center whitespace-nowrap">สต๊อกสินค้าเก่า</th>
                         <th class="py-2 px-3 whitespace-nowrap">โลเคชั่นจัดเก็บ</th>
-                        <th class="py-2 px-3 whitespace-nowrap">วันหมดอายุ (EXP)</th>
+                        <th class="py-2 px-3 whitespace-nowrap">วันหมดอายุ / รหัส Lot</th>
                       </tr>
                     </thead>
                     <tbody id="modal-items-body" class="divide-y divide-gray-100">
@@ -1226,7 +1226,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260924.05';
+    const CURRENT_VERSION = '20260924.06';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2754,7 +2754,7 @@
               </div>
               <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3 text-sm">
                 <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">สินค้า / SKU</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.product)} / ${productHistoryDisplay(row.sku)}</dd></div>
-                <div><dt class="text-xs text-gray-500">วันหมดอายุที่บันทึก</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.expDate)}</dd></div>
+                <div><dt class="text-xs text-gray-500">วันหมดอายุ / รหัส Lot</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.expDate)}${row.lotCode ? ` · Lot: ${productHistoryDisplay(row.lotCode)}` : ''}</dd></div>
                 <div><dt class="text-xs text-gray-500">ผู้รับสินค้า</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.receiver)}</dd></div>
                 <div><dt class="text-xs text-gray-500">จำนวนรับ</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.quantity)} ${row.unit ? esc(row.unit) : ''}</dd></div>
                 <div><dt class="text-xs text-gray-500">คลังตาม PO / ตำแหน่งรับจริง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
@@ -2776,7 +2776,7 @@
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 lg:max-w-3xl">
                 <div class="rounded-xl bg-brand-orangeLight px-3 py-3"><p class="text-xs text-brand-orange">วันที่รับล่าสุด</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiptDate)}</p></div>
-                <div class="rounded-xl bg-emerald-50 px-3 py-3"><p class="text-xs text-emerald-700">วันหมดอายุที่บันทึก</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.expDate)}</p></div>
+                <div class="rounded-xl bg-emerald-50 px-3 py-3"><p class="text-xs text-emerald-700">วันหมดอายุ / รหัส Lot</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.expDate)}${latest.lotCode ? ` · Lot: ${productHistoryDisplay(latest.lotCode)}` : ''}</p></div>
                 <div class="rounded-xl bg-blue-50 px-3 py-3"><p class="text-xs text-brand-blue">จำนวนรับ</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.quantity)} ${latest.unit ? esc(latest.unit) : ''}</p></div>
                 <div class="rounded-xl bg-gray-50 px-3 py-3"><p class="text-xs text-gray-500">ผู้รับสินค้า</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiver)}</p></div>
               </div>
@@ -3373,7 +3373,7 @@
                         <td class="py-2 px-3 text-center font-bold text-brand-blue whitespace-nowrap">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ลัง')}</td>
                         <td class="py-2 px-3 text-center font-semibold text-slate-700 whitespace-nowrap">${esc(formatGrDashboardOldStock(it))}</td>
                         <td class="py-2 px-3 text-gray-600 min-w-[220px]">${esc(it.locIn || it.location_in || '-')}</td>
-                        <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(it.noExpiry ? 'ไม่มีวันหมดอายุ' : (it.expRaw || it.expDate || it.exp_date || '-'))}</td>
+                        <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(it.noExpiry ? `ไม่มีวันหมดอายุ${it.lotCode ? ` · Lot: ${it.lotCode}` : ''}` : (it.expRaw || it.expDate || it.exp_date || '-'))}</td>
                     </tr>
                 `).join('');
             }
@@ -3985,8 +3985,8 @@
                     <input type="number" class="input-field po-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${itemQty1}"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                     <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
-                    <div><span class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ <span class="text-red-500">*</span></span>
-                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? esc(item.exp || '') : ''}" oninput="handleExpiryInputChange(this)">
+                    <div><span class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
+                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? esc(item.noExpiry ? (item.lotCode || '') : (item.exp || '')) : ''}" oninput="handleExpiryInputChange(this)">
                     <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="po-no-expiry" ${isSavedData && item.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
                     <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="po-old-stock-label">${needsSecondOldStock ? `สต๊อกเก่า ${esc(parsedLoc.wh || group.warehouse)}` : 'สต๊อกเก่า'}</span> <span class="text-red-500">*</span></label>
@@ -4198,8 +4198,8 @@
                 <input type="number" class="input-field ex-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${esc(initial.grQty ?? '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
                 <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1" value="${esc(initial.unit || '')}"></div>
-                <div><span class="block text-[10px] text-gray-500 mb-1 font-medium">วันหมดอายุ <span class="text-red-500">*</span></span>
-                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="31/12/2026 หรือ 31/12/2569" value="${esc(initial.exp || '')}" oninput="handleExpiryInputChange(this)">
+                <div><span class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
+                <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="31/12/2026 หรือ 31/12/2569" value="${esc(initial.noExpiry ? (initial.lotCode || '') : (initial.exp || ''))}" oninput="handleExpiryInputChange(this)">
                 <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="ex-no-expiry" ${initial.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
                 <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อกเก่า <span class="text-red-500">*</span></label>
@@ -4252,19 +4252,27 @@
     function syncNoExpiryControl(checkbox, clearValue) {
         const input = checkbox.parentElement.parentElement.querySelector('.po-exp, .ex-exp');
         if (!input) return;
-        if (checkbox.checked && clearValue) input.value = '';
-        input.disabled = checkbox.disabled || checkbox.checked;
+        if (clearValue && !(checkbox.checked && looksLikeLotCode(input.value.trim()))) input.value = '';
+        input.disabled = checkbox.disabled;
+        input.placeholder = checkbox.checked ? 'รหัส Lot เช่น G2C (ถ้ามี)' : '31/12/2026 หรือ 31/12/2569';
+        const label = input.parentElement.querySelector('.exp-field-label');
+        if (label) label.textContent = checkbox.checked ? 'รหัส Lot (ถ้ามี)' : 'วันหมดอายุ / รหัส Lot';
+        input.parentElement.querySelector('.exp-required-star')?.classList.toggle('hidden', checkbox.checked);
         input.classList.toggle('bg-gray-100', input.disabled);
         updateExpiryPreview(input);
     }
 
     function handleNoExpiryChange(checkbox) {
         syncNoExpiryControl(checkbox, true);
-        if (!checkbox.checked) checkbox.parentElement.parentElement.querySelector('.po-exp, .ex-exp')?.focus();
+        checkbox.parentElement.parentElement.querySelector('.po-exp, .ex-exp')?.focus();
     }
 
     function handleExpiryInputChange(inputEl) {
         updateExpiryPreview(inputEl);
+    }
+
+    function looksLikeLotCode(value) {
+        return /^[A-Za-z0-9._/-]+$/.test(value) && /[A-Za-z]/.test(value) && /[0-9]/.test(value);
     }
 
     function updateExpiryPreview(inputEl) {
@@ -4287,6 +4295,13 @@
             return;
         }
 
+        if (inputEl.parentElement.querySelector('.po-no-expiry, .ex-no-expiry')?.checked) {
+            inputEl.classList.remove('input-error');
+            delete inputEl.dataset.resolvedIso;
+            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]">รหัส Lot: ${esc(val)}</span>`;
+            return;
+        }
+
         const res = GrExpiry.parseExpiryInput(val);
         inputEl.classList.remove('input-error');
         delete inputEl.dataset.resolvedIso;
@@ -4295,7 +4310,9 @@
             wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]"><i data-lucide="check" class="w-3 h-3"></i> ${esc(res.previewText)}</span>`;
             if (window.lucide && lucide.createIcons) lucide.createIcons({ root: wrap });
         } else {
-            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">บันทึกเป็นข้อความ: ${esc(val)}</span>`;
+            wrap.innerHTML = looksLikeLotCode(val)
+                ? `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">หากเป็นรหัส Lot ให้เลือก “ไม่มีวันหมดอายุ”</span>`
+                : `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">บันทึกเป็นข้อความ: ${esc(val)}</span>`;
         }
     }
 
@@ -4356,13 +4373,15 @@
           const noExpiry = noExpiryInput?.checked === true;
           const rawExp = expInp ? expInp.value.trim() : '';
           let exp = '';
+          let lotCode = '';
           if (rawExp) {
               if (rawExp.length > 200) {
                   if (expInp) expInp.classList.add('input-error');
                   formHasError = true;
                   expiryHasError = true;
               } else {
-                  exp = rawExp;
+                  if (noExpiry) lotCode = rawExp;
+                  else exp = rawExp;
               }
           }
           const oldStockInput = row.querySelector('.po-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
@@ -4406,9 +4425,9 @@
               if (!isDraft && !floorSel.value) { floorSel.classList.add('input-error'); formHasError = true; }
               if (!isDraft && splitActive && !floor2El.value) { floor2El.classList.add('input-error'); formHasError = true; }
               if (!isDraft && oldStock === '') { if (oldStockInput) oldStockInput.classList.add('input-error'); oldStockHasError = true; }
-              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty, unit, locIn, exp, noExpiry, oldStock, oldStockByWarehouse });
+              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty, unit, locIn, exp, noExpiry, lotCode, oldStock, oldStockByWarehouse });
           } else if (isDraft) {
-              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty: "", unit, locIn, exp, noExpiry, oldStock, oldStockByWarehouse });
+              poItemsData.push({ rowNumber: rowNum, uid: uid, expectedStatus: itemMeta.status || 'Pending GR', sku: itemMeta.sku || '', product: itemMeta.product || '', grQty: "", unit, locIn, exp, noExpiry, lotCode, oldStock, oldStockByWarehouse });
           }
       });
 
@@ -4427,13 +4446,15 @@
           const noExpiry = row.querySelector('.ex-no-expiry')?.checked === true;
           const rawExp = expInp ? expInp.value.trim() : '';
           let exp = '';
+          let lotCode = '';
           if (rawExp) {
               if (rawExp.length > 200) {
                   if (expInp) expInp.classList.add('input-error');
                   formHasError = true;
                   expiryHasError = true;
               } else {
-                  exp = rawExp;
+                  if (noExpiry) lotCode = rawExp;
+                  else exp = rawExp;
               }
           }
           const oldStockInput = row.querySelector('.ex-old-stock'); const oldStock = oldStockInput ? oldStockInput.value.trim() : '';
@@ -4445,11 +4466,11 @@
               if (!isDraft && grQty && !noExpiry && !exp) { expInp.classList.add('input-error'); expiryChoiceHasError = true; }
               if (!isDraft && !floorSel.value) { floorSel.classList.add('input-error'); formHasError = true; }
               if (!isDraft && grQty && oldStock === '') { if (oldStockInput) oldStockInput.classList.add('input-error'); oldStockHasError = true; }
-              if (product && grQty) extraItemsData.push({ sku, product, grQty, unit, locIn, exp, noExpiry, oldStock, oldStockByWarehouse: oldStock === '' ? {} : { [whSel.value]: oldStock } });
+              if (product && grQty) extraItemsData.push({ sku, product, grQty, unit, locIn, exp, noExpiry, lotCode, oldStock, oldStockByWarehouse: oldStock === '' ? {} : { [whSel.value]: oldStock } });
           }
       });
 
-      if (expiryHasError) return showNotification("ความยาวข้อความวันหมดอายุเกินกำหนด 200 ตัวอักษร", "warning");
+      if (expiryHasError) return showNotification("ข้อความวันหมดอายุหรือรหัส Lot ยาวเกิน 200 ตัวอักษร", "warning");
       if (expiryChoiceHasError) return showNotification("กรุณากรอกวันหมดอายุหรือเลือกไม่มีวันหมดอายุสำหรับสินค้าที่รับทุกรายการ", "warning");
       if (splitQtyHasError) return showNotification("กรุณาระบุจำนวนรับคลังที่ 1 มากกว่า 0 หรือเลือกคลังที่รับจริงเป็นคลังหลัก", "warning");
       if (oldStockHasError) return showNotification("กรุณากรอกสต๊อกเก่าสำหรับสินค้าที่รับทุกรายการ (ใส่ 0 หากไม่มีสต๊อกเดิม)", "warning");

@@ -195,7 +195,7 @@ async function createTest() {
 
     let char201 = 'a'.repeat(201);
     result = await runTestWithExpValue(char201);
-    assert.strictEqual(result.notification, 'ความยาวข้อความวันหมดอายุเกินกำหนด 200 ตัวอักษร', '201 chars should fail length validation');
+    assert.strictEqual(result.notification, 'ข้อความวันหมดอายุหรือรหัส Lot ยาวเกิน 200 ตัวอักษร', '201 chars should fail length validation');
 
     const expiryWarning = 'กรุณากรอกวันหมดอายุหรือเลือกไม่มีวันหมดอายุสำหรับสินค้าที่รับทุกรายการ';
     result = await runTestWithExpValue('');
@@ -209,10 +209,19 @@ async function createTest() {
     assert.equal(result.calls[0].payload.items[0].noExpiry, true);
     assert.equal(result.calls[0].payload.extraItems[0].noExpiry, true);
     assert.equal(result.calls[0].payload.items[0].exp, '');
+    assert.equal(result.calls[0].payload.items[0].lotCode, '');
+
+    result = await runTestWithExpValue('G2C', { poNoExpiry: true, extraNoExpiry: true, extraExpValue: 'B-7' });
+    assert.equal(result.calls.length, 1, 'lot codes in no-expiry mode must reach API');
+    assert.equal(result.calls[0].payload.items[0].exp, '');
+    assert.equal(result.calls[0].payload.items[0].lotCode, 'G2C');
+    assert.equal(result.calls[0].payload.extraItems[0].exp, '');
+    assert.equal(result.calls[0].payload.extraItems[0].lotCode, 'B-7');
 
     result = await runTestWithExpValue('31 ธ.ค. 69', { extraExpValue: '', extraNoExpiry: true });
     assert.equal(result.calls.length, 1, 'raw expiry and checked no-expiry may coexist on separate rows');
     assert.equal(result.calls[0].payload.items[0].exp, '31 ธ.ค. 69');
+    assert.equal(result.calls[0].payload.items[0].lotCode, '');
     assert.equal(result.calls[0].payload.items[0].noExpiry, false);
     assert.equal(result.calls[0].payload.extraItems[0].noExpiry, true);
 
