@@ -188,7 +188,7 @@ for (let i = 1; i <= 10; i++) {
         grQty: isDraft ? String(10 * i) : '',
         locIn: isDraft ? 'W1-1F-Z1' : '',
         exp: isDraft ? '31/12/2026' : '',
-        oldStock: '',
+        oldStock: i === 1 ? 0 : '',
         billRemark: 'หมายเหตุรวมทั้งบิล',
         itemRemark: ''
     });
@@ -229,6 +229,7 @@ const itemsContainerHtml = getEl('r-items-container').innerHTML;
 assert.ok(itemsContainerHtml.includes('data-uid="item-1"'), 'Modal HTML must include item 1');
 assert.ok(itemsContainerHtml.includes('data-uid="item-9"'), 'Modal HTML must include item 9');
 assert.ok(!itemsContainerHtml.includes('data-uid="item-10"'), 'Modal HTML must NOT include unreceived item 10');
+assert.match(itemsContainerHtml, /data-uid="item-1"[\s\S]*?po-old-stock[^>]*value="0"/, 'Saved zero old stock must be visible when the draft bill reopens');
 console.log('[PASS] 5. openReceivingDetail renders only 9 item rows into modal');
 
 // 6. Test handleRecallOrReset scoping

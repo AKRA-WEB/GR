@@ -32,8 +32,14 @@ async function createTest() {
 
     let lastNotification = null;
 
-    async function runTestWithExpValue(expValue) {
+    async function runTestWithExpValue(expValue, options = {}) {
         lastNotification = null;
+        const calls = [];
+        const errorMarks = { po: false, extra: false };
+        const poOldStock = createMockElement({ value: options.poOldStock ?? '5' });
+        const extraOldStock = createMockElement({ value: options.extraOldStock ?? '3' });
+        poOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.po = true; }, remove: () => {} };
+        extraOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.extra = true; }, remove: () => {} };
         
         const mockDoc = {
             getElementById: (id) => {
@@ -55,9 +61,10 @@ async function createTest() {
                         dataset: { rownum: '1', uid: 'uuid-1' },
                         querySelectorMap: {
                             '.po-exp': createMockElement({ value: expValue }),
-                            '.po-qty': createMockElement({ value: '10' }),
+                            '.po-qty': createMockElement({ value: options.poQty ?? '10' }),
                             '.po-unit': createMockElement({ value: 'unit' }),
-                            '.po-loc-floor': createMockElement({ value: '1' })
+                            '.po-loc-floor': createMockElement({ value: '1' }),
+                            '.po-old-stock': poOldStock
                         }
                     })];
                 }
@@ -68,7 +75,8 @@ async function createTest() {
                             '.ex-qty': createMockElement({ value: '10' }),
                             '.ex-product': createMockElement({ value: 'extra prod' }),
                             '.ex-unit': createMockElement({ value: 'unit' }),
-                            '.ex-loc-floor': createMockElement({ value: '1' })
+                            '.ex-loc-floor': createMockElement({ value: '1' }),
+                            '.ex-old-stock': extraOldStock
                         }
                     })];
                 }
@@ -89,7 +97,10 @@ async function createTest() {
                 speechSynthesis: { cancel: () => {} },
                 scrollTo: () => {},
                 appSession: { roles: ['ADMIN'], perms: { 'app-gr': ['approveGR', 'receiveGR'] }, token: 'mock-token' },
-                AkraSupabaseGR: { request: async () => ({ success: true }) }
+                AkraSupabaseGR: { request: async (action, payload) => {
+                    calls.push({ action, payload });
+                    return { success: true };
+                } }
             },
             URLSearchParams: class { get() { return null; } },
             console: { ...console, error: () => {}, log: () => {} },
@@ -155,18 +166,41 @@ async function createTest() {
         context.groupedPOs = [{ poDate: '2026-09-08', vendor: 'Vendor', poNumber: 'PO-1', warehouse: 'W1', refPrUid: 'PR-1', items: [{ uid: 'uuid-1', status: 'Pending GR', sku: 'SKU-1', product: 'P1' }] }];
 
         // Run the function
-        await context.submitReceiving({ preventDefault: () => {} }, 'GR Completed');
+        await context.submitReceiving({ preventDefault: () => {} }, options.targetStatus || 'GR Completed');
         
-        return lastNotification;
+        return { notification: lastNotification, calls, errorMarks };
     }
 
     let char200 = 'a'.repeat(200);
-    let msg1 = await runTestWithExpValue(char200);
-    assert.strictEqual(msg1, "ยืนยันรับเข้าคลังเรียบร้อย! (บิลย้ายไปที่แท็บ 'รับแล้ว')", '200 chars should pass length validation');
+    let result = await runTestWithExpValue(char200);
+    assert.strictEqual(result.notification, "ยืนยันรับเข้าคลังเรียบร้อย! (บิลย้ายไปที่แท็บ 'รับแล้ว')", '200 chars should pass length validation');
+    assert.equal(result.calls.length, 1, 'valid receipt should reach the API once');
 
     let char201 = 'a'.repeat(201);
-    let msg2 = await runTestWithExpValue(char201);
-    assert.strictEqual(msg2, 'ความยาวข้อความวันหมดอายุเกินกำหนด 200 ตัวอักษร', '201 chars should fail length validation');
+    result = await runTestWithExpValue(char201);
+    assert.strictEqual(result.notification, 'ความยาวข้อความวันหมดอายุเกินกำหนด 200 ตัวอักษร', '201 chars should fail length validation');
+
+    const oldStockWarning = 'กรุณากรอกสต๊อกเก่าสำหรับสินค้าที่รับทุกรายการ (ใส่ 0 หากไม่มีสต๊อกเดิม)';
+    result = await runTestWithExpValue('', { poOldStock: '' });
+    assert.equal(result.notification, oldStockWarning, 'blank PO old stock must be explained');
+    assert.equal(result.calls.length, 0, 'blank PO old stock must block the API');
+    assert.equal(result.errorMarks.po, true, 'blank PO old stock must be marked');
+
+    result = await runTestWithExpValue('', { extraOldStock: '', targetStatus: 'Pending Review' });
+    assert.equal(result.notification, oldStockWarning, 'blank extra old stock must be explained');
+    assert.equal(result.calls.length, 0, 'blank extra old stock must block review submission');
+    assert.equal(result.errorMarks.extra, true, 'blank extra old stock must be marked');
+
+    result = await runTestWithExpValue('', { poOldStock: '0', extraOldStock: '0' });
+    assert.equal(result.calls.length, 1, 'zero old stock must be accepted');
+    assert.equal(result.calls[0].payload.items[0].oldStock, '0');
+    assert.equal(result.calls[0].payload.extraItems[0].oldStock, '0');
+
+    result = await runTestWithExpValue('', { poOldStock: '', extraOldStock: '', targetStatus: 'Draft GR' });
+    assert.equal(result.calls.length, 1, 'draft must allow blank old stock');
+
+    result = await runTestWithExpValue('', { poQty: '', poOldStock: '', extraOldStock: '0' });
+    assert.equal(result.calls.length, 1, 'unreceived PO row must not require old stock');
     
     console.log('PASS gr-submit-payload: submitReceiving payload behavior, 200/201 char boundary validation, and vm.Script syntax compilation verified');
 }

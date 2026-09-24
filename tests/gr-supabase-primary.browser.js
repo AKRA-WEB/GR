@@ -4,7 +4,7 @@ async (page) => {
       { uid: 'PO-A', product: 'Product A', status: 'GR Completed' },
       { uid: 'PO-B', product: 'Product B', status: 'Pending GR' }
     ],
-    extras: [{ id: 'EX-A', sku: 'BONUS-A', product: 'Bonus A', grQty: 1, unit: 'ชิ้น', locIn: 'W1-1F-A1', exp: '', oldStock: '' }]
+    extras: [{ id: 'EX-A', sku: 'BONUS-A', product: 'Bonus A', grQty: 1, unit: 'ชิ้น', locIn: 'W1-1F-A1', exp: '', oldStock: '0' }]
   };
   const edgeActions = [];
   let gasPosts = 0;
@@ -91,11 +91,14 @@ async (page) => {
     const before = { pending: window.appData.pendingPOs.map(item => item.uid) };
     window.openReceivingDetail(0);
     const renderedExtras = Array.from(document.querySelectorAll('.extra-item-row .ex-product')).map(input => input.value);
-    window.addExtraItemRow({ sku: 'BONUS-B', product: 'Bonus B', grQty: 2, unit: 'ชิ้น', locIn: 'W1-1F-A2', exp: '', oldStock: '' });
+    window.addExtraItemRow({ sku: 'BONUS-B', product: 'Bonus B', grQty: 2, unit: 'ชิ้น', locIn: 'W1-1F-A2', exp: '', oldStock: '0' });
     const poQty = document.querySelector('.po-item-row .po-qty');
     const poFloor = document.querySelector('.po-item-row .po-loc-floor');
     poQty.value = '10';
     poFloor.value = Array.from(poFloor.options).find(option => option.value)?.value || '';
+    await window.submitReceiving({ preventDefault() {} }, 'GR Completed');
+    const blankOldStockBlocked = document.querySelector('.po-item-row .po-old-stock').classList.contains('input-error');
+    document.querySelector('.po-item-row .po-old-stock').value = '0';
     await window.submitReceiving({ preventDefault() {} }, 'GR Completed');
     const completed = await window.apiCall('getInitialData', { includeCompleted: true, completedLimit: 200 });
     await window.apiCall('recallGR', { actionType: 'reset', billRef: 'BILL-1', poUids: ['PO-B'] });
@@ -103,6 +106,7 @@ async (page) => {
     return {
       before,
       renderedExtras,
+      blankOldStockBlocked,
       completed: completed.grCompleted.map(item => item.uid).sort(),
       completedExtras: (completed.grCompleted[0]?.extraItems || []).map(item => item.product).sort(),
       resetPending: reset.pendingPOs.map(item => item.uid).sort(),
@@ -111,6 +115,7 @@ async (page) => {
   });
 
   if (JSON.stringify(result.before.pending) !== JSON.stringify(['PO-B'])) throw new Error(`Unexpected initial projection: ${JSON.stringify(result)}`);
+  if (!result.blankOldStockBlocked || edgeActions.filter(action => action === 'bulkReceivePO').length !== 1) throw new Error(`Old-stock guard did not block first submission: ${JSON.stringify(result)}`);
   if (JSON.stringify(result.renderedExtras) !== JSON.stringify(['Bonus A'])) throw new Error(`Canonical extras were not rendered: ${JSON.stringify(result)}`);
   if (JSON.stringify(result.completedExtras) !== JSON.stringify(['Bonus A', 'Bonus B'])) throw new Error(`Extra merge/approval lost data: ${JSON.stringify(result)}`);
   if (JSON.stringify(result.completed) !== JSON.stringify(['PO-A', 'PO-B'])) throw new Error(`Later receive lost completed rows: ${JSON.stringify(result)}`);
