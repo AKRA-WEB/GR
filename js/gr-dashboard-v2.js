@@ -30,14 +30,21 @@ var GrDashboard = (() => {
     el('dashboard-custom-date-box').classList.toggle('hidden',value!=='custom');
     if(value==='custom') {
       const f=grDashboardState.analytics?.filters;
-      el('dashboard-date-from').value=grDashboardState.dateFrom||f?.dateFrom||'';
-      el('dashboard-date-to').value=grDashboardState.dateTo||f?.dateTo||'';
+      el('dashboard-date-from').value=f?.dateFrom||grDashboardState.dateFrom||'';
+      el('dashboard-date-to').value=f?.dateTo||grDashboardState.dateTo||'';
+      return custom();
     } else load(true);
   }
   function custom() {
     const from=el('dashboard-date-from').value,to=el('dashboard-date-to').value;
-    if(!from||!to||from>to) { el('gr-report-status').textContent='กรุณาเลือกช่วงวันที่ให้ครบ โดยวันเริ่มไม่เกินวันสิ้นสุด';return; }
-    grDashboardState.dateFrom=from;grDashboardState.dateTo=to;grDashboardState.exactDate=null;load(true);
+    if(!from||!to||from>to) {
+      ++generation;grDashboardState.loading=false;grDashboardState.loaded=false;
+      el('gr-report-status').textContent='กรุณาเลือกช่วงวันที่ให้ครบ โดยวันเริ่มไม่เกินวันสิ้นสุด';
+      el('gr-chart-row').innerHTML='';el('gr-report-content').classList.remove('gr-is-loading');
+      el('gr-report-content').setAttribute('aria-busy','false');updateGrDashboardLoadMoreState(false);return;
+    }
+    grDashboardState.preset='custom';grDashboardState.dateFrom=from;grDashboardState.dateTo=to;
+    grDashboardState.exactDate=null;grDashboardState.selectedDay=null;return load(true);
   }
   function filter() {
     const s=grDashboardState;
@@ -61,7 +68,7 @@ var GrDashboard = (() => {
     const request=++generation, query=filters();
     const offset=append?s.offset:0;
     s.loading=true;s.loadingMore=append;
-    if(!append){s.loaded=false;s.offset=0;s.hasMore=false;el('gr-report-content').setAttribute('aria-busy','true');el('gr-report-content').classList.add('gr-is-loading');renderGrDashboardBillsLoading();}
+    if(!append){s.loaded=false;s.offset=0;s.hasMore=false;el('gr-report-content').setAttribute('aria-busy','true');el('gr-report-content').classList.add('gr-is-loading');el('gr-chart-row').innerHTML='<p role="status">กำลังโหลดกราฟตามช่วงวันที่…</p>';renderGrDashboardBillsLoading();}
     updateGrDashboardLoadMoreState(true);el('gr-report-status').textContent='กำลังโหลดข้อมูล…';chips();
     try {
       const res=await apiCall('getGrDashboardAnalytics',{...query,offset,limit:s.limit});
@@ -161,6 +168,7 @@ var GrDashboard = (() => {
     el(rowId+'-position').textContent=`${next+1} / ${slides.length}`;
   }
   function init() {
+    ['dashboard-date-from','dashboard-date-to'].forEach(id=>el(id).addEventListener('change',custom));
     el('vendor-leadtime-view').addEventListener('click',event=>{
       if(Date.now()<suppressClickUntil){event.preventDefault();return;}
       const card=event.target.closest('[data-card]');if(card){drillCard(card.dataset.card);return;}

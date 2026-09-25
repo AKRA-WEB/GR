@@ -13,6 +13,42 @@ test('slow earlier filter response cannot replace the newest report',async()=>{
  f.pending[1].resolve(result(2));await second;f.pending[0].resolve(result(8));await first;
  assert.equal(f.state.analytics.total,2);assert.equal(f.pending[1].query.warehouse,'W2');assert.equal(f.state.loading,false);
 });
+
+test('custom date changes reload all charts immediately and discard the previous range',async()=>{
+ const f=fixture();f.state.preset='custom';f.state.selectedDay='2026-09-25';f.state.exactDate='2026-09-25';
+ f.node('dashboard-date-from').value='2026-09-24';f.node('dashboard-date-to').value='2026-09-24';
+ f.node('gr-chart-row').innerHTML='previous date chart';
+ assert.equal(typeof f.events['dashboard-date-to:change'],'function');
+ f.events['dashboard-date-to:change']();
+ assert.equal(f.pending.length,1);assert.equal(f.pending[0].query.dateFrom,'2026-09-24');assert.equal(f.pending[0].query.dateTo,'2026-09-24');
+ assert.equal(f.pending[0].query.exactDate,null);assert.equal(f.state.selectedDay,null);
+ assert.ok(!f.node('gr-chart-row').innerHTML.includes('previous date chart'));
+ const r=result(0);r.filters={dateFrom:'2026-09-24',dateTo:'2026-09-24'};
+ f.pending[0].resolve(r);await new Promise(resolve=>setTimeout(resolve,0));
+ assert.match(f.node('dashboard-active-period-label').textContent,/24\/09\/2026/);
+ assert.match(f.node('gr-chart-row').innerHTML,/รวม 0 ลัง/);
+});
+
+test('switching to custom starts with the displayed period, not an old custom range',()=>{
+ const f=fixture();Object.assign(f.state,{dateFrom:'2026-08-01',dateTo:'2026-08-31',analytics:{filters:{dateFrom:'2026-09-24',dateTo:'2026-09-24'}}});
+ f.api.preset('custom');
+ assert.equal(f.node('dashboard-date-from').value,'2026-09-24');
+ assert.equal(f.node('dashboard-date-to').value,'2026-09-24');
+ assert.equal(f.pending[0].query.preset,'custom');
+ assert.equal(f.pending[0].query.dateFrom,'2026-09-24');
+ f.pending[0].resolve(result(0));
+});
+
+test('an incomplete date edit cancels an older in-flight chart response',async()=>{
+ const f=fixture();f.state.preset='custom';
+ f.node('dashboard-date-from').value='2026-09-24';f.node('dashboard-date-to').value='2026-09-25';
+ const loading=f.api.custom();
+ f.node('dashboard-date-to').value='';f.events['dashboard-date-to:change']();
+ assert.equal(f.pending.length,1);assert.equal(f.state.loading,false);
+ f.pending[0].resolve(result(8));await loading;
+ assert.equal(f.node('gr-chart-row').innerHTML,'');
+ assert.match(f.node('gr-report-status').textContent,/กรุณาเลือกช่วงวันที่/);
+});
 test('card drilldown keeps date, search and warehouse while applying issue filter',async()=>{
  const f=fixture();Object.assign(f.state,{exactDate:'2026-09-24',warehouse:'W2',search:'flour'});
  f.events['vendor-leadtime-view:click']({target:{closest:selector=>selector==='[data-card]'?{dataset:{card:'issues'}}:null}});
