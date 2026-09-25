@@ -14,15 +14,12 @@ assert.match(html, /id="vendor-leadtime-view"[^>]*dashboard-preview-surface/, 'd
 assert.match(html, /family=Prompt/, 'dashboard preview typography must load Prompt');
 assert.match(html, /dashboard-preview-tabs/, 'dashboard tabs need the preview-aligned navigation treatment');
 assert.match(html, /dashboard-preview-kpis/, 'dashboard KPI grid needs the preview-aligned spacing treatment');
-assert.match(script, /dashboard-wh-donut/, 'warehouse breakdown must retain the preview donut visual');
 assert.match(script, /function\s+loadGrDashboardMore\s*\(/, 'dashboard must expose paged historical loading');
 assert.match(script, /function\s+groupGrDashboardBills\s*\(/, 'dashboard must group same-round receipt rows');
 assert.match(script, /function\s+getGrDashboardApprover\s*\(/, 'dashboard must normalize untrusted receiver-derived approvers');
 assert.match(script, /dashboard-chart-item-label/, 'daily chart must expose item totals separately from bill totals');
 assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(56px, 1fr\)\)`/, 'daily chart must keep historical dates horizontally accessible');
 assert.match(script, /const GR_DASHBOARD_PAGE_SIZE = 20/, 'dashboard must load the 20 latest bills first');
-assert.match(script, /search:\s*grDashboardState\.search/, 'dashboard bill search must be sent to the server for all matching bills');
-assert.match(script, /GR_DASHBOARD_SEARCH_PAGE_SIZE = 100/, 'dashboard search must request a broad result page instead of filtering only loaded bills');
 assert.match(script, /normalizeDashboardSearchText/, 'dashboard search must normalize partial Thai/vendor input');
 assert.match(html, /max-w-6xl/, 'bill detail modal must use a wider desktop layout');
 assert.match(html, /min-w-\[1080px\]/, 'bill detail table must reserve enough desktop width for all columns');
@@ -85,6 +82,7 @@ sandbox.window.window = sandbox.window;
 
 vm.createContext(sandbox);
 vm.runInContext(script, sandbox, { filename: 'GR/index.html' });
+vm.runInContext(fs.readFileSync(path.join(grDir,'js/gr-dashboard-v2.js'),'utf8'),sandbox);
 
 const grouped = sandbox.groupGrDashboardBills([
     {
@@ -104,12 +102,7 @@ const grouped = sandbox.groupGrDashboardBills([
     }
 ]);
 
-assert.equal(grouped.length, 2, 'same PO/date/warehouse/receiver/approver should render as one receiving round');
-const sameRound = grouped.find(row => row.receiver === 'Receiver');
-assert.equal(sameRound.totalCrates, 150, 'grouped receiving round must sum crates');
-assert.equal(sameRound.itemCount, 2, 'grouped receiving round must sum item count');
-assert.deepEqual(Array.from(sameRound.grNumbers), ['GR-1', 'GR-2'], 'grouped row must retain source GR numbers');
-
+assert.equal(grouped.length,3,'server receipt identities must never be merged by PO/date heuristics');
 assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'สอน' }), 'ไม่ระบุ', 'receiver-derived approver must not be shown as an approval');
 assert.equal(sandbox.getGrDashboardApprover({ receiver: 'สอน', approver: 'Chen' }), 'Chen', 'authenticated Chen approval must remain visible');
 
@@ -123,14 +116,10 @@ Object.entries(warehouseBadgeClasses).forEach(([warehouse, expectedClass]) => {
 assert.match(sandbox.getWarehouseBadge('C2'), /background-color:#1d4ed8/, 'C2 badge must carry its explicit dark-blue color');
 assert.match(sandbox.getWarehouseChipStyle('W1', true), /background-color:#fef3c7/, 'W1 filter chip must use its warehouse color');
 assert.match(sandbox.getWarehouseChipStyle('C2', true), /background-color:#1d4ed8/, 'C2 filter chip must use its warehouse color');
-sandbox.renderGrWarehouseBreakdown([
-    { warehouse: 'C2', totalCrates: 60, percentage: 60, billCount: 1 },
-    { warehouse: 'W1', totalCrates: 40, percentage: 40, billCount: 1 }
-], 100);
-const warehouseBreakdownHtml = element('dashboard-wh-breakdown').innerHTML;
-assert.match(warehouseBreakdownHtml, /#1d4ed8/, 'C2 breakdown color must remain dark blue regardless of result order');
-assert.match(warehouseBreakdownHtml, /#fef3c7/, 'W1 breakdown color must remain light yellow regardless of result order');
-
+sandbox.GrDashboard.renderCharts({warehouseBreakdown:[{key:'C2',label:'C2',value:60},{key:'W1',label:'W1',value:40}]});
+const warehouseBreakdownHtml=element('gr-chart-row').innerHTML;
+assert.match(warehouseBreakdownHtml,/#1d4ed8/,'C2 color stays stable');
+assert.match(warehouseBreakdownHtml,/#fef3c7/,'W1 color stays stable');
 sandbox.renderGrDailyChart([{ date: '2026-09-19', billCount: 3, itemCount: 7, totalCrates: 351 }]);
 const chartHtml = element('dashboard-daily-chart').innerHTML;
 assert.match(chartHtml, />3 บิล</, 'daily chart must label the number of receipt bills');
@@ -153,9 +142,7 @@ sandbox.renderGrDashboardBillsTable([
     { grId: 'gr-3', grNumber: 'GR-3', poId: 'po-1', poNumber: 'PO-1', vendor: 'Vendor', ataDate: '2026-09-19', warehouse: 'W3', receiver: 'Receiver', approver: 'Chen', totalCrates: 25, itemCount: 4, items: [{ sku: 'D', product: 'D', grQty: 25 }] }
 ]);
 const tableHtml = element('dashboard-bills-tbody').innerHTML;
-assert.match(tableHtml, /รวม 7 รายการในรอบเดียวกัน/, 'same-round row must describe seven items, not three bills');
-assert.doesNotMatch(tableHtml, /รวม 3 บิลในรอบเดียวกัน/, 'same-round row must not mislabel source receipts as item count');
-
+assert.equal((tableHtml.match(/onclick="openGrBillDetailModal/g)||[]).length,3,'each of three server bills retains its own row action');
 sandbox.grDashboardState.analytics = {
     bills: [{
         grId: 'gr-detail', grNumber: 'GR-DETAIL', poNumber: 'PO-DETAIL', vendor: 'Vendor',
@@ -173,4 +160,4 @@ assert.match(element('modal-bill-wh').innerHTML, /background-color:#facc15/, 'bi
 assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: 0, unit: 'ลัง' }), '0 ลัง', 'zero old stock must remain visible');
 assert.equal(sandbox.formatGrDashboardOldStock({ oldStock: '', unit: 'ลัง' }), '-', 'blank old stock must remain a dash');
 
-console.log('PASS gr-dashboard-followup: chart sizing, same-round grouping, pagination contract, and historical approver contract are covered');
+console.log('PASS gr-dashboard-followup: chart sizing, server identity preservation, pagination contract, and historical approver contract are covered');

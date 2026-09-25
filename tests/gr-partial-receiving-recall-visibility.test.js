@@ -154,6 +154,7 @@ const sandbox = {
 
 vm.createContext(sandbox);
 vm.runInContext(mainScript, sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/gr-dashboard-v2.js'),'utf8'),sandbox);
 
 const apiCalls = [];
 sandbox.apiCall = async (action, payload) => {

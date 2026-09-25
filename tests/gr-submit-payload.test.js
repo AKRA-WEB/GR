@@ -51,6 +51,9 @@ async function createTest() {
         
         const mockDoc = {
             getElementById: (id) => {
+                if (id === 'gr-issue-normal') return { checked: true };
+                if (id === 'gr-issue-note') return { value: '' };
+                if (id === 'lift-fee-container') return null;
                 if (id === 'toast-container') return createMockElement();
                 if (id === 'r-group-index') return createMockElement({ value: '0' });
                 if (id === 'r-ata') return createMockElement({ value: '2026-09-08' });
@@ -107,6 +110,7 @@ async function createTest() {
         };
 
         const context = {
+            crypto: require('node:crypto').webcrypto,
             document: mockDoc,
             window: { 
                 location: { search: '', href: '' }, 
@@ -179,6 +183,8 @@ async function createTest() {
         vm.createContext(context);
         const script = new vm.Script(allScripts);
         script.runInContext(context);
+        vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/gr-dashboard-v2.js'), 'utf8'), context);
+        context.appData.grSchemaVersion=2;
 
         context.groupedPOs = [{ poDate: '2026-09-08', vendor: 'Vendor', poNumber: 'PO-1', warehouse: 'W1', refPrUid: 'PR-1', items: [{ uid: 'uuid-1', status: 'Pending GR', sku: 'SKU-1', product: 'P1' }] }];
 

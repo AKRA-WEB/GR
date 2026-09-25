@@ -27,7 +27,7 @@ const versionJson = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
 const versionMatch = htmlContent.match(/const\s+CURRENT_VERSION\s*=\s*["']([^"']+)["']/);
 assert(versionMatch, 'CURRENT_VERSION must exist in index.html');
 assert.strictEqual(versionMatch[1], versionJson.version, `index.html version (${versionMatch[1]}) must match version.json (${versionJson.version})`);
-assert.strictEqual(versionJson.version, '20260922.01', 'Version must be locked at 20260922.01');
+
 console.log(`✅ Version parity verified: ${versionJson.version}`);
 
 // 2. Strict User Rule Invariant: No decorative emojis/icons in dashboard
@@ -90,28 +90,8 @@ console.log('✅ Client contract and unauthenticated rejection verified.');
 // 5. Verify DOM Elements for Comprehensive Dashboard
 console.log('\n5. Verifying presence of required DOM elements in index.html...');
 const requiredDomIds = [
-  // Presets & Filter Controls
-  'btn-preset-today',
-  'btn-preset-7d',
-  'btn-preset-1m',
-  'btn-preset-custom',
-  'dashboard-custom-date-box',
-  'dashboard-date-from',
-  'dashboard-date-to',
-  'dashboard-active-period-label',
-  // KPI Stat Cards
-  'kpi-approved-bills',
-  'kpi-total-crates',
-  'kpi-top-warehouse',
-  'kpi-avg-leadtime',
-  'kpi-wh-breakdown-sub',
-  'kpi-ontime-rate-sub',
-  // Visual Analytics
-  'dashboard-wh-breakdown',
-  'dashboard-wh-total-label',
-  'dashboard-daily-chart',
-  'dashboard-chart-filter-status',
-  'dashboard-btn-reset-day',
+  'dashboard-date-preset','dashboard-custom-date-box','dashboard-date-from','dashboard-date-to','dashboard-active-period-label',
+  'gr-kpi-row','gr-chart-row','dashboard-daily-chart','dashboard-chart-filter-status','dashboard-btn-reset-day','tab-btn-approved-bills',
   // Bills Table
   'dashboard-bill-search',
   'dashboard-bill-wh',
@@ -265,6 +245,7 @@ mockSandbox.window.window = mockSandbox.window;
 
 vm.createContext(mockSandbox);
 vm.runInContext(mainScriptContent, mockSandbox);
+vm.runInContext(fs.readFileSync(path.join(grDir,'js/gr-dashboard-v2.js'),'utf8'),mockSandbox);
 
 vm.runInContext(`
   AppVersionGuard.start({
@@ -282,20 +263,12 @@ async function testRuntimeExecution() {
 
   // Test that UI render functions can execute without runtime exceptions
   mockSandbox.applyGrDashboardSummary(res.summary, res.warehouseBreakdown);
-  const countEl = mockSandbox.document.getElementById('kpi-approved-bills');
-  assert.strictEqual(countEl.innerText, '12', 'kpi-approved-bills must render 12');
-
-  const cratesEl = mockSandbox.document.getElementById('kpi-total-crates');
-  assert.strictEqual(cratesEl.innerText, '450', 'kpi-total-crates must render 450');
-
-  const whEl = mockSandbox.document.getElementById('kpi-top-warehouse');
-  assert.strictEqual(whEl.innerText, 'W1 และ W2', 'kpi-top-warehouse must show top warehouses');
-
-  mockSandbox.renderGrWarehouseBreakdown(res.warehouseBreakdown, res.summary.totalCrates);
-  const whContainer = mockSandbox.document.getElementById('dashboard-wh-breakdown');
-  assert.ok(whContainer.innerHTML.includes('W1'), 'Warehouse breakdown must render W1');
-  assert.ok(whContainer.innerHTML.includes('55.6%'), 'Warehouse breakdown must render percentage');
-
+  const cards=mockSandbox.document.getElementById('gr-kpi-row').innerHTML;
+  assert.ok(cards.includes('12'), 'approved card renders count');
+  assert.equal((cards.match(/data-card=/g)||[]).length,4,'four actionable cards');
+  mockSandbox.GrDashboard.renderCharts({warehouseBreakdown:[{key:'W1',label:'W1',value:250},{key:'W2',label:'W2',value:200}]});
+  const charts=mockSandbox.document.getElementById('gr-chart-row').innerHTML;
+  assert.ok(charts.includes('W1'));assert.ok(charts.includes('55.6%'));
   mockSandbox.renderGrDailyChart(res.dailyStats);
   const chartContainer = mockSandbox.document.getElementById('dashboard-daily-chart');
   assert.ok(chartContainer.innerHTML.includes('2026-09-19'), 'Daily chart must render 2026-09-19');

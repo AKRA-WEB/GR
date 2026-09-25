@@ -683,6 +683,8 @@
       #form-receiving .po-ordered-qty strong { font-size: 9px; }
     }
   </style>
+  <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.02">
+  <script src="js/gr-dashboard-v2.js?v=20260925.02" defer></script>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -773,7 +775,7 @@
                 </button>
                 <div class="dashboard-preview-kicker">
                   <strong>ระบบตรวจรับสินค้า (GR)</strong>
-                  <span class="dashboard-preview-live">ข้อมูลอัปเดตแบบเรียลไทม์</span>
+                  <span class="dashboard-preview-live">ข้อมูลตามช่วงวันที่ที่เลือก</span>
                 </div>
                 <h2 id="vendor-leadtime-title" class="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                   Dashboard ภาพรวมการรับสินค้าเข้าคลัง
@@ -784,7 +786,7 @@
               <!-- Tab Navigation -->
               <div class="dashboard-preview-tabs flex flex-nowrap overflow-x-auto gap-2 bg-gray-100 p-1.5 rounded-xl border border-gray-200 shrink-0 hide-scrollbar pb-1.5">
                 <button type="button" id="tab-btn-dashboard-overview" onclick="switchVendorLeadtimeTab('overview')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition bg-white text-brand-orange shadow-sm border border-gray-200/50">
-                  ภาพรวมและบิลรับเข้า
+                  ภาพรวมการรับสินค้า
                 </button>
                 <button type="button" id="tab-btn-vendor-benchmarks" onclick="switchVendorLeadtimeTab('benchmarks')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent">
                   Leadtime และสถิติ Vendor
@@ -792,123 +794,34 @@
                 <button type="button" id="tab-btn-product-drilldown" onclick="switchVendorLeadtimeTab('product')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent">
                   ค้นหาประวัติสินค้ารายตัว
                 </button>
+                <button type="button" id="tab-btn-approved-bills" onclick="switchVendorLeadtimeTab('bills')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg border border-transparent">Approved GR Bills</button>
               </div>
             </div>
 
-            <!-- Tab 1: Comprehensive Inbound Overview -->
-            <div id="vendor-leadtime-tab-overview" class="flex flex-col gap-4">
-              
-              <!-- Filter Controls Toolbar -->
-              <div class="dashboard-preview-filter glass-card p-3 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-xs font-medium text-gray-500 mr-1 hidden sm:inline-block">ช่วงเวลา:</span>
-                  <button type="button" id="btn-preset-today" onclick="setDashboardPreset('today')" class="px-4 py-2 rounded-lg text-sm font-bold transition bg-brand-orange text-white shadow-sm flex-1 sm:flex-none whitespace-nowrap">
-                    วันนี้ (Today)
-                  </button>
-                  <button type="button" id="btn-preset-7d" onclick="setDashboardPreset('7d')" class="px-4 py-2 rounded-lg text-sm font-medium transition bg-gray-100 text-gray-600 hover:bg-gray-200 flex-1 sm:flex-none whitespace-nowrap">
-                    7 วันล่าสุด
-                  </button>
-                  <button type="button" id="btn-preset-1m" onclick="setDashboardPreset('1m')" class="px-4 py-2 rounded-lg text-sm font-medium transition bg-gray-100 text-gray-600 hover:bg-gray-200 flex-1 sm:flex-none whitespace-nowrap">
-                    1 เดือน (30 วัน)
-                  </button>
-                  <button type="button" id="btn-preset-custom" onclick="setDashboardPreset('custom')" class="px-4 py-2 rounded-lg text-sm font-medium transition bg-gray-100 text-gray-600 hover:bg-gray-200 flex-1 sm:flex-none whitespace-nowrap">
-                    กำหนดวันเอง
-                  </button>
-                  <div id="dashboard-custom-date-box" class="hidden flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                    <input type="date" id="dashboard-date-from" onchange="applyDashboardCustomDate()" class="text-sm bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 flex-1 sm:flex-none">
-                    <span class="text-xs text-gray-400">ถึง</span>
-                    <input type="date" id="dashboard-date-to" onchange="applyDashboardCustomDate()" class="text-sm bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 flex-1 sm:flex-none">
-                  </div>
-                </div>
 
-                <div class="flex items-center justify-between lg:justify-end gap-3 w-full lg:w-auto border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0">
-                  <span id="dashboard-active-period-label" class="text-xs text-gray-500 font-medium whitespace-nowrap">กำลังแสดง: วันนี้</span>
-                  <button type="button" onclick="loadGrDashboardAnalytics(true)" class="px-4 py-2 rounded-lg text-sm font-medium bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 whitespace-nowrap shrink-0">
-                    รีเฟรชข้อมูล
-                  </button>
-                </div>
-              </div>
-
-              <!-- 4 Top KPI Stat Cards -->
-              <div class="dashboard-preview-kpis grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                
-                <!-- Card 1: บิลที่อนุมัติรับลงสินค้า -->
-                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-brand-orange">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">บิลที่อนุมัติรับลงสินค้า</p>
-                  <div class="flex items-baseline gap-2 mt-1">
-                    <p id="kpi-approved-bills" class="text-2xl font-black text-gray-900">-</p>
-                    <span class="text-xs font-medium text-gray-500">บิล</span>
-                  </div>
-                  <p class="text-[11px] text-emerald-600 font-medium mt-0.5">นับเฉพาะบิลที่อนุมัติรับแล้ว (GR Completed)</p>
-                  <div class="dashboard-preview-card-footer"><span>ไม่นับบิลซ้ำตามรายการ</span><strong>บิลตามช่วง</strong></div>
-                </div>
-
-                <!-- Card 2: ยอดรวมจำนวนลังสินค้า -->
-                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-brand-blue">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">จำนวนสินค้าทั้งหมด</p>
-                  <div class="flex items-baseline gap-2 mt-1">
-                    <p id="kpi-total-crates" class="text-2xl font-black text-brand-blue">-</p>
-                    <span class="text-xs font-medium text-gray-500">ลัง / หน่วย</span>
-                  </div>
-                  <p id="kpi-total-items-sub" class="text-[11px] text-gray-400 mt-0.5">รวมสินค้าทุกรายการที่รับลง</p>
-                  <div class="dashboard-preview-card-footer"><span>ยอดรับเข้าจริง</span><strong>รวมทุกรายการ</strong></div>
-                </div>
-
-                <!-- Card 3: สัดส่วนคลังหลักที่รับเข้า -->
-                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-emerald-500">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">คลังที่รับเข้าหลัก</p>
-                  <div class="flex items-baseline gap-2 mt-1">
-                    <p id="kpi-top-warehouse" class="text-2xl font-black text-emerald-600">-</p>
-                  </div>
-                  <p id="kpi-wh-breakdown-sub" class="text-[11px] text-gray-400 mt-0.5">สัดส่วนการกระจายคลังสินค้า</p>
-                  <div class="dashboard-preview-card-footer"><span>คลังปลายทาง</span><strong>แยกตามโลเคชั่น</strong></div>
-                </div>
-
-                <!-- Card 4: ระยะเวลาส่งมอบเฉลี่ย (Lead Time) -->
-                <div class="dashboard-preview-kpi-card glass-card p-4 border-l-4 border-l-purple-500">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Lead Time เฉลี่ยรอบส่ง</p>
-                  <div class="flex items-baseline gap-2 mt-1">
-                    <p id="kpi-avg-leadtime" class="text-2xl font-black text-purple-700">-</p>
-                    <span class="text-xs font-medium text-gray-500">วัน</span>
-                  </div>
-                  <p id="kpi-ontime-rate-sub" class="text-[11px] text-gray-400 mt-0.5">นับจากวันสั่งซื้อถึงวันรับจริง</p>
-                  <div class="dashboard-preview-card-footer"><span>PO ถึง ATA</span><strong>Leadtime รอบนี้</strong></div>
-                </div>
-
-              </div>
-
-              <!-- Visual Analytics Row (Warehouse Distribution & Daily Inbound Trend) -->
-              <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                
-                <!-- Box 1: Warehouse Allocation Breakdown -->
-                <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between">
-                  <div>
-                    <div class="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <h3 class="font-bold text-gray-900 text-sm">ลงคลังไหน อะไร เท่าไหร่</h3>
-                      <span class="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">สัดส่วนลัง</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">แจกแจงจำนวนสินค้าและสัดส่วนที่นำลงแต่ละคลัง</p>
-                  </div>
-
-                  <div id="dashboard-wh-breakdown" class="space-y-3 my-4">
-                    <div class="text-xs text-gray-400 text-center py-4">กำลังประมวลผลข้อมูลคลัง...</div>
-                  </div>
-
-                  <div class="pt-2 border-t border-gray-100 text-[11px] text-gray-400 flex justify-between">
-                    <span>จำแนกตามคลังปลายทาง</span>
-                    <span id="dashboard-wh-total-label">รวมทุกคลัง</span>
-                  </div>
-                </div>
-
-                <!-- Box 2: Daily Inbound Volume Bar Chart -->
-                <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between lg:col-span-2">
+            <div id="gr-report-filters" class="gr-report-filter">
+              <label>วันที่<select id="dashboard-date-preset" onchange="setDashboardPreset(this.value)"><option value="today">วันนี้</option><option value="yesterday">เมื่อวาน</option><option value="7d">7 วันล่าสุด</option><option value="30d">30 วันล่าสุด</option><option value="thisMonth">เดือนนี้</option><option value="lastMonth">เดือนที่แล้ว</option><option value="custom">กำหนดเอง</option></select></label>
+              <div id="dashboard-custom-date-box" class="hidden"><label>เริ่มวันที่<input type="date" id="dashboard-date-from"></label><label>ถึงวันที่<input type="date" id="dashboard-date-to"></label><button type="button" onclick="applyDashboardCustomDate()">ใช้ช่วงวันที่</button></div>
+              <label class="gr-search">ค้นหา<input type="search" id="dashboard-bill-search" maxlength="200" oninput="filterDashboardBillsTable()" placeholder="GR, PO, Vendor, SKU, ชื่อสินค้า"></label>
+              <label>คลังรับจริง<select id="dashboard-bill-wh" onchange="filterDashboardBillsTable()"><option value="">คลังทั้งหมด</option><option>W1</option><option>W2</option><option>W3</option><option>W4</option><option>W5</option><option>C1</option><option>C2</option><option value="UNKNOWN">ไม่ทราบการกระจาย</option></select></label>
+              <label>พนักงานผู้รับ<select id="dashboard-bill-receiver" onchange="filterDashboardBillsTable()"><option value="">พนักงานทั้งหมด</option></select></label>
+              <label>หมายเหตุ / ปัญหาบิล<select id="dashboard-bill-issue" onchange="filterDashboardBillsTable()"><option value="">สถานะทั้งหมด</option><option value="normal">ปกติ / ไม่พบปัญหา</option><option value="any">พบปัญหาทุกประเภท</option><option value="SHORT_DELIVERY">ของไม่ครบ</option><option value="BACKORDER">ค้างส่ง</option><option value="DAMAGED">พบสินค้าเสียหาย</option><option value="BILL_CORRECTION">แก้บิล</option><option value="RETURNED">ตีกลับ</option><option value="NO_PO">ไม่มี PO</option><option value="unknown">ยังไม่ได้ระบุ</option></select></label>
+              <label class="gr-check-filter"><input type="checkbox" id="dashboard-lift-only" onchange="filterDashboardBillsTable()">เฉพาะบิลใช้ลิฟท์</label>
+              <button type="button" onclick="GrDashboard.reset()">ล้างตัวกรอง</button><button type="button" onclick="loadGrDashboardAnalytics(true)">โหลดใหม่</button>
+              <p id="dashboard-active-period-label" class="gr-date-range">กำลังอ่านช่วงวันที่…</p><p id="gr-filter-chips"></p>
+            </div>
+            <p id="gr-report-status" role="status" aria-live="polite"></p>
+            <div id="vendor-leadtime-tab-overview"><div id="gr-report-content" aria-busy="false">
+              <h3 class="gr-section-heading">สรุปการรับสินค้า</h3><div id="gr-kpi-row" class="gr-carousel" aria-label="ตัวเลขสรุป"></div><div class="gr-carousel-controls"><button type="button" onclick="GrDashboard.move('gr-kpi-row',-1)" aria-label="ใบก่อนหน้า">←</button><span id="gr-kpi-row-position">1 / 4 · ปัดเพื่อดูเพิ่ม</span><button type="button" onclick="GrDashboard.move('gr-kpi-row',1)" aria-label="ใบถัดไป">→</button></div>
+              <p id="gr-coverage"></p><h3 class="gr-section-heading">สัดส่วนการรับสินค้า</h3><div id="gr-chart-row" class="gr-carousel" aria-label="กราฟสัดส่วน"></div><div class="gr-carousel-controls"><button type="button" onclick="GrDashboard.move('gr-chart-row',-1)" aria-label="ใบก่อนหน้า">←</button><span id="gr-chart-row-position">1 / 4 · ปัดเพื่อดูเพิ่ม</span><button type="button" onclick="GrDashboard.move('gr-chart-row',1)" aria-label="ใบถัดไป">→</button></div>                <!-- Box 2: Daily Inbound Volume Bar Chart -->
+                <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between ">
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
                     <div>
                       <h3 class="font-bold text-gray-900 text-sm">สถิติการรับสินค้าแยกตามวัน (Daily Inbound Volume)</h3>
                       <p class="text-xs text-gray-500 mt-0.5">คลิกที่แท่งแต่ละวันเพื่อกรองดูบิลที่มาส่งในวันนั้นโดยเฉพาะ</p>
                     </div>
                     <div class="flex items-center gap-3 text-xs text-gray-600 font-medium">
-                      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-brand-blue"></span> จำนวนลัง</span>
+                      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-brand-blue"></span> จำนวนรายการ</span>
                       <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-brand-orange"></span> บิลรับเข้า</span>
                     </div>
                   </div>
@@ -926,24 +839,17 @@
                   </div>
                 </div>
 
-              </div>
 
-              <!-- Filterable Inbound Bills Table -->
+            </div></div>
+            <div id="vendor-leadtime-tab-bills" class="hidden">              <!-- Filterable Inbound Bills Table -->
               <div class="dashboard-preview-bills glass-card overflow-hidden border border-gray-200">
                 <div class="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
                   <div>
                     <h3 class="font-bold text-gray-900 text-sm">รายการบิลรับสินค้าเข้าคลังที่อนุมัติแล้ว (Approved GR Bills)</h3>
+                    <p id="gr-bill-scope-summary" class="text-xs text-gray-500 mt-1"></p>
                     <p class="text-xs text-gray-500 mt-0.5">คลิกที่แถวบิลหรือกดปุ่ม ดูรายละเอียด เพื่อตรวจสอบรายการสินค้า โลเคชั่นจัดเก็บ และผู้ดำเนินการ</p>
                   </div>
 
-                  <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                    <input type="text" id="dashboard-bill-search" oninput="filterDashboardBillsTable()" placeholder="ค้นหา Vendor, PO, GR, SKU, สินค้า..." class="text-xs bg-white border border-gray-300 rounded-lg px-3 py-1.5 w-full sm:w-60 focus:outline-none focus:ring-1 focus:ring-brand-orange">
-                    <select id="dashboard-bill-wh" onchange="filterDashboardBillsTable()" class="text-xs bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 w-full sm:w-auto text-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-orange">
-                      <option value="">ทุกคลัง</option>
-                      <option value="W1">คลัง W1</option><option value="W2">คลัง W2</option><option value="W3">คลัง W3</option>
-                      <option value="W4">คลัง W4</option><option value="W5">คลัง W5</option><option value="C1">คลัง C1</option><option value="C2">คลัง C2</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div class="overflow-x-auto custom-scrollbar">
@@ -977,12 +883,11 @@
                   <button type="button" id="dashboard-bills-load-more" onclick="loadGrDashboardMore()" class="hidden px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:border-brand-orange hover:text-brand-orange font-semibold transition">
                     โหลดบิลเก่าเพิ่ม
                   </button>
-                  <span class="text-[11px] text-gray-400">ฐานข้อมูล Supabase PostgreSQL Authoritative</span>
+                  <span class="text-[11px] text-gray-400">แสดงเฉพาะบิลที่อนุมัติแล้ว</span>
                 </div>
               </div>
 
             </div>
-
             <!-- Tab 2: Vendor Leadtime Benchmarks -->
             <div id="vendor-leadtime-tab-benchmarks" class="hidden flex flex-col gap-4">
               
@@ -1007,7 +912,7 @@
                     <option value="receipts_desc">จำนวนบิลรับเข้ามากสุด</option>
                     <option value="lead_asc">Leadtime เร็วสุด (น้อยไปมาก)</option>
                     <option value="lead_desc">Leadtime ช้าสุด (มากไปน้อย)</option>
-                    <option value="ontime_desc">อัตราส่งตรงเวลาสูงสุด</option>
+                    <option value="ontime_desc">อัตราตรงเวลาสูงสุด</option>
                     <option value="name_asc">ชื่อ Vendor (ก-ฮ / A-Z)</option>
                   </select>
                 </div>
@@ -1193,6 +1098,7 @@
               </div>
 
               <div id="r-lift-fee-section"></div>
+              <div id="gr-issue-review"></div>
 
               <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุท้ายบิล (แวท, เลขที่ใบกำกับ ฯลฯ)</label>
@@ -1226,7 +1132,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260924.06';
+    const CURRENT_VERSION = '20260925.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -1454,6 +1360,7 @@
             pendingPOs,
             grCompleted,
             products,
+            grSchemaVersion: 2,
             deliveryPlanning: { sampleCount: 48, vendorCount: 4 },
             planByUid
         };
@@ -1873,7 +1780,9 @@
         }
     }
     function clearReceivingCaches() {
-        removeCache('CACHE_GR_ACTIVE_DATA_V2');
+        grDashboardState.loaded = false;
+        grDashboardState.analytics = null;
+        removeCache('CACHE_GR_ACTIVE_DATA_V3');
         removeCache('CACHE_GR_FULL_DATA_V2');
     }
     async function loadGRProductsBackground() {
@@ -2014,7 +1923,7 @@
         (groups || []).forEach((group, index) => {
             const ref = usableBillRefUid(group && group.refPrUid);
             const status = group.status || '';
-            const key = ref ? 'bill:' + ref + ':status:' + status : 'legacy-status-group:' + index;
+            const key = ref ? 'bill:' + ref + ':status:' + status + ':event:' + (group.receivingEventId || '') : 'legacy-status-group:' + index;
             if (!buckets[key]) {
                 buckets[key] = { group, groups: [], listStatusCounts: ref ? overallCounts[ref] : { [status]: (group.items ? group.items.length : 0) } };
             }
@@ -2044,6 +1953,8 @@
         return Array.from(extras.values());
     }
     function isSameBillItem(item, group) {
+        if ((item.receivingEventId || '') !== (group.receivingEventId || '') &&
+            !(group.receivingEventId && !item.receivingEventId && item.status === 'Pending GR' && group.status !== 'GR Completed')) return false;
         const itemRef = usableBillRefUid(item && item.refPrUid);
         const groupRef = usableBillRefUid(group && group.refPrUid);
         if (itemRef || groupRef) return itemRef && groupRef && itemRef === groupRef;
@@ -2486,7 +2397,14 @@
     async function apiCall(action, payload = null) {
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (!navigator.onLine) return { success: false, message: 'Offline' };
-      if (isLocalPreviewMode()) return getLocalPreviewApiResponse(action, payload);
+      if (isLocalPreviewMode()) {
+        if (action === 'getGrDashboardAnalytics' && payload?.schemaVersion === 2) {
+          const response = await fetch('/__gr-dashboard-preview?filters=' + encodeURIComponent(JSON.stringify(payload)));
+          if (!response.ok) return { success: false, message: 'เปิด preview ผ่านเซิร์ฟเวอร์ข้อมูลจำลองของ Dashboard รุ่นใหม่' };
+          return response.json();
+        }
+        return getLocalPreviewApiResponse(action, payload);
+      }
 
       const supabaseGrActions = ['bootstrap', 'getInitialData', 'getProducts', 'getDeliveryPlanning', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics', 'bulkReceivePO', 'recallGR'];
       if (supabaseGrActions.includes(action)) {
@@ -2546,7 +2464,7 @@
         // Reset so a stale true from a previous fetch cannot make the loading-state UI skip
         // straight to "no plan" while cached active data (which never carries plan fields) renders.
         grDeliveryPlanningLoaded = false;
-        const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V2', GR_CACHE_TTL);
+        const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V3', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
         let cacheUsable = isManualRefresh && grActiveDataRendered;
         if (cachedData && !isManualRefresh) {
@@ -2586,7 +2504,7 @@
         if (response.success) {
             const productsAlreadyLoaded = (appData && appData.products) || [];
             const receivingViewWasOpen = !document.getElementById('receiving-list-view').classList.contains('hidden');
-            setCache('CACHE_GR_ACTIVE_DATA_V2', response);
+            setCache('CACHE_GR_ACTIVE_DATA_V3', response);
             appData = response;
             appData.products = grProductsLoaded ? productsAlreadyLoaded : (cachedProducts ? (cachedProducts.products || []) : []);
             grCompletedLoaded = false;
@@ -2800,92 +2718,16 @@
     const CACHE_GR_VENDOR_LEADTIME_KEY = 'CACHE_GR_VENDOR_LEADTIME_V1';
     const GR_VENDOR_LEADTIME_CACHE_TTL = 15 * 60 * 1000;
 
-    function switchVendorLeadtimeTab(tab) {
-        currentVendorLeadtimeTab = tab;
-        const btnOverview = document.getElementById('tab-btn-dashboard-overview');
-        const btnBenchmarks = document.getElementById('tab-btn-vendor-benchmarks');
-        const btnProduct = document.getElementById('tab-btn-product-drilldown');
-
-        const tabOverview = document.getElementById('vendor-leadtime-tab-overview');
-        const tabBenchmarks = document.getElementById('vendor-leadtime-tab-benchmarks');
-        const tabProduct = document.getElementById('vendor-leadtime-tab-product');
-
-        const activeClass = 'shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition-all bg-white text-brand-orange shadow-sm border border-gray-200/50';
-        const inactiveClass = 'shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition-all text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent';
-
-        if (btnOverview) btnOverview.className = tab === 'overview' ? activeClass : inactiveClass;
-        if (btnBenchmarks) btnBenchmarks.className = tab === 'benchmarks' ? activeClass : inactiveClass;
-        if (btnProduct) btnProduct.className = tab === 'product' ? activeClass : inactiveClass;
-
-        if (tabOverview) tabOverview.classList.toggle('hidden', tab !== 'overview');
-        if (tabBenchmarks) tabBenchmarks.classList.toggle('hidden', tab !== 'benchmarks');
-        if (tabProduct) tabProduct.classList.toggle('hidden', tab !== 'product');
-
-        if (tab === 'overview') {
-            if (!grDashboardState.loaded) loadGrDashboardAnalytics();
-        } else if (tab === 'benchmarks') {
-            if (!vendorLeadtimeLoaded) loadVendorLeadtimeInsights();
-        } else if (tab === 'product') {
-            prepareProductHistoryDashboard();
-        }
-        lucide.createIcons({ root: document.getElementById('vendor-leadtime-view') });
-    }
+    function switchVendorLeadtimeTab(tab) { return GrDashboard.tab(tab); }
 
     async function openVendorLeadtimeDashboard() {
         showView('vendor-leadtime-view');
         switchVendorLeadtimeTab(currentVendorLeadtimeTab || 'overview');
-        if (!grDashboardState.loaded) {
-            await loadGrDashboardAnalytics();
-        }
     }
 
-    function setDashboardPreset(preset) {
-        grDashboardState.preset = preset;
-        grDashboardState.exactDate = null;
-        grDashboardState.selectedDay = null;
-        grDashboardState.offset = 0;
-        grDashboardState.total = 0;
-        grDashboardState.hasMore = false;
+    function setDashboardPreset(preset) { return GrDashboard.preset(preset); }
 
-        const presets = ['today', '7d', '1m', 'custom'];
-        presets.forEach(p => {
-            const btn = document.getElementById(`btn-preset-${p}`);
-            if (btn) {
-                btn.className = p === preset
-                    ? 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-brand-orange text-white shadow-sm'
-                    : 'px-3 py-1.5 rounded-lg text-xs font-medium transition bg-gray-100 text-gray-600 hover:bg-gray-200';
-            }
-        });
-
-        const customBox = document.getElementById('dashboard-custom-date-box');
-        if (customBox) {
-            customBox.classList.toggle('hidden', preset !== 'custom');
-        }
-
-        const label = document.getElementById('dashboard-active-period-label');
-        if (label) {
-            if (preset === 'today') label.innerText = 'กำลังแสดง: วันนี้';
-            else if (preset === '7d') label.innerText = 'กำลังแสดง: 7 วันล่าสุด';
-            else if (preset === '1m') label.innerText = 'กำลังแสดง: 1 เดือน (30 วัน)';
-            else if (preset === 'custom') label.innerText = 'กำลังแสดง: กำหนดวันเอง';
-        }
-
-        if (preset !== 'custom') {
-            loadGrDashboardAnalytics(true);
-        }
-    }
-
-    function applyDashboardCustomDate() {
-        const from = document.getElementById('dashboard-date-from')?.value;
-        const to = document.getElementById('dashboard-date-to')?.value;
-        grDashboardState.dateFrom = from || null;
-        grDashboardState.dateTo = to || null;
-        if (from || to) {
-            const label = document.getElementById('dashboard-active-period-label');
-            if (label) label.innerText = `กำลังแสดง: ${from || 'เริ่มต้น'} ถึง ${to || 'ปัจจุบัน'}`;
-            loadGrDashboardAnalytics(true);
-        }
-    }
+    function applyDashboardCustomDate() { return GrDashboard.custom(); }
 
     function renderGrDashboardBillsLoading(append = false) {
         const tbody = document.getElementById('dashboard-bills-tbody');
@@ -2926,139 +2768,16 @@
         return Array.from(byId.values());
     }
 
-    async function loadGrDashboardAnalytics(force = false, append = false) {
-        if (grDashboardState.loading) return;
-        grDashboardState.loading = true;
-        grDashboardState.loadingMore = Boolean(append);
-
-        const billsTbody = document.getElementById('dashboard-bills-tbody');
-        renderGrDashboardBillsLoading(append);
-
-        const offset = append ? Number(grDashboardState.offset || 0) : 0;
-        if (!append) {
-            grDashboardState.offset = 0;
-            grDashboardState.total = 0;
-            grDashboardState.hasMore = false;
-        }
-
-        const payload = {
-            preset: grDashboardState.preset,
-            exactDate: grDashboardState.exactDate,
-            dateFrom: grDashboardState.dateFrom,
-            dateTo: grDashboardState.dateTo,
-            warehouse: grDashboardState.warehouse,
-            search: grDashboardState.search,
-            offset,
-            limit: grDashboardState.search ? GR_DASHBOARD_SEARCH_PAGE_SIZE : grDashboardState.limit
-        };
-
-        try {
-            const res = await apiCall('getGrDashboardAnalytics', payload);
-            if (res && res.success) {
-                const bills = mergeGrDashboardBills(append ? grDashboardState.analytics?.bills : [], res.bills);
-                grDashboardState.analytics = { ...res, bills };
-                grDashboardState.offset = offset + (Array.isArray(res.bills) ? res.bills.length : 0);
-                grDashboardState.total = Number(res.total || 0);
-                grDashboardState.hasMore = grDashboardState.offset < grDashboardState.total;
-                grDashboardState.loaded = true;
-                applyGrDashboardSummary(res.summary, res.warehouseBreakdown);
-                renderGrWarehouseBreakdown(res.warehouseBreakdown, res.summary?.totalCrates);
-                renderGrDailyChart(res.dailyStats);
-                renderGrDashboardBillsTable(getDashboardFilteredBills());
-            } else if (billsTbody && !append) {
-                billsTbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-red-600 text-xs">${esc(res?.message || 'ไม่สามารถโหลดข้อมูล Dashboard ได้')}</td></tr>`;
-            }
-        } catch (err) {
-            if (billsTbody && !append) {
-                billsTbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-red-600 text-xs">เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard</td></tr>`;
-            }
-        } finally {
-            grDashboardState.loading = false;
-            grDashboardState.loadingMore = false;
-            updateGrDashboardLoadMoreState(false);
-            if (grDashboardState.reloadAfterLoad) {
-                grDashboardState.reloadAfterLoad = false;
-                loadGrDashboardAnalytics(true);
-            }
-        }
-    }
+    async function loadGrDashboardAnalytics(force = false, append = false) { return GrDashboard.load(force, append); }
 
     function loadGrDashboardMore() {
         if (!grDashboardState.hasMore || grDashboardState.loading) return;
         loadGrDashboardAnalytics(false, true);
     }
 
-    function applyGrDashboardSummary(summary, warehouseBreakdown) {
-        if (!summary) return;
-        const countEl = document.getElementById('kpi-approved-bills');
-        const cratesEl = document.getElementById('kpi-total-crates');
-        const whEl = document.getElementById('kpi-top-warehouse');
-        const leadEl = document.getElementById('kpi-avg-leadtime');
-        const whSubEl = document.getElementById('kpi-wh-breakdown-sub');
-        const ontimeSubEl = document.getElementById('kpi-ontime-rate-sub');
+    function applyGrDashboardSummary(summary) { return GrDashboard.renderSummary(summary); }
 
-        if (countEl) countEl.innerText = Number(summary.approvedBills || 0).toLocaleString();
-        if (cratesEl) cratesEl.innerText = Number(summary.totalCrates || 0).toLocaleString();
-        if (leadEl) leadEl.innerText = Number(summary.overallAvgLeadDays || 0).toFixed(1);
-
-        if (whEl) {
-            const topWh = (warehouseBreakdown || []).slice(0, 2).map(w => w.warehouse).join(' และ ') || 'ทุกคลัง';
-            whEl.innerText = topWh;
-        }
-
-        if (whSubEl && Array.isArray(warehouseBreakdown) && warehouseBreakdown.length > 0) {
-            whSubEl.innerText = warehouseBreakdown.slice(0, 3).map(w => `${w.warehouse}: ${w.totalCrates} ลัง (${w.percentage}%)`).join(' | ');
-        }
-
-        if (ontimeSubEl) {
-            ontimeSubEl.innerText = summary.overallOnTimeRate !== null ? `ส่งตรงเวลา ${summary.overallOnTimeRate}%` : 'นับจากวันสั่งซื้อถึงวันรับจริง';
-        }
-    }
-
-    function renderGrWarehouseBreakdown(breakdown, totalCrates) {
-        const container = document.getElementById('dashboard-wh-breakdown');
-        const totalLabel = document.getElementById('dashboard-wh-total-label');
-        if (!container) return;
-
-        const list = Array.isArray(breakdown) ? breakdown : [];
-        const total = Number(totalCrates || list.reduce((sum, item) => sum + Number(item.totalCrates || 0), 0));
-        if (totalLabel) {
-            totalLabel.innerText = `รวม ${total.toLocaleString()} ลัง`;
-        }
-
-        if (list.length === 0) {
-            container.innerHTML = `<div class="text-xs text-gray-400 text-center py-6">ไม่มีรายการรับเข้าในช่วงเวลานี้</div>`;
-            return;
-        }
-
-        let cursor = 0;
-        const segments = list.map((w, index) => {
-            const pct = Math.max(0, Number(w.percentage || 0));
-            const start = cursor;
-            cursor += pct;
-            return `${getWarehouseColor(w.warehouse)} ${start}% ${cursor}%`;
-        });
-        const donutStyle = `background: conic-gradient(${segments.join(', ')})`;
-        const rows = list.map((w, index) => {
-            const pct = Number(w.percentage || 0);
-            return `
-                <div class="dashboard-wh-list-row">
-                    <div class="dashboard-wh-list-label">
-                        <span class="dashboard-wh-swatch" style="background:${getWarehouseColor(w.warehouse)}"></span>
-                        <span>คลัง ${esc(w.warehouse)} <span class="text-slate-400 font-normal">(${esc(w.billCount)} บิล)</span></span>
-                    </div>
-                    <div class="dashboard-wh-list-value">${Number(w.totalCrates || 0).toLocaleString()} ลัง <span class="text-slate-400 font-normal">(${pct}%)</span></div>
-                </div>`;
-        }).join('');
-
-        container.innerHTML = `
-            <div class="dashboard-wh-content">
-                <div class="dashboard-wh-donut" style="${donutStyle}" role="img" aria-label="สัดส่วนจำนวนลังตามคลัง">
-                    <div class="dashboard-wh-donut-hole"><strong>${total.toLocaleString()}</strong><span>ลังทั้งหมด</span></div>
-                </div>
-                <div class="dashboard-wh-list">${rows}</div>
-            </div>`;
-    }
+    function renderGrWarehouseBreakdown() { return GrDashboard.renderCharts(grDashboardState.analytics || {}); }
 
     function renderGrDailyChart(dailyStats) {
         const container = document.getElementById('dashboard-daily-chart');
@@ -3096,7 +2815,7 @@
                     <div class="dashboard-chart-bar flex flex-col justify-end items-center" style="height: ${heightPx}px;">
                         ${bills > 0 ? `<span class="dashboard-chart-bill-dot" title="${bills} บิล"></span>` : ''}
                     </div>
-                    <span class="dashboard-chart-day-label">${esc(dateStr.slice(5))}</span>
+                    <span class="dashboard-chart-day-label">${esc(GrDashboard.date(dateStr))}</span>
                     <span class="dashboard-chart-bill-label">${bills > 0 ? `${bills} บิล` : '-'}</span>
                     <span class="dashboard-chart-item-label">${items > 0 ? `${items} รายการ` : '0 รายการ'}</span>
                 </div>`;
@@ -3113,91 +2832,17 @@
             .reduce((sum, b) => sum + Number(b.itemCount || (Array.isArray(b.items) ? b.items.length : 0)), 0);
     }
 
-    async function selectDashboardDailyFilter(dateStr) {
-        grDashboardState.selectedDay = dateStr;
-        const statusEl = document.getElementById('dashboard-chart-filter-status');
-        const resetBtn = document.getElementById('dashboard-btn-reset-day');
-        if (statusEl) statusEl.innerHTML = `กำลังแสดง: <strong>วันที่ ${esc(dateStr)}</strong>`;
-        if (resetBtn) resetBtn.classList.remove('hidden');
+    async function selectDashboardDailyFilter(dateStr) { return GrDashboard.day(dateStr); }
 
-        const dayStat = (grDashboardState.analytics?.dailyStats || []).find(d => d.date === dateStr);
-        while (dayStat && grDashboardState.hasMore && !(grDashboardState.analytics?.bills || []).some(b => (b.ataDate || b.grDate) === dateStr)) {
-            const beforeOffset = Number(grDashboardState.offset || 0);
-            await loadGrDashboardAnalytics(false, true);
-            if (Number(grDashboardState.offset || 0) <= beforeOffset) break;
-        }
-
-        renderGrDailyChart(grDashboardState.analytics?.dailyStats);
-
-        const allBills = grDashboardState.analytics?.bills || [];
-        const filtered = allBills.filter(b => {
-            const billDate = b.ataDate || b.grDate || '';
-            return billDate === dateStr;
-        });
-        renderGrDashboardBillsTable(filtered);
-    }
-
-    function resetDashboardDailyFilter() {
-        grDashboardState.selectedDay = null;
-        const statusEl = document.getElementById('dashboard-chart-filter-status');
-        const resetBtn = document.getElementById('dashboard-btn-reset-day');
-        if (statusEl) statusEl.innerText = 'กำลังแสดง: ทั้งหมดในรอบที่เลือก';
-        if (resetBtn) resetBtn.classList.add('hidden');
-
-        renderGrDailyChart(grDashboardState.analytics?.dailyStats);
-        renderGrDashboardBillsTable(grDashboardState.analytics?.bills || []);
-    }
+    function resetDashboardDailyFilter() { return GrDashboard.resetDay(); }
 
     function normalizeDashboardSearchText(value) {
         return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
     }
 
-    function getDashboardFilteredBills() {
-        const query = normalizeDashboardSearchText(grDashboardState.search || document.getElementById('dashboard-bill-search')?.value || '');
-        const wh = grDashboardState.warehouse || document.getElementById('dashboard-bill-wh')?.value || '';
-        let list = grDashboardState.analytics?.bills || [];
+    function getDashboardFilteredBills() { return grDashboardState.analytics?.bills || []; }
 
-        if (grDashboardState.selectedDay) {
-            list = list.filter(b => (b.ataDate || b.grDate) === grDashboardState.selectedDay);
-        }
-
-        if (wh) {
-            list = list.filter(b => b.warehouse === wh);
-        }
-
-        if (query) {
-            list = list.filter(b => {
-                const po = normalizeDashboardSearchText(b.poNumber);
-                const gr = normalizeDashboardSearchText(b.grNumber);
-                const vendor = normalizeDashboardSearchText(b.vendor);
-                const itemsStr = normalizeDashboardSearchText((b.items || []).map(i => `${i.sku} ${i.product}`).join(' '));
-                return po.includes(query) || gr.includes(query) || vendor.includes(query) || itemsStr.includes(query);
-            });
-        }
-
-        return list;
-    }
-
-    function filterDashboardBillsTable() {
-        const searchInput = document.getElementById('dashboard-bill-search');
-        const warehouseInput = document.getElementById('dashboard-bill-wh');
-        const nextSearch = normalizeDashboardSearchText(searchInput?.value || '');
-        const nextWarehouse = warehouseInput?.value || '';
-        const changed = nextSearch !== grDashboardState.search || nextWarehouse !== grDashboardState.warehouse;
-        grDashboardState.search = nextSearch;
-        grDashboardState.warehouse = nextWarehouse;
-        renderGrDashboardBillsTable(getDashboardFilteredBills());
-        if (!changed) return;
-        if (grDashboardSearchTimer) clearTimeout(grDashboardSearchTimer);
-        grDashboardSearchTimer = setTimeout(() => {
-            grDashboardSearchTimer = null;
-            if (grDashboardState.loading) {
-                grDashboardState.reloadAfterLoad = true;
-                return;
-            }
-            loadGrDashboardAnalytics(true);
-        }, 300);
-    }
+    function filterDashboardBillsTable() { return GrDashboard.filter(); }
 
     function dashboardBillGroupKey(bill) {
         return [
@@ -3210,38 +2855,14 @@
     }
 
     function getGrDashboardApprover(bill) {
+        if (bill && !bill.legacy && bill.reviewedBy) return bill.approver || bill.reviewedBy;
         const approver = String(bill?.approver || '').trim();
         const receiver = String(bill?.receiver || '').trim();
         if (!approver || (receiver && approver.localeCompare(receiver, undefined, { sensitivity: 'accent' }) === 0)) return 'ไม่ระบุ';
         return approver;
     }
 
-    function groupGrDashboardBills(bills) {
-        const groups = new Map();
-        (Array.isArray(bills) ? bills : []).forEach(bill => {
-            const key = dashboardBillGroupKey(bill);
-            let group = groups.get(key);
-            if (!group) {
-                group = {
-                    ...bill,
-                    grId: `dashboard-group-${groups.size + 1}`,
-                    grIds: [],
-                    grNumbers: [],
-                    items: [],
-                    itemCount: 0,
-                    totalCrates: 0,
-                    approver: getGrDashboardApprover(bill)
-                };
-                groups.set(key, group);
-            }
-            if (bill.grId !== undefined && bill.grId !== null && !group.grIds.includes(bill.grId)) group.grIds.push(bill.grId);
-            if (bill.grNumber && !group.grNumbers.includes(bill.grNumber)) group.grNumbers.push(bill.grNumber);
-            group.totalCrates += Number(bill.totalCrates || 0);
-            group.itemCount += Number(bill.itemCount || (Array.isArray(bill.items) ? bill.items.length : 0));
-            group.items.push(...(Array.isArray(bill.items) ? bill.items : []));
-        });
-        return Array.from(groups.values());
-    }
+    function groupGrDashboardBills(bills) { return Array.isArray(bills) ? bills : []; }
 
     function renderGrDashboardBillsTable(bills) {
         const tbody = document.getElementById('dashboard-bills-tbody');
@@ -3266,16 +2887,16 @@
         tbody.innerHTML = list.map(b => {
             const grId = b.grId || '';
             const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
-            const grNum = sourceGrNumbers[0] || '-';
+            const grNum = b.grNumber || sourceGrNumbers[0] || '-';
             const poNum = b.poNumber || '-';
             const vendor = b.vendor || '-';
-            const ata = b.ataDate || b.grDate || '-';
+            const ata = GrDashboard.date(b.ataDate || b.grDate);
             const wh = b.warehouse || 'W1';
             const crates = Number(b.totalCrates || 0);
             const itemsCount = Number(b.itemCount || (b.items ? b.items.length : 0));
             const receiver = b.receiver || '-';
             const approver = getGrDashboardApprover(b);
-            const lead = b.leadtimeDays !== undefined ? `${b.leadtimeDays} วัน` : '-';
+            const lead = b.leadtimeDays != null ? `${b.leadtimeDays} วัน` : '-';
 
             return `
                 <tr class="hover:bg-gray-50/80 transition cursor-pointer" onclick="openGrBillDetailModal('${esc(grId)}')">
@@ -3286,7 +2907,7 @@
                     </td>
                     <td class="py-3 px-4">
                         <div class="font-semibold text-gray-800">${esc(vendor)}</div>
-                        <div class="text-[10px] text-gray-400">สั่งเมื่อ: ${esc(b.poDate || '-')} (Leadtime: ${lead})</div>
+                        <div class="text-[10px] text-gray-400">สั่งเมื่อ: ${esc(GrDashboard.date(b.poDate))} (Leadtime: ${lead})</div>
                     </td>
                     <td class="py-3 px-4 text-gray-700">${esc(ata)}</td>
                     <td class="py-3 px-4">${getWarehouseBadge(wh)}</td>
@@ -3304,7 +2925,7 @@
                     </td>
                     <td class="py-3 px-4 text-center">
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            GR Completed
+                            ${esc(GrDashboard.issueText(b.issueCodes))}
                         </span>
                     </td>
                     <td class="py-3 px-4 text-right">
@@ -3339,22 +2960,22 @@
 
         const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
         const groupedItemCount = Number(b.itemCount || (Array.isArray(b.items) ? b.items.length : 0));
-        if (grEl) grEl.innerText = sourceGrNumbers.length > 1 ? `${sourceGrNumbers[0]} (รวม ${groupedItemCount} รายการ)` : sourceGrNumbers[0];
-        if (poEl) poEl.innerText = `PO: ${b.poNumber || '-'} | วันที่สั่ง: ${b.poDate || '-'}`;
+        if (grEl) grEl.innerText = b.grNumber || (sourceGrNumbers.length > 1 ? `${sourceGrNumbers[0]} (รวม ${groupedItemCount} รายการ)` : sourceGrNumbers[0]);
+        if (poEl) poEl.innerText = `PO: ${b.poNumber || '-'} | วันที่สั่ง: ${GrDashboard.date(b.poDate)}`;
         if (vendorEl) vendorEl.innerText = b.vendor || '-';
-        if (ataEl) ataEl.innerText = b.ataDate || b.grDate || '-';
+        if (ataEl) ataEl.innerText = GrDashboard.date(b.ataDate || b.grDate);
         if (whEl) whEl.innerHTML = getWarehouseBadge(b.warehouse || 'W1');
-        if (leadEl) leadEl.innerText = b.leadtimeDays !== undefined ? `${b.leadtimeDays} วัน` : '-';
+        if (leadEl) leadEl.innerText = b.leadtimeDays != null ? `${b.leadtimeDays} วัน` : '-';
         if (receiverEl) receiverEl.innerText = b.receiver || '-';
         if (approverEl) approverEl.innerText = getGrDashboardApprover(b);
 
         const items = b.items || [];
         if (countEl) countEl.innerText = items.length;
-        if (cratesEl) cratesEl.innerText = `รวม ${Number(b.totalCrates || 0).toLocaleString()} ลัง`;
+        if (cratesEl) cratesEl.innerText = `รวมทั้งบิล ${Number(b.fullBillCrates ?? b.totalCrates ?? 0).toLocaleString()} ลัง`;
 
         if (remarkBox && remarkEl) {
-            if (b.remark) {
-                remarkEl.innerText = b.remark;
+            if (b.remark || b.issueCodes || b.issueNote) {
+                remarkEl.innerText = [GrDashboard.issueText(b.issueCodes), b.issueNote, b.remark, b.liftRounds != null ? `ลิฟท์ ${b.liftRounds} รอบ` : 'รอบลิฟท์: ยังยืนยันไม่ได้'].filter(Boolean).join(' · ');
                 remarkBox.classList.remove('hidden');
             } else {
                 remarkBox.classList.add('hidden');
@@ -3469,76 +3090,7 @@
         });
     }
 
-    function renderVendorLeadtimeList() {
-        const container = document.getElementById('vl-vendor-list');
-        if (!container || !vendorLeadtimeInsights || !vendorLeadtimeInsights.vendors) return;
-
-        const search = (document.getElementById('vl-search-input')?.value || '').trim().toLowerCase();
-        const confFilter = document.getElementById('vl-confidence-filter')?.value || '';
-        const sortBy = document.getElementById('vl-sort-by')?.value || 'receipts_desc';
-
-        let list = (vendorLeadtimeInsights.vendors || []).filter(v => {
-            if (search && !v.vendorName.toLowerCase().includes(search)) return false;
-            if (confFilter && v.confidence !== confFilter) return false;
-            return true;
-        });
-
-        list.sort((a, b) => {
-            if (sortBy === 'lead_asc') return (a.avgLeadDays - b.avgLeadDays) || (b.totalReceipts - a.totalReceipts);
-            if (sortBy === 'lead_desc') return (b.avgLeadDays - a.avgLeadDays) || (b.totalReceipts - a.totalReceipts);
-            if (sortBy === 'ontime_desc') return ((b.onTimeRate ?? -1) - (a.onTimeRate ?? -1)) || (b.totalReceipts - a.totalReceipts);
-            if (sortBy === 'name_asc') return a.vendorName.localeCompare(b.vendorName, 'th');
-            return (b.totalReceipts - a.totalReceipts) || (a.avgLeadDays - b.avgLeadDays);
-        });
-
-        if (list.length === 0) {
-            container.innerHTML = `<div class="col-span-full rounded-2xl border border-dashed border-gray-300 bg-white/60 p-10 text-center text-xs text-gray-500">ไม่พบข้อมูล Vendor ตามเงื่อนไขที่ค้นหา</div>`;
-            return;
-        }
-
-        container.innerHTML = list.map(v => {
-            const leadClass = v.avgLeadDays <= 2 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : (v.avgLeadDays <= 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200');
-
-            const confBadge = v.confidence === 'high' ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">เชื่อถือสูง (8+ บิล)</span>`
-                : (v.confidence === 'medium' ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue">ปานกลาง (3-7 บิล)</span>`
-                : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">เบื้องต้น (1-2 บิล)</span>`);
-
-            const onTimeBadge = v.onTimeRate !== null
-                ? `<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">${v.onTimeRate}% ตรงเวลา</span>`
-                : `<span class="text-[11px] text-gray-400">ยังไม่มีวันนัด</span>`;
-
-            return `
-                <div class="glass-card p-4 sm:p-5 flex flex-col justify-between hover:shadow-md transition">
-                    <div>
-                        <div class="flex items-start justify-between gap-2 mb-2">
-                            <h3 class="font-bold text-gray-900 text-sm leading-tight">${esc(v.vendorName)}</h3>
-                            ${confBadge}
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2 mb-3">
-                            <span class="text-xs font-bold px-2 py-0.5 rounded-lg border ${leadClass}">
-                                เฉลี่ย ${esc(v.avgLeadDays)} วัน
-                            </span>
-                            ${onTimeBadge}
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-gray-50/80 p-2.5 rounded-xl border border-gray-100 mb-3">
-                            <div><span class="text-gray-400">มัธยฐาน:</span> <span class="font-semibold text-gray-700">${esc(v.medianLeadDays)} วัน</span></div>
-                            <div><span class="text-gray-400">P75 Safety:</span> <span class="font-semibold text-gray-700">${esc(v.p75LeadDays)} วัน</span></div>
-                            <div><span class="text-gray-400">ส่งไวสุด - ช้าสุด:</span> <span class="font-semibold text-gray-700">${esc(v.minLeadDays)} - ${esc(v.maxLeadDays)} วัน</span></div>
-                            <div><span class="text-gray-400">รับล่าสุด:</span> <span class="font-semibold text-gray-700">${esc(v.latestAtaDate || '-')}</span></div>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-                        <span class="text-xs text-gray-500 font-medium">รับเข้าแล้ว ${esc(v.totalReceipts)} บิล (${esc(v.totalItems)} รายการ)</span>
-                        <button type="button" onclick="viewVendorHistory('${esc(v.vendorName)}')" class="text-xs font-bold text-brand-orange hover:text-[#CC4904] bg-brand-orangeLight px-2.5 py-1 rounded-lg border border-brand-orange/20 transition">
-                            ดูประวัติบิล
-                        </button>
-                    </div>
-                </div>`;
-        }).join('');
-
-        lucide.createIcons({ root: container });
-    }
+    function renderVendorLeadtimeList() { return GrDashboard.renderVendors(grDashboardState.analytics); }
 
     function viewVendorHistory(vendorName) {
         switchVendorLeadtimeTab('overview');
@@ -3554,9 +3106,10 @@
         ...(appData.grCompleted || [])
       ];
       allPOs.forEach(po => {
-        const key = poBillGroupKey(po, '|' + (po.status || ''));
+        const key = poBillGroupKey(po, '|' + (po.status || '') + '|' + (po.receivingEventId || ''));
         if (!groups[key]) {
             groups[key] = {
+                receivingEventId: po.receivingEventId || null,
                 refPrUid: usableBillRefUid(po.refPrUid),
                 poNumber: po.poNumber,
                 vendor: po.vendor,
@@ -3878,6 +3431,7 @@
         document.getElementById('r-ata').value = (firstItem.ata && firstItem.ata.includes('/')) ? parseDateToInput(firstItem.ata) : new Date().toISOString().split('T')[0];
         document.getElementById('r-receiver').value = firstItem?.receiverName || window.currentUser;
         document.getElementById('r-remark').value = savedReceivingRemark.note;
+        GrDashboard.review(firstItem, currentGroupStatus === 'GR Completed');
 
         // เช็ค Overdue ปกติ 
         const isOverdue = group.items.some(i => i.displayStatus === 'Overdue');
@@ -3912,8 +3466,8 @@
                 defaultLiftFee = 'เชื่อ';
             }
 
-            let previousRounds = savedReceivingRemark.liftRounds;
-            let previousPayment = savedReceivingRemark.liftPayment || defaultLiftFee;
+            let previousRounds = firstItem?.liftRounds ?? savedReceivingRemark.liftRounds;
+            let previousPayment = firstItem?.liftPayment || savedReceivingRemark.liftPayment || defaultLiftFee;
             
             liftFeeSection.innerHTML = `
                 <div class="bg-brand-blueLight/30 p-4 rounded-xl border border-brand-blue/20 shadow-sm mb-6" id="lift-fee-container">
@@ -4488,6 +4042,8 @@
           replaceExtras: currentBillHadLoadedExtras || extraItemsData.length > 0
       };
 
+      try { GrDashboard.writeMetadata(bulkPayload); } catch (error) { return showNotification(error.message, 'warning'); }
+
       const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
           .map(id => document.getElementById(id))
           .filter(Boolean);
@@ -4523,7 +4079,7 @@
         try {
             const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false });
             if (response.success) {
-                setCache('CACHE_GR_ACTIVE_DATA_V2', response);
+                setCache('CACHE_GR_ACTIVE_DATA_V3', response);
                 const prevProducts = appData.products;
                 appData = response;
                 appData.products = prevProducts || [];
