@@ -21,6 +21,7 @@ var GrDashboard = (() => {
       panel?.classList.toggle('hidden',key!==name);
     });
     el('gr-report-filters')?.classList.toggle('hidden',name==='product');
+    if(name==='overview'&&['search','warehouse','receiver','issue','liftOnly','vendor','sku','exactDate','selectedDay'].some(key=>grDashboardState[key])) return reset();
     if(name==='product') prepareProductHistoryDashboard();
     else if(!grDashboardState.loaded&&!grDashboardState.loading) load();
     else if(name==='benchmarks') renderVendors(grDashboardState.analytics);
@@ -54,9 +55,10 @@ var GrDashboard = (() => {
     clearTimeout(grDashboardSearchTimer);grDashboardSearchTimer=setTimeout(()=>load(true),250);
   }
   function reset() {
+    clearTimeout(grDashboardSearchTimer);
     Object.assign(grDashboardState,{search:'',warehouse:'',receiver:'',issue:'',liftOnly:false,vendor:'',sku:'',exactDate:null,selectedDay:null});
     ['dashboard-bill-search','dashboard-bill-wh','dashboard-bill-receiver','dashboard-bill-issue'].forEach(id=>el(id).value='');
-    el('dashboard-lift-only').checked=false;load(true);
+    el('dashboard-lift-only').checked=false;return load(true);
   }
   function chips() {
     const s=grDashboardState,labels=[s.vendor&&'Vendor: '+s.vendor,s.sku&&'SKU: '+s.sku,s.exactDate&&'วันที่: '+date(s.exactDate),s.liftOnly&&'ใช้ลิฟท์',s.issue&&('หมายเหตุ: '+(issues[s.issue]||{any:'พบปัญหา',normal:'ปกติ',unknown:'ยังไม่ได้ระบุ'}[s.issue]))].filter(Boolean);

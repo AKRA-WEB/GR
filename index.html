@@ -683,8 +683,8 @@
       #form-receiving .po-ordered-qty strong { font-size: 9px; }
     }
   </style>
-  <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.03">
-  <script src="js/gr-dashboard-v2.js?v=20260925.03" defer></script>
+  <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.04">
+  <script src="js/gr-dashboard-v2.js?v=20260925.04" defer></script>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -1132,7 +1132,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260925.03';
+    const CURRENT_VERSION = '20260925.04';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {

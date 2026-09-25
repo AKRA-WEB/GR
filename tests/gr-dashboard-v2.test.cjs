@@ -56,6 +56,22 @@ test('card drilldown keeps date, search and warehouse while applying issue filte
  assert.equal(f.pending[0].query.exactDate,'2026-09-24');assert.equal(f.pending[0].query.issue,'any');assert.equal(f.pending[0].query.search,'flour');
  f.pending[0].resolve(result(0));
 });
+
+test('returning to overview clears drilldown filters and pending results while preserving the date range',async()=>{
+ const f=fixture();Object.assign(f.state,{preset:'custom',dateFrom:'2026-09-01',dateTo:'2026-09-25',vendor:'Vendor A',sku:'SKU-A',warehouse:'W2',receiver:'Receiver',search:'flour',issue:'any',liftOnly:true,exactDate:'2026-09-24',selectedDay:'2026-09-24'});
+ f.c.currentVendorLeadtimeTab='bills';
+ for(const id of ['dashboard-bill-search','dashboard-bill-wh','dashboard-bill-receiver','dashboard-bill-issue'])f.node(id).value='filtered';
+ f.node('dashboard-lift-only').checked=true;
+ const old=f.api.load();const overview=f.api.tab('overview');
+ assert.equal(f.pending.length,2);
+ const query=f.pending[1].query;
+ for(const key of ['vendor','sku','warehouse','receiver','search','issue'])assert.equal(query[key],'');
+ assert.equal(query.liftOnly,false);assert.equal(query.exactDate,null);
+ assert.equal(query.preset,'custom');assert.equal(query.dateFrom,'2026-09-01');assert.equal(query.dateTo,'2026-09-25');
+ assert.equal(f.node('dashboard-bill-wh').value,'');assert.equal(f.node('dashboard-lift-only').checked,false);
+ f.pending[1].resolve(result(8));await overview;f.pending[0].resolve(result(1));await old;
+ assert.equal(f.state.analytics.total,8);assert.equal(f.node('gr-filter-chips').textContent,'');
+});
 test('privileged completion defaults to normal; unchanged retries reuse request ID and changed data receives a new ID',()=>{
  const f=fixture();f.node('lift-fee-rounds').value='0';
  const a=f.api.writeMetadata({targetStatus:'GR Completed',items:[{grQty:1}]});
