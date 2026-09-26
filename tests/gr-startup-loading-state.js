@@ -43,6 +43,16 @@ Object.assign(context, {
   grCompletedHasMore: false,
   grCompletedNextOffset: 0,
   grCompletedLoadedFromCache: false,
+  grActiveDataRequestGeneration: 0,
+  grSessionCacheScope() { return 'test-session'; },
+  readGRActiveData(options) { return context.apiCall('getInitialData', options); },
+  reconciliationClearCount: 0,
+  clearCurrentGRReconciliations() { context.reconciliationClearCount++; },
+  hasPendingGRReconciliation() { return false; },
+  renderGRReconciliationNotice() {},
+  grProductsDataScope: null,
+  grProductsLoadedFromFreshFetch: false,
+  grProductsRequestedScope: null,
   GR_CACHE_TTL: 1,
   GR_PRODUCTS_CACHE_TTL: 1,
   PERF_MODE: false,
@@ -72,8 +82,13 @@ vm.runInContext(`${html.slice(loadingStart, loadingEnd)}\n${html.slice(loadStart
   await vm.runInContext('openReceiving(true)', context);
   assert.equal(elements.get('data-loader').classList.contains('hidden'), true, 'successful retry must dismiss the loading state');
 
+  context.apiCall = async () => ({ success: true, products: [] });
+  const clearsBeforeMalformedRead = context.reconciliationClearCount;
+  await vm.runInContext('openReceiving(true)', context);
+  assert.equal(context.reconciliationClearCount, clearsBeforeMalformedRead, 'a success flag without the authoritative pendingPOs array must not clear post-save reconciliation markers');
+
   elements.get('data-loader').classList.add('hidden');
-  context.getCache = key => key === 'CACHE_GR_ACTIVE_DATA_V2' ? { products: [], pendingPOs: [] } : null;
+  context.getCache = key => key === 'CACHE_GR_ACTIVE_DATA_V3' ? { products: [], pendingPOs: [] } : null;
   context.groupPendingPOs = () => { throw new Error('corrupt cache shape'); };
   context.grActiveDataRendered = false;
   context.apiCall = async () => ({ success: false, message: 'network_failed' });

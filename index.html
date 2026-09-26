@@ -761,6 +761,10 @@
 
           <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
 
+          <div id="gr-reconciliation-notice" class="hidden mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
+            <div class="flex flex-wrap items-center justify-between gap-3"><span id="gr-reconciliation-message">บันทึกแล้ว กำลังอัปเดตข้อมูลบิล</span><button type="button" onclick="retryGRReconciliation()" class="rounded-md border border-amber-500 px-3 py-1.5 font-semibold hover:bg-amber-100">ลองโหลดข้อมูลใหม่</button></div>
+          </div>
+
           <div id="po-list-container" class="gr-bill-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
 
@@ -1132,14 +1136,38 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260926.01';
+    const CURRENT_VERSION = '20260926.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
+    const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
+    async function fetchVersionConfig(url) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        let timeoutId;
+        const timeout = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                if (controller) controller.abort();
+                const error = new Error('Version check timed out');
+                error.name = 'TimeoutError';
+                reject(error);
+            }, VERSION_CHECK_TIMEOUT_MS);
+        });
+        try {
+            const options = { cache: 'no-store' };
+            if (controller) options.signal = controller.signal;
+            const request = Promise.resolve().then(() => fetch(url, options)).then(async response => ({
+                response,
+                config: response.ok ? await response.json() : null
+            }));
+            return await Promise.race([request, timeout]);
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
     async function checkAppVersion() {
         try {
-            const res = await fetch('version.json?t=' + Date.now());
-            if (!res.ok) return true;
-            const config = await res.json();
+            const result = await fetchVersionConfig('version.json?t=' + Date.now());
+            if (!result.response.ok) return true;
+            const config = result.config;
             if (config && config.version && config.version !== CURRENT_VERSION) {
                 alert('พบเวอร์ชันใหม่ กำลังอัปเดตระบบ...');
                 const url = new URL(window.location.href);
@@ -1159,7 +1187,7 @@
        mutation via blockIfStale(). Reads listed in readActions stay allowed. */
     const AppVersionGuard = (function () {
         var cfg = { current: '', readActions: [] };
-        var stale = false, started = false;
+        var stale = false, started = false, checkPromise = null;
         var POLL_MS = 5 * 60 * 1000;
 
         function reload() {
@@ -1221,9 +1249,9 @@
         }
         async function fetchRemote() {
             try {
-                var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-                if (!res.ok) return null;
-                var c = await res.json();
+                var result = await fetchVersionConfig('version.json?t=' + Date.now());
+                if (!result.response.ok) return null;
+                var c = result.config;
                 return (c && c.version) ? String(c.version) : null;
             } catch (e) { console.warn('Version check skipped:', e); return null; }
         }
@@ -1234,9 +1262,14 @@
         }
         async function check() {
             if (stale) return false;
-            var remote = await fetchRemote();
-            if (remote && remote !== cfg.current) { markStale(); return false; }
-            return true;
+            if (checkPromise) return checkPromise;
+            checkPromise = (async function () {
+                var remote = await fetchRemote();
+                if (remote && remote !== cfg.current) { markStale(); return false; }
+                return true;
+            })();
+            try { return await checkPromise; }
+            finally { checkPromise = null; }
         }
         // Returns true when the caller's mutation should be BLOCKED. Awaits a fresh check
         // right before a save to close the polling race window (see plan Risk note).
@@ -1465,6 +1498,11 @@
     const GR_COMPLETED_WINDOW_SIZE = 200;
     const GR_COMPLETED_CACHE_TTL = 30 * 60 * 1000;
     var receivingMutationInFlight = false;
+    var grActiveDataRequests = new Map();
+    var grActiveDataRequestGeneration = 0;
+    var grActiveReadEpoch = 0;
+    var grReconcilingBillKeys = new Map();
+    var grReconciliationRetryPromise = null;
     var grDeliveryPlanningLoaded = false;
     var grDeliveryPlanRenderPending = false;
     var deliveryPlanFilter = '';
@@ -1591,7 +1629,7 @@
         init: async () => {
             const isVersionOk = await checkAppVersion();
             if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getVendorDeliveryInsights', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics'] });
+            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning', 'getVendorDeliveryInsights', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics'] });
 
             lucide.createIcons();
             UI.showLoading();
@@ -1746,11 +1784,33 @@
     }
     const GR_CACHE_TTL = 60 * 1000;
     const GR_PRODUCTS_CACHE_TTL = 2 * 60 * 60 * 1000;
+    const GR_CACHE_MAX_ENTRY_BYTES = 2 * 1024 * 1024;
+    const GR_CACHE_MAX_TOTAL_BYTES = 3 * 1024 * 1024;
+    const GR_CACHE_MAX_ENTRIES = 6;
+    const GR_DISPOSABLE_CACHE_NAMES = ['CACHE_GR_ACTIVE_DATA_V3', 'CACHE_GR_ACTIVE_DATA_V2', 'CACHE_GR_PRODUCTS_V1', 'CACHE_GR_FULL_DATA_V2'];
     var grProductsLoaded = false;
+    var grProductsLoadedFromFreshFetch = false;
+    var grProductsRequestedScope = null;
+    var grProductsDataScope = null;
+    var grProductsLoadScope = null;
+    var grProductsLoadPromise = null;
+    var grProductsLoadGeneration = 0;
+    var grProductsRefreshError = '';
+    var grProductSearchIndex = null;
+    var grProductSearchSource = null;
+    var productHistoryOptionsQuery = null;
+    var productHistoryOptionsSource = null;
+    var productHistoryInputHandlerAttached = false;
+    var grExtraProductSuggestionId = 0;
+    function grSessionCacheScope() {
+        const user = window.appSession;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user?.identityId || '') ||
+            !Number.isSafeInteger(user.sessionVersion) || user.sessionVersion < 1 || !user.authorizationRevision) return null;
+        return [user.identityId, user.sessionVersion, user.authorizationRevision].join('::');
+    }
     function cacheStorageKey(key) {
         const user = window.appSession;
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(user?.identityId || '') ||
-            !Number.isSafeInteger(user.sessionVersion) || user.sessionVersion < 1 || !user.authorizationRevision) return null;
+        if (!grSessionCacheScope()) return null;
         return key + '::identity:' + user.identityId + '::session:' + user.sessionVersion + '::authorization:' + encodeURIComponent(user.authorizationRevision);
     }
     function removeCache(key) {
@@ -1771,38 +1831,171 @@
     function setCache(key, data) {
         const scoped = cacheStorageKey(key);
         if (!scoped) return false;
+        let raw;
+        try { raw = JSON.stringify({ _ts: Date.now(), _d: data }); }
+        catch (_) { return false; }
+        const incomingBytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(raw).length : raw.length * 2;
+        if (incomingBytes > GR_CACHE_MAX_ENTRY_BYTES) return false;
+        try { cleanupGRReadCache(scoped, incomingBytes); } catch (_) { /* Storage may be denied; the write below remains best-effort. */ }
         try {
-            localStorage.setItem(scoped, JSON.stringify({ _ts: Date.now(), _d: data }));
+            localStorage.setItem(scoped, raw);
             return true;
         } catch (e) {
-            console.warn('Cache write skipped:', e);
-            return false;
+            if (!(e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014))) {
+                console.warn('Cache write skipped:', e);
+                return false;
+            }
+            try {
+                cleanupGRReadCache(scoped, incomingBytes, true);
+                localStorage.setItem(scoped, raw);
+                return true;
+            } catch (retryError) {
+                console.warn('Cache write skipped:', retryError || e);
+                return false;
+            }
+        }
+    }
+    function cleanupGRReadCache(incomingKey, incomingBytes, quotaFailure = false) {
+        const ttlForName = name => name === 'CACHE_GR_PRODUCTS_V1' ? GR_PRODUCTS_CACHE_TTL : GR_CACHE_TTL;
+        const entries = [];
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const storageKey = localStorage.key(i);
+            if (!storageKey) continue;
+            const name = GR_DISPOSABLE_CACHE_NAMES.find(cacheName => storageKey === cacheName || storageKey.startsWith(cacheName + '::identity:'));
+            if (!name || storageKey === incomingKey) continue;
+            const raw = localStorage.getItem(storageKey);
+            let timestamp = 0;
+            try { timestamp = Number(JSON.parse(raw)._ts) || 0; } catch (_) { /* Corrupt disposable cache entry. */ }
+            const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(raw || '').length : (raw || '').length * 2;
+            if (!timestamp || Date.now() - timestamp > ttlForName(name)) {
+                localStorage.removeItem(storageKey);
+            } else {
+                entries.push({ key: storageKey, timestamp, bytes });
+            }
+        }
+        entries.sort((a, b) => a.timestamp - b.timestamp);
+        let totalBytes = incomingBytes + entries.reduce((total, entry) => total + entry.bytes, 0);
+        let count = entries.length + 1;
+        let freedBytes = 0;
+        while (entries.length && (totalBytes > GR_CACHE_MAX_TOTAL_BYTES || count > GR_CACHE_MAX_ENTRIES || (quotaFailure && freedBytes < Math.min(incomingBytes, 256 * 1024)))) {
+            const oldest = entries.shift();
+            localStorage.removeItem(oldest.key);
+            totalBytes -= oldest.bytes;
+            count--;
+            freedBytes += oldest.bytes;
         }
     }
     function clearReceivingCaches() {
+        grActiveReadEpoch++;
         grDashboardState.loaded = false;
         grDashboardState.analytics = null;
         removeCache('CACHE_GR_ACTIVE_DATA_V3');
         removeCache('CACHE_GR_FULL_DATA_V2');
     }
-    async function loadGRProductsBackground() {
-        if (grProductsLoaded) return;
-        const cached = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
-        if (cached) {
-            appData.products = cached.products || [];
-            grProductsLoaded = true;
-            return;
+    function readGRActiveData(options, prefetchedPromise = null) {
+        const scope = grSessionCacheScope();
+        if (!scope) return apiCall('getInitialData', options);
+        const requestKey = scope + '::epoch:' + grActiveReadEpoch + '::' + JSON.stringify(options);
+        if (grActiveDataRequests.has(requestKey)) return grActiveDataRequests.get(requestKey);
+        const request = prefetchedPromise || Promise.resolve().then(() => apiCall('getInitialData', options));
+        grActiveDataRequests.set(requestKey, request);
+        const clearRequest = () => {
+            if (grActiveDataRequests.get(requestKey) === request) grActiveDataRequests.delete(requestKey);
+        };
+        request.then(clearRequest, clearRequest);
+        return request;
+    }
+    function hasPendingGRReconciliation() {
+        const scope = grSessionCacheScope();
+        for (const [key, itemScope] of grReconcilingBillKeys) {
+            if (itemScope !== scope) grReconcilingBillKeys.delete(key);
         }
-        const fetchStart = Date.now();
-        try {
-            const response = await apiCall('getProducts', {});
-            perfLog('products background fetch', fetchStart);
-            if (response.success) {
-                setCache('CACHE_GR_PRODUCTS_V1', response);
-                appData.products = response.products || [];
+        return grReconcilingBillKeys.size > 0;
+    }
+    function renderGRReconciliationNotice(message) {
+        const notice = document.getElementById('gr-reconciliation-notice');
+        if (!notice) return;
+        const pending = hasPendingGRReconciliation();
+        notice.classList.toggle('hidden', !pending);
+        const messageEl = document.getElementById('gr-reconciliation-message');
+        if (messageEl && pending) messageEl.textContent = message || 'บันทึกแล้ว กำลังอัปเดตข้อมูลบิล';
+        const retry = notice.querySelector ? notice.querySelector('button') : null;
+        if (retry) retry.disabled = !!grReconciliationRetryPromise;
+    }
+    function clearCurrentGRReconciliations() {
+        const scope = grSessionCacheScope();
+        for (const [key, itemScope] of grReconcilingBillKeys) {
+            if (itemScope === scope) grReconcilingBillKeys.delete(key);
+        }
+        renderGRReconciliationNotice();
+    }
+    function retryGRReconciliation() {
+        if (!hasPendingGRReconciliation() || grReconciliationRetryPromise) return grReconciliationRetryPromise;
+        grReconciliationRetryPromise = openReceivingInBackground();
+        renderGRReconciliationNotice('กำลังโหลดสถานะบิลที่บันทึกแล้ว...');
+        grReconciliationRetryPromise.then(success => {
+            grReconciliationRetryPromise = null;
+            renderGRReconciliationNotice(success ? '' : 'บันทึกแล้ว แต่ยังโหลดสถานะบิลล่าสุดไม่ได้ กดเพื่อลองอ่านข้อมูลอีกครั้ง');
+        });
+        return grReconciliationRetryPromise;
+    }
+    async function loadGRProductsBackground() {
+        const scope = grSessionCacheScope();
+        if (grProductsLoadPromise && grProductsLoadScope === scope) return grProductsLoadPromise;
+        if (scope !== grProductsRequestedScope) {
+            grProductsLoadGeneration++;
+            grProductsRequestedScope = scope;
+            grProductsDataScope = scope;
+            grProductsLoaded = false;
+            grProductsLoadedFromFreshFetch = false;
+            grProductsRefreshError = '';
+            appData.products = [];
+            grProductSearchIndex = null;
+            productHistoryOptionsSource = null;
+        }
+        if (grProductsLoaded && grProductsLoadedFromFreshFetch) return;
+        if (!grProductsLoaded) {
+            const cached = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
+            if (cached && scope === grSessionCacheScope()) {
+                appData.products = cached.products || [];
                 grProductsLoaded = true;
+                grProductSearchIndex = null;
+                productHistoryOptionsSource = null;
             }
-        } catch(e) { console.warn('GR products background load error', e); }
+        }
+        const generation = grProductsLoadGeneration;
+        grProductsLoadScope = scope;
+        const fetchStart = Date.now();
+        grProductsLoadPromise = (async () => {
+            try {
+                const response = await apiCall('getProducts', {});
+                perfLog('products background fetch', fetchStart);
+                if (generation !== grProductsLoadGeneration || scope !== grSessionCacheScope()) return;
+                if (response.success && Array.isArray(response.products)) {
+                    setCache('CACHE_GR_PRODUCTS_V1', response);
+                    appData.products = response.products;
+                    grProductsLoaded = true;
+                    grProductsLoadedFromFreshFetch = true;
+                    grProductsDataScope = scope;
+                    grProductsRefreshError = '';
+                    grProductSearchIndex = null;
+                    productHistoryOptionsSource = null;
+                } else {
+                    grProductsRefreshError = response.message || response.error || 'โหลดรายชื่อสินค้าไม่สำเร็จ';
+                }
+            } catch (e) {
+                if (generation === grProductsLoadGeneration && scope === grSessionCacheScope()) {
+                    grProductsRefreshError = e.message || 'โหลดรายชื่อสินค้าไม่สำเร็จ';
+                }
+                console.warn('GR products background load error', e);
+            } finally {
+                if (generation === grProductsLoadGeneration) {
+                    grProductsLoadPromise = null;
+                    grProductsLoadScope = null;
+                }
+            }
+        })();
+        return grProductsLoadPromise;
     }
     function mergeDeliveryPlanningIntoPendingPOs(planByUid) {
         (appData.pendingPOs || []).forEach(item => {
@@ -2461,16 +2654,35 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
+        const loadGeneration = ++grActiveDataRequestGeneration;
+        const sessionScope = grSessionCacheScope();
         // Reset so a stale true from a previous fetch cannot make the loading-state UI skip
         // straight to "no plan" while cached active data (which never carries plan fields) renders.
         grDeliveryPlanningLoaded = false;
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V3', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
+        if (grProductsDataScope !== sessionScope) {
+            grProductsLoaded = false;
+            grProductsLoadedFromFreshFetch = false;
+            grProductsRequestedScope = null;
+            grProductsDataScope = sessionScope;
+            grProductsRefreshError = '';
+            grProductSearchIndex = null;
+            productHistoryOptionsSource = null;
+            appData.products = [];
+        }
         let cacheUsable = isManualRefresh && grActiveDataRendered;
         if (cachedData && !isManualRefresh) {
             try {
+                const productsAlreadyLoaded = grProductsLoaded && grProductsDataScope === sessionScope ? appData.products : [];
                 appData = cachedData;
-                if (cachedProducts) { appData.products = cachedProducts.products || []; grProductsLoaded = true; }
+                if (grProductsLoaded && grProductsDataScope === sessionScope) appData.products = productsAlreadyLoaded || [];
+                else if (cachedProducts) {
+                    appData.products = cachedProducts.products || [];
+                    grProductsLoaded = true;
+                    grProductsLoadedFromFreshFetch = false;
+                    grProductsDataScope = sessionScope;
+                } else appData.products = [];
                 groupPendingPOs();
                 renderPOListForReceiving();
                 showView('receiving-list-view');
@@ -2493,15 +2705,16 @@
         const coldStart = !cacheUsable && !isManualRefresh;
 
         const fetchStart = Date.now();
-        const fetchPromise = (!isManualRefresh && initialDataPrefetch)
-            ? initialDataPrefetch
-            : apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, bypassCache: isManualRefresh, perf: PERF_MODE });
+        const activeReadOptions = { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, bypassCache: isManualRefresh, perf: PERF_MODE };
+        const fetchPromise = readGRActiveData(activeReadOptions, !isManualRefresh ? initialDataPrefetch : null);
         initialDataPrefetch = null;
         const response = await fetchPromise;
+        if (loadGeneration !== grActiveDataRequestGeneration || sessionScope !== grSessionCacheScope()) return;
         perfLog(coldStart ? 'active fetch (cold start)' : (isManualRefresh ? 'active fetch (manual refresh)' : 'active fetch (warm cache)'), fetchStart);
         if (response.serverTimings) perfLog('active server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
 
-        if (response.success) {
+        const hasAuthoritativeActiveData = response.success && Array.isArray(response.pendingPOs);
+        if (hasAuthoritativeActiveData) {
             const productsAlreadyLoaded = (appData && appData.products) || [];
             const receivingViewWasOpen = !document.getElementById('receiving-list-view').classList.contains('hidden');
             setCache('CACHE_GR_ACTIVE_DATA_V3', response);
@@ -2513,6 +2726,7 @@
             grCompletedNextOffset = 0;
             grCompletedLoadedFromCache = false;
             groupPendingPOs();
+            clearCurrentGRReconciliations();
             if (document.getElementById('r-status-filter').value === 'GR Completed') {
                 await ensureCompletedLoaded();
             }
@@ -2520,7 +2734,7 @@
             grActiveDataRendered = true;
 
             if (!cacheUsable && !isManualRefresh && receivingViewWasOpen) showView('receiving-list-view');
-            if (!grProductsLoaded) loadGRProductsBackground();
+            loadGRProductsBackground();
             if (!cacheUsable || isManualRefresh) hideDataLoading();
         } else if (!cacheUsable) {
             if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
@@ -2529,50 +2743,77 @@
         } else if (isManualRefresh) {
             hideDataLoading();
         }
+        if (!hasAuthoritativeActiveData && hasPendingGRReconciliation()) renderGRReconciliationNotice('บันทึกแล้ว แต่ยังโหลดสถานะบิลล่าสุดไม่ได้ กดเพื่อลองอ่านข้อมูลอีกครั้ง');
         // Independent of whether the active fetch succeeded: if cachedData already rendered the
         // list (or pendingPOs is otherwise populated), still attempt to fill in the plan/calendar
         // so an active-fetch failure cannot leave "กำลังโหลดแผนรับสินค้า..." stuck forever.
         loadGRDeliveryPlanningBackground(isManualRefresh);
     }
 
+    function normalizeGRProductText(value) {
+        return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+    function getGRProductSearchIndex() {
+        const products = appData.products || [];
+        if (grProductSearchSource !== products || !grProductSearchIndex) {
+            grProductSearchSource = products;
+            grProductSearchIndex = products.map(product => ({
+                product,
+                sku: normalizeGRProductText(product.sku),
+                name: normalizeGRProductText(product.name),
+                option: productHistoryOptionValue(product),
+                optionNormalized: normalizeGRProductText(productHistoryOptionValue(product))
+            }));
+        }
+        return grProductSearchIndex;
+    }
     function productHistoryOptionValue(product) {
         const sku = String((product && product.sku) || '').trim();
         const name = String((product && product.name) || '').trim();
         return sku ? `${sku} — ${name}` : name;
     }
 
-    function renderProductHistoryOptions() {
+    function renderProductHistoryOptions(query = '') {
         const options = document.getElementById('product-history-options');
+        const normalized = normalizeGRProductText(query);
+        const products = appData.products || [];
+        if (productHistoryOptionsQuery === normalized && productHistoryOptionsSource === products) return;
+        productHistoryOptionsQuery = normalized;
+        productHistoryOptionsSource = products;
         options.replaceChildren();
-        (appData.products || []).forEach(product => {
+        getGRProductSearchIndex().filter(entry => !normalized || entry.sku.includes(normalized) || entry.name.includes(normalized) || entry.optionNormalized.includes(normalized)).slice(0, 30).forEach(entry => {
             const option = document.createElement('option');
-            option.value = productHistoryOptionValue(product);
+            option.value = entry.option;
             options.appendChild(option);
         });
     }
 
     function selectedProductHistoryProduct() {
-        const input = document.getElementById('dashboard-product-input').value.trim();
-        const normalized = input.toLowerCase().replace(/\s+/g, ' ');
-        return (appData.products || []).find(product => {
-            const sku = String(product.sku || '').trim().toLowerCase();
-            const name = String(product.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
-            return normalized === productHistoryOptionValue(product).toLowerCase().replace(/\s+/g, ' ')
-                || (sku && normalized === sku)
-                || normalized === name;
-        }) || null;
+        const normalized = normalizeGRProductText(document.getElementById('dashboard-product-input').value);
+        const match = getGRProductSearchIndex().find(entry => normalized === entry.optionNormalized || (entry.sku && normalized === entry.sku) || normalized === entry.name);
+        return match ? match.product : null;
     }
 
     async function prepareProductHistoryDashboard() {
         const status = document.getElementById('dashboard-product-status');
-        if (!grProductsLoaded) {
-            status.textContent = 'กำลังโหลดรายชื่อสินค้า...';
-            await loadGRProductsBackground();
+        const refresh = loadGRProductsBackground();
+        if (!grProductsLoaded) status.textContent = 'กำลังโหลดรายชื่อสินค้า...';
+        const input = document.getElementById('dashboard-product-input');
+        renderProductHistoryOptions(input.value);
+        if (!productHistoryInputHandlerAttached) {
+            input.addEventListener('input', () => renderProductHistoryOptions(input.value));
+            productHistoryInputHandlerAttached = true;
         }
-        renderProductHistoryOptions();
-        status.textContent = grProductsLoaded ? '' : 'โหลดรายชื่อสินค้าไม่สำเร็จ กรุณากลับไปรีเฟรชแล้วลองใหม่';
-        document.getElementById('dashboard-product-input').focus();
+        if (grProductsLoaded && !grProductsLoadedFromFreshFetch) status.textContent = 'กำลังอัปเดตรายชื่อสินค้า...';
+        input.focus();
         lucide.createIcons({ root: document.getElementById('vendor-leadtime-tab-product') });
+        await Promise.resolve(refresh);
+        if (currentVendorLeadtimeTab === 'product') {
+            renderProductHistoryOptions(input.value);
+            status.textContent = grProductsRefreshError
+                ? (grProductsLoaded ? 'อัปเดตรายชื่อสินค้าไม่สำเร็จ ใช้รายการที่โหลดไว้ก่อนหน้าได้' : 'โหลดรายชื่อสินค้าไม่สำเร็จ กรุณากลับไปรีเฟรชแล้วลองใหม่')
+                : '';
+        }
     }
 
     async function searchProductReceiptHistory(reset = true) {
@@ -2887,13 +3128,16 @@
 
     function groupGrDashboardBills(bills) { return Array.isArray(bills) ? bills : []; }
 
-    function renderGrDashboardBillsTable(bills) {
+    function renderGrDashboardBillsTable(bills, append = false) {
         const tbody = document.getElementById('dashboard-bills-tbody');
         const countLabel = document.getElementById('dashboard-bills-count-label');
         if (!tbody) return;
 
         const sourceList = Array.isArray(bills) ? bills : [];
         const list = groupGrDashboardBills(sourceList);
+        const previouslyRendered = Array.isArray(grDashboardState.renderedBillGroups) ? grDashboardState.renderedBillGroups : [];
+        const existingIds = new Set(previouslyRendered.map(b => String(b.grId)));
+        const rowsToRender = append ? list.filter(b => !existingIds.has(String(b.grId))) : list;
         grDashboardState.renderedBillGroups = list;
         if (countLabel) {
             countLabel.innerText = list.length === sourceList.length
@@ -2902,12 +3146,13 @@
         }
         updateGrDashboardLoadMoreState(false);
 
-        if (list.length === 0) {
+        if (list.length === 0 && !append) {
             tbody.innerHTML = `<tr><td colspan="9" class="py-10 text-center text-gray-400 text-xs">ไม่พบบิลรับเข้าตามเงื่อนไขที่เลือก</td></tr>`;
             return;
         }
+        if (append && rowsToRender.length === 0) return;
 
-        tbody.innerHTML = list.map(b => {
+        const rowsHtml = rowsToRender.map(b => {
             const grId = b.grId || '';
             const sourceGrNumbers = Array.isArray(b.grNumbers) && b.grNumbers.length ? b.grNumbers : [b.grNumber || '-'];
             const grNum = b.grNumber || sourceGrNumbers[0] || '-';
@@ -2922,7 +3167,7 @@
             const lead = b.leadtimeDays != null ? `${b.leadtimeDays} วัน` : '-';
 
             return `
-                <tr class="hover:bg-gray-50/80 transition cursor-pointer" onclick="openGrBillDetailModal('${esc(grId)}')">
+                <tr data-gr-id="${esc(grId)}" class="hover:bg-gray-50/80 transition cursor-pointer" onclick="openGrBillDetailModal('${esc(grId)}')">
                     <td class="py-3 px-4">
                         <div class="font-bold text-gray-900">${esc(grNum)}</div>
                         ${sourceGrNumbers.length > 1 ? `<div class="text-[10px] text-brand-orange font-semibold">รวม ${itemsCount} รายการในรอบเดียวกัน</div><div class="text-[10px] text-gray-400">อ้างอิง ${esc(sourceGrNumbers.join(', '))}</div>` : ''}
@@ -2958,6 +3203,8 @@
                     </td>
                 </tr>`;
         }).join('');
+        if (append) tbody.insertAdjacentHTML('beforeend', rowsHtml);
+        else tbody.innerHTML = rowsHtml;
     }
 
     function openGrBillDetailModal(grId) {
@@ -3338,6 +3585,7 @@
 
             let cardClass = "glass-card status-card status-card--pending gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
             let statusBadge = `<span class="gr-status-badge text-xs status-badge--pending px-2.5 py-1 rounded-md font-bold border">รอสินค้าเข้า</span>`;
+            const reconciling = grReconcilingBillKeys.get(poBillGroupKey(group)) === grSessionCacheScope();
             
             if (hasOverdue && !isPendingReview) {
                 cardClass = "glass-card status-card status-card--overdue gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
@@ -3351,6 +3599,10 @@
             } else if (isCompleted) {
                 cardClass = "glass-card status-card status-card--completed gr-bento-card gr-bill-card p-4 cursor-pointer transition active:scale-95";
                 statusBadge = `<span class="gr-status-badge text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md font-bold border border-emerald-200 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> ลงสินค้าสำเร็จ</span>`;
+            }
+            if (reconciling) {
+                cardClass += ' opacity-75 cursor-wait';
+                statusBadge = `<span class="gr-status-badge text-xs bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md font-bold border border-amber-300" role="status">บันทึกแล้ว · กำลังตรวจสอบ</span>`;
             }
 
             const statusSplitEntries = Object.entries(group.listStatusCounts || {}).sort((a, b) => receivingStatusPriority(b[0]) - receivingStatusPriority(a[0]));
@@ -3406,12 +3658,18 @@
             htmlStr += `<button type="button" onclick="loadMoreCompletedGR()" class="w-full mt-1 py-3 text-sm font-semibold text-brand-blue bg-white border border-brand-blue/30 rounded-lg hover:bg-brand-blueLight transition col-span-full">โหลดประวัติเพิ่ม (${remainingBills} บิลที่เหลือ)</button>`;
         }
         container.innerHTML = htmlStr; lucide.createIcons({ root: container });
+        renderGRReconciliationNotice();
         renderDeliveryPlanSummary();
         renderWarehouseChips();
     }
 
     function openReceivingDetail(index) {
         const group = groupedPOs[index];
+        if (!group) return;
+        if (grReconcilingBillKeys.get(poBillGroupKey(group)) === grSessionCacheScope()) {
+            showNotification('บันทึกบิลนี้แล้ว กำลังตรวจสอบสถานะล่าสุด กรุณาลองอีกครั้งหลังโหลดข้อมูลเสร็จ', 'warning');
+            return;
+        }
         currentActiveGroup = group; 
         const currentGroupStatus = group.status; // ใช้ตัวแปร status ของกลุ่มตรงๆ
         group.items = getBillModalItems(group);
@@ -3743,9 +4001,12 @@
             hideDataLoading();
 
             if (res.success) {
+                const reconciliationScope = grSessionCacheScope();
+                if (reconciliationScope) grReconcilingBillKeys.set(poBillGroupKey(group), reconciliationScope);
                 clearReceivingCaches();
                 showNotification(res.message, "success");
                 showView('receiving-list-view');
+                renderPOListForReceiving();
                 await openReceiving(true); // Force manual refresh to reload lists and cache
             } else {
                 showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error");
@@ -3761,14 +4022,15 @@
         const container = document.getElementById('r-extra-items-container'); const div = document.createElement('div');
         const defWh = (currentActiveGroup && currentActiveGroup.warehouse) || '';
         const parsedLoc = parseLoc(initial.locIn || '');
+        const suggestionId = `ex-product-options-${++grExtraProductSuggestionId}`;
         div.className = "extra-item-row bg-white p-4 rounded-xl border border-orange-200 shadow-sm relative";
         div.innerHTML = `
             <button type="button" onclick="this.closest('.extra-item-row').remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition"><i data-lucide="x" class="w-4 h-4"></i></button>
             <div class="pr-8 mb-3 relative">
                 <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อสินค้า (พิมพ์ค้นหา หรือ พิมพ์ชื่อใหม่) <span class="text-red-500">*</span></label>
-                <input type="text" class="input-field ex-product py-2.5 font-medium border-orange-300 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="เช่น แลกฟรี กล่องเขียว..." autocomplete="off" value="${esc(initial.product || '')}">
+                <input type="text" class="input-field ex-product py-2.5 font-medium border-orange-300 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="เช่น แลกฟรี กล่องเขียว..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${suggestionId}" value="${esc(initial.product || '')}">
                 <input type="hidden" class="ex-sku" value="${esc(initial.sku || '')}">
-                <ul class="suggestion-box absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto hidden mt-1 divide-y divide-gray-50"></ul>
+                <ul id="${suggestionId}" class="suggestion-box absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto hidden mt-1 divide-y divide-gray-50" role="listbox"></ul>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับ <span class="text-red-500">*</span></label>
@@ -3794,29 +4056,80 @@
 
     function setupAutocomplete(inputEl) {
         const suggestionBox = inputEl.nextElementSibling.nextElementSibling;
+        let filteredProducts = [];
+        let activeIndex = -1;
+        const setExpanded = expanded => inputEl.setAttribute('aria-expanded', String(expanded));
+        const selectProduct = product => {
+            inputEl.value = product.name;
+            const row = inputEl.closest('.extra-item-row');
+            inputEl.dataset.selectedSku = String(product.sku || '');
+            inputEl.dataset.selectedUnit = String(product.unit || '');
+            row.querySelector('.ex-sku').value = inputEl.dataset.selectedSku;
+            row.querySelector('.ex-unit').value = inputEl.dataset.selectedUnit;
+            inputEl.removeAttribute('aria-activedescendant');
+            suggestionBox.classList.add('hidden');
+            setExpanded(false);
+            row.querySelector('.ex-qty').focus();
+        };
+        const updateActiveOption = () => {
+            Array.from(suggestionBox.children).forEach((option, index) => {
+                const active = index === activeIndex;
+                option.classList.toggle('bg-orange-50', active);
+                option.setAttribute('aria-selected', String(active));
+            });
+            if (activeIndex >= 0 && suggestionBox.children[activeIndex]) {
+                inputEl.setAttribute('aria-activedescendant', suggestionBox.children[activeIndex].id);
+                suggestionBox.children[activeIndex].scrollIntoView?.({ block: 'nearest' });
+            } else inputEl.removeAttribute('aria-activedescendant');
+        };
         inputEl.addEventListener('input', function() {
             const val = this.value.trim().toLowerCase(); suggestionBox.innerHTML = '';
-            if (!val || !appData.products || appData.products.length === 0) { suggestionBox.classList.add('hidden'); return; }
-            const filtered = appData.products.filter(p => p.name.toLowerCase().includes(val)).slice(0, 15);
-            if (filtered.length === 0) { suggestionBox.classList.add('hidden'); return; }
+            activeIndex = -1;
+            filteredProducts = [];
+            delete inputEl.dataset.selectedSku;
+            delete inputEl.dataset.selectedUnit;
+            const row = inputEl.closest('.extra-item-row');
+            if (row) {
+                row.querySelector('.ex-sku').value = '';
+                row.querySelector('.ex-unit').value = '';
+            }
+            if (!val || !appData.products || appData.products.length === 0) { setExpanded(false); suggestionBox.classList.add('hidden'); return; }
+            const normalizedVal = normalizeGRProductText(val);
+            filteredProducts = getGRProductSearchIndex().filter(entry => entry.name.includes(normalizedVal) || entry.sku.includes(normalizedVal)).slice(0, 15).map(entry => entry.product);
+            if (filteredProducts.length === 0) { setExpanded(false); suggestionBox.classList.add('hidden'); return; }
             
-            filtered.forEach(p => {
-                const li = document.createElement('li'); li.className = 'px-3 py-2 hover:bg-orange-50 cursor-pointer text-sm font-medium text-gray-700 flex justify-between';
-                li.innerHTML = `<span>${p.name}</span> <span class="text-[10px] text-gray-400">${p.unit}</span>`;
-                li.onmousedown = function(e) {
-                    e.preventDefault(); inputEl.value = p.name;
-                    const row = inputEl.closest('.extra-item-row');
-                    row.querySelector('.ex-sku').value = p.sku || ''; 
-                    row.querySelector('.ex-unit').value = p.unit || ''; 
-                    row.querySelector('.ex-qty').focus();
-                    suggestionBox.classList.add('hidden');
-                };
+            filteredProducts.forEach((p, index) => {
+                const li = document.createElement('li');
+                li.id = `${inputEl.getAttribute('aria-controls')}-option-${index}`;
+                li.setAttribute('role', 'option');
+                li.setAttribute('aria-selected', 'false');
+                li.className = 'px-3 py-2 hover:bg-orange-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center justify-between gap-2';
+                li.innerHTML = `<span class="min-w-0 truncate">${esc(p.name)} <span class="text-[10px] text-gray-400">${esc(p.sku || '')}</span></span><span class="text-[10px] text-gray-400">${esc(p.unit || '')}</span>`;
+                li.addEventListener('mousedown', event => event.preventDefault());
+                li.addEventListener('click', () => selectProduct(p));
                 suggestionBox.appendChild(li);
             });
             suggestionBox.classList.remove('hidden');
+            setExpanded(true);
         });
-        inputEl.addEventListener('blur', () => setTimeout(() => suggestionBox.classList.add('hidden'), 200));
-        inputEl.addEventListener('focus', function() { if (this.value && suggestionBox.children.length > 0) suggestionBox.classList.remove('hidden'); });
+        inputEl.addEventListener('keydown', event => {
+            if (suggestionBox.classList.contains('hidden') || !filteredProducts.length) return;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const step = event.key === 'ArrowDown' ? 1 : -1;
+                activeIndex = (activeIndex + step + filteredProducts.length) % filteredProducts.length;
+                updateActiveOption();
+            } else if (event.key === 'Enter' && activeIndex >= 0) {
+                event.preventDefault();
+                selectProduct(filteredProducts[activeIndex]);
+            } else if (event.key === 'Escape') {
+                suggestionBox.classList.add('hidden');
+                setExpanded(false);
+                inputEl.removeAttribute('aria-activedescendant');
+            }
+        });
+        inputEl.addEventListener('blur', () => setTimeout(() => { suggestionBox.classList.add('hidden'); setExpanded(false); }, 200));
+        inputEl.addEventListener('focus', function() { if (this.value && suggestionBox.children.length > 0) { suggestionBox.classList.remove('hidden'); setExpanded(true); } });
     }
 
     function initExpiryInputPreview(inputEl) {
@@ -3928,6 +4241,7 @@
       const index = document.getElementById('r-group-index').value; 
       const group = currentActiveGroup || groupedPOs[index];
       if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า กรุณาลองใหม่อีกครั้ง", "error");
+      if (grReconcilingBillKeys.get(poBillGroupKey(group)) === grSessionCacheScope()) return showNotification('บันทึกบิลนี้แล้ว กำลังตรวจสอบสถานะล่าสุด', 'warning');
       let formHasError = false;
       let expiryHasError = false;
       let expiryChoiceHasError = false;
@@ -4014,10 +4328,11 @@
           const whSel = row.querySelector('.ex-loc-wh'); const floorSel = row.querySelector('.ex-loc-floor'); const zoneInp = row.querySelector('.ex-loc-zone');
           pInput.classList.remove('input-error'); qInput.classList.remove('input-error'); floorSel.classList.remove('input-error');
 
-          const sku = row.querySelector('.ex-sku') ? row.querySelector('.ex-sku').value.trim() : '';
+          const skuInput = row.querySelector('.ex-sku');
+          const sku = (skuInput ? skuInput.value.trim() : '') || pInput.dataset.selectedSku || '';
           const product = pInput.value.trim(); const grQty = qInput.value.trim();
           const locIn = serializeLoc(whSel.value, floorSel.value, zoneInp.value);
-          const unit = row.querySelector('.ex-unit').value.trim();
+          const unit = row.querySelector('.ex-unit').value.trim() || pInput.dataset.selectedUnit || '';
           const expInp = row.querySelector('.ex-exp');
           if (expInp) expInp.classList.remove('input-error');
           const noExpiry = row.querySelector('.ex-no-expiry')?.checked === true;
@@ -4085,10 +4400,13 @@
               else msg = "ยืนยันรับเข้าคลังเรียบร้อย! (บิลย้ายไปที่แท็บ 'รับแล้ว')";
               
               showNotification(msg, "success"); 
+              const reconciliationScope = grSessionCacheScope();
+              if (reconciliationScope) grReconcilingBillKeys.set(poBillGroupKey(group), reconciliationScope);
               showView('receiving-list-view');
               clearReceivingCaches();
+              renderPOListForReceiving();
               
-              openReceivingInBackground(); 
+              openReceivingInBackground();
           } 
           else { showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error"); }
       } finally {
@@ -4099,13 +4417,23 @@
     }
 
     async function openReceivingInBackground() {
+        const loadGeneration = ++grActiveDataRequestGeneration;
+        const sessionScope = grSessionCacheScope();
+        const productsAlreadyLoaded = grProductsDataScope === sessionScope ? appData.products : [];
         try {
-            const response = await apiCall('getInitialData', { includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false });
-            if (response.success) {
+            const response = await readGRActiveData({ includeCompleted: false, includeProducts: false, includeDeliveryPlanning: false, bypassCache: false, perf: PERF_MODE });
+            if (loadGeneration !== grActiveDataRequestGeneration || sessionScope !== grSessionCacheScope()) return false;
+            if (response.success && Array.isArray(response.pendingPOs)) {
                 setCache('CACHE_GR_ACTIVE_DATA_V3', response);
-                const prevProducts = appData.products;
+                if (grProductsDataScope !== sessionScope) {
+                    grProductsLoaded = false;
+                    grProductsLoadedFromFreshFetch = false;
+                    grProductsRequestedScope = null;
+                    grProductsDataScope = sessionScope;
+                    grProductsRefreshError = '';
+                }
                 appData = response;
-                appData.products = prevProducts || [];
+                appData.products = productsAlreadyLoaded || [];
                 grCompletedLoaded = false;
                 grCompletedLoadedFull = false;
                 grCompletedHasMore = false;
@@ -4113,10 +4441,19 @@
                 grCompletedLoadedFromCache = false;
                 grDeliveryPlanningLoaded = false;
                 groupPendingPOs();
+                clearCurrentGRReconciliations();
                 renderPOListForReceiving();
                 loadGRDeliveryPlanningBackground();
+                return true;
             }
-        } catch(e) {}
+            if (hasPendingGRReconciliation()) renderGRReconciliationNotice('บันทึกแล้ว แต่ยังโหลดสถานะบิลล่าสุดไม่ได้ กดเพื่อลองอ่านข้อมูลอีกครั้ง');
+            return false;
+        } catch(e) {
+            if (loadGeneration === grActiveDataRequestGeneration && sessionScope === grSessionCacheScope() && hasPendingGRReconciliation()) {
+                renderGRReconciliationNotice('บันทึกแล้ว แต่ยังโหลดสถานะบิลล่าสุดไม่ได้ กดเพื่อลองอ่านข้อมูลอีกครั้ง');
+            }
+            return false;
+        }
     }
 
     function parseDateToInput(ddmmyyyy) { if(!ddmmyyyy) return ''; const p = ddmmyyyy.split('/'); if(p.length === 3) return `${p[2]}-${p[1]}-${p[0]}`; return ddmmyyyy; }

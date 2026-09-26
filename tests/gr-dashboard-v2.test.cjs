@@ -3,10 +3,12 @@ function fixture(){
  const nodes=new Map(),events={},pending=[];
  const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',checked:false,textContent:'',innerHTML:'',children:[],classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(type,fn){events[id+':'+type]=fn;},add(){}});return nodes.get(id);};
  const state={preset:'today',limit:50,loaded:true,loading:false,offset:0,hasMore:false};
- const c={document:{getElementById:node,addEventListener(type,fn){events[type]=fn;},querySelectorAll(){return [];},querySelector(){return null;}},crypto:require('node:crypto').webcrypto,console,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:true}),grDashboardState:state,grDashboardSearchTimer:null,currentVendorLeadtimeTab:'overview',canApproveGR:()=>true,prepareProductHistoryDashboard(){},renderGrDashboardBillsLoading(){},updateGrDashboardLoadMoreState(){},renderGrDailyChart(){},renderGrDashboardBillsTable(){},mergeGrDashboardBills:(a=[],b=[])=>[...a,...b],apiCall:(action,query)=>new Promise(resolve=>pending.push({action,query,resolve}))};
+ const billRenders=[],dailyRenders=[];
+ const c={document:{getElementById:node,addEventListener(type,fn){events[type]=fn;},querySelectorAll(){return [];},querySelector(){return null;}},crypto:require('node:crypto').webcrypto,console,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:true}),grDashboardState:state,grDashboardSearchTimer:null,currentVendorLeadtimeTab:'overview',canApproveGR:()=>true,prepareProductHistoryDashboard(){},renderGrDashboardBillsLoading(){},updateGrDashboardLoadMoreState(){},renderGrDailyChart(value){dailyRenders.push(value);},renderGrDashboardBillsTable(bills,append=false){billRenders.push({bills,append});},mergeGrDashboardBills:(a=[],b=[])=>[...new Map([...a,...b].map(bill=>[String(bill.grId),bill])).values()],apiCall:(action,query)=>new Promise(resolve=>pending.push({action,query,resolve}))};
  c.appData={grSchemaVersion:2};vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/gr-dashboard-v2.js'),'utf8'),c);events.DOMContentLoaded();
- return {api:c.GrDashboard,node,state,pending,events,c};
+ return {api:c.GrDashboard,node,state,pending,events,c,billRenders,dailyRenders};
 }
+function watchWrites(target){let value=target.innerHTML,count=0;Object.defineProperty(target,'innerHTML',{get(){return value;},set(next){count++;value=next;}});return()=>count;}
 function result(total){return {success:true,schemaVersion:2,total,bills:[{grId:String(total)}],filters:{dateFrom:'2026-09-25',dateTo:'2026-09-25'},summary:{approvedBills:total,problemBills:0,liftRounds:0,overallAvgLeadDays:null,leadtimeSamples:0},receivers:[],dailyStats:[],vendorBreakdown:[]};}
 test('slow earlier filter response cannot replace the newest report',async()=>{
  const f=fixture();const first=f.api.load();f.state.warehouse='W2';const second=f.api.load();
@@ -93,4 +95,56 @@ test('canonical dates are Gregorian dd/mm/yyyy, while non-date lot text stays un
 
 test('new UI blocks writes against an old backend capability response',()=>{
  const f=fixture();f.c.appData={};assert.throws(()=>f.api.writeMetadata({targetStatus:'Draft GR'}),/อัปเดต/);
+});
+
+test('identical in-flight Dashboard filters share one read',async()=>{
+ const f=fixture();const first=f.api.load();f.api.load();
+ assert.equal(f.pending.length,1);
+ f.pending[0].resolve(result(1));await first;
+ assert.equal(f.state.analytics.total,1);
+});
+
+test('returning to an earlier filter does not reuse its stale in-flight response',async()=>{
+ const f=fixture();const first=f.api.load();f.state.warehouse='W2';const second=f.api.load();f.state.warehouse='';const third=f.api.load();
+ assert.equal(f.pending.length,3);
+ assert.equal(f.pending[2].query.warehouse,'');
+ f.pending[0].resolve(result(8));await first;f.pending[1].resolve(result(2));await second;
+ f.pending[2].resolve(result(3));await third;
+ assert.equal(f.state.analytics.total,3);
+ assert.equal(f.state.loading,false);
+});
+
+test('unchanged page append adds only bills and leaves aggregate sections untouched',async()=>{
+ const f=fixture();f.c.currentVendorLeadtimeTab='benchmarks';
+ const watched=['gr-kpi-row','gr-chart-row','gr-coverage','vl-vendor-list','dashboard-bill-receiver'].map(id=>watchWrites(f.node(id)));
+ const first=f.api.load();
+ const initial=result(2);initial.warehouseBreakdown=[{key:'W1',label:'W1',value:4}];initial.vendorBreakdown=[{key:'V',label:'Vendor',value:1,samples:1}];initial.skuBreakdown=[];initial.receiverBreakdown=[];initial.dailyStats=[{date:'2026-09-25',value:4}];
+ f.pending[0].resolve(initial);await first;
+ const before=watched.map(count=>count());const dailyBefore=f.dailyRenders.length;const append=f.api.load(false,true);
+ f.pending[1].resolve({...initial,bills:[{grId:'next'}]});await append;
+ assert.deepEqual(watched.map(count=>count()),before);
+ assert.equal(f.dailyRenders.length,dailyBefore);
+ assert.equal(f.billRenders.at(-1).append,true);
+ assert.equal(f.billRenders.at(-1).bills.length,2);
+ assert.equal(f.state.analytics.bills.filter(bill=>bill.grId==='next').length,1);
+});
+
+test('append reconciles changed server aggregates without rebuilding unchanged sections',async()=>{
+ const f=fixture();
+ const kpiWrites=watchWrites(f.node('gr-kpi-row')),chartWrites=watchWrites(f.node('gr-chart-row'));
+ const first=f.api.load();const initial=result(2);initial.warehouseBreakdown=[];initial.vendorBreakdown=[];initial.skuBreakdown=[];initial.receiverBreakdown=[];initial.dailyStats=[];
+ f.pending[0].resolve(initial);await first;
+ const beforeKpi=kpiWrites(),beforeCharts=chartWrites();const append=f.api.load(false,true);
+ f.pending[1].resolve({...initial,bills:[{grId:'next'}],summary:{...initial.summary,liftRounds:7}});await append;
+ assert.equal(kpiWrites(),beforeKpi+1);
+ assert.equal(chartWrites(),beforeCharts);
+});
+
+test('vendor cards render when their hidden tab is first opened',async()=>{
+ const f=fixture(),vendorWrites=watchWrites(f.node('vl-vendor-list'));
+ const load=f.api.load();const response=result(1);response.vendorBreakdown=[{key:'Vendor-A',label:'Vendor A',value:1,samples:1}];
+ f.pending[0].resolve(response);await load;
+ assert.equal(vendorWrites(),0);
+ f.api.tab('benchmarks');
+ assert.equal(vendorWrites(),1);
 });

@@ -12,7 +12,7 @@ async function createTest() {
         allScripts += match[1] + '\n';
     }
 
-    const classList = { add: () => {}, remove: () => {}, contains: () => false };
+    const classList = { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false };
     function createMockElement(opts = {}) {
         return {
             value: opts.value || '',
@@ -43,6 +43,12 @@ async function createTest() {
         const poOldStock = createMockElement({ value: options.poOldStock ?? '5' });
         const poOldStock2 = createMockElement({ value: options.poOldStock2 ?? '' });
         const extraOldStock = createMockElement({ value: options.extraOldStock ?? '3' });
+        const extraProductInput = createMockElement({
+            value: 'extra prod',
+            dataset: options.extraSelectedSku ? { selectedSku: options.extraSelectedSku, selectedUnit: options.extraSelectedUnit || '' } : {}
+        });
+        const extraSkuInput = createMockElement({ value: options.extraHiddenSku ?? '' });
+        const extraUnitInput = createMockElement({ value: options.extraUnitValue ?? 'unit' });
         poOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.po = true; }, remove: () => {} };
         poOldStock2.classList = { add: name => { if (name === 'input-error') errorMarks.po2 = true; }, remove: () => {} };
         extraOldStock.classList = { add: name => { if (name === 'input-error') errorMarks.extra = true; }, remove: () => {} };
@@ -92,8 +98,9 @@ async function createTest() {
                             '.ex-exp': extraExpiry,
                             '.ex-no-expiry': { checked: options.extraNoExpiry === true },
                             '.ex-qty': createMockElement({ value: '10' }),
-                            '.ex-product': createMockElement({ value: 'extra prod' }),
-                            '.ex-unit': createMockElement({ value: 'unit' }),
+                            '.ex-product': extraProductInput,
+                            '.ex-sku': extraSkuInput,
+                            '.ex-unit': extraUnitInput,
                             '.ex-loc-wh': createMockElement({ value: 'W1' }),
                             '.ex-loc-floor': createMockElement({ value: '1' }),
                             '.ex-old-stock': extraOldStock
@@ -125,8 +132,9 @@ async function createTest() {
             },
             URLSearchParams: class { get() { return null; } },
             console: { ...console, error: () => {}, log: () => {} },
-            setTimeout: (cb) => {
+            setTimeout: (cb, delay) => {
                 // If it's the notification timeout, capture the text
+                if (delay === 5000) return setTimeout(cb, delay);
                 cb();
             },
             clearTimeout: clearTimeout,
@@ -233,6 +241,16 @@ async function createTest() {
 
     const oldStockWarning = 'กรุณากรอกสต๊อกเก่าสำหรับสินค้าที่รับทุกรายการ (ใส่ 0 หากไม่มีสต๊อกเดิม)';
     const validExpiry = '31/12/2026';
+    result = await runTestWithExpValue(validExpiry, {
+        extraNoExpiry: true,
+        extraSelectedSku: 'LOCAL-002',
+        extraSelectedUnit: 'ถุง',
+        extraUnitValue: ''
+    });
+    assert.equal(result.calls.length, 1, 'a selected catalog product must submit even if its hidden field is empty');
+    assert.equal(result.calls[0].payload.extraItems[0].sku, 'LOCAL-002');
+    assert.equal(result.calls[0].payload.extraItems[0].unit, 'ถุง');
+
     result = await runTestWithExpValue(validExpiry, { poOldStock: '' });
     assert.equal(result.notification, oldStockWarning, 'blank PO old stock must be explained');
     assert.equal(result.calls.length, 0, 'blank PO old stock must block the API');

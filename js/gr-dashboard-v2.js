@@ -6,6 +6,7 @@ var GrDashboard = (() => {
   const colors=['#ea580c','#2563eb','#059669','#9333ea','#ca8a04','#64748b'];
   const warehouseColors={W1:'#fef3c7',W2:'#f97316',W3:'#facc15',W4:'#22c55e',W5:'#6b7280',C1:'#bae6fd',C2:'#1d4ed8'};
   let generation=0, lastPayload='', mutationId=null, suppressClickUntil=0;
+  const inFlightRequests=new Map();
   const el=id=>document.getElementById(id);
   const html=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=value=>Number(value||0).toLocaleString('th-TH',{maximumFractionDigits:2});
@@ -67,32 +68,55 @@ var GrDashboard = (() => {
   async function load(force=false,append=false) {
     const s=grDashboardState;
     if(append&&(s.loading||!s.hasMore))return;
-    const request=++generation, query=filters();
+    const query=filters();
     const offset=append?s.offset:0;
+    const requestKey=JSON.stringify({query,offset,limit:s.limit});
+    const existingRequest=inFlightRequests.get(requestKey);
+    if(existingRequest&&existingRequest.generation===generation)return existingRequest.promise;
+    const request=++generation;
     s.loading=true;s.loadingMore=append;
     if(!append){s.loaded=false;s.offset=0;s.hasMore=false;el('gr-report-content').setAttribute('aria-busy','true');el('gr-report-content').classList.add('gr-is-loading');el('gr-chart-row').innerHTML='<p role="status">กำลังโหลดกราฟตามช่วงวันที่…</p>';renderGrDashboardBillsLoading();}
     updateGrDashboardLoadMoreState(true);el('gr-report-status').textContent='กำลังโหลดข้อมูล…';chips();
-    try {
-      const res=await apiCall('getGrDashboardAnalytics',{...query,offset,limit:s.limit});
-      if(request!==generation)return;
-      if(!res?.success)throw new Error(res?.message||'โหลดข้อมูลไม่สำเร็จ');
-      if(res.schemaVersion!==2)throw new Error('Dashboard รุ่นใหม่ยังไม่พร้อม กรุณารีเฟรชหลังอัปเดตระบบ');
-      const bills=mergeGrDashboardBills(append?s.analytics?.bills:[],res.bills);
-      s.analytics={...res,bills};s.offset=offset+res.bills.length;s.total=res.total;s.hasMore=s.offset<res.total;s.loaded=true;
-      el('dashboard-active-period-label').textContent=`ช่วงวันที่ ${date(res.filters.dateFrom)} – ${date(res.filters.dateTo)}`;
-      renderSummary(res.summary);renderCharts(res);renderGrDailyChart(res.dailyStats);renderGrDashboardBillsTable(bills);renderVendors(res);
-      const receiver=el('dashboard-bill-receiver');receiver.innerHTML='<option value="">พนักงานทั้งหมด</option>'+res.receivers.map(n=>`<option value="${html(n)}">${html(n)}</option>`).join('');receiver.value=s.receiver||'';
-      if(s.receiver&&!receiver.value){receiver.add(new Option(s.receiver,s.receiver));receiver.value=s.receiver;}
-      el('gr-report-status').textContent='';
-      el('gr-bill-scope-summary').textContent=`${number(res.total)} บิล · รอบลิฟท์ที่ยืนยันได้ ${number(res.summary.liftRounds)} รอบ (รอบร่วมหลายบิลนับครั้งเดียว)`+(s.warehouse||s.sku?' · ยอดลังตามคลัง/SKU ที่เลือก รายละเอียดแสดงทั้งบิล':'');
-    } catch(error) {
-      if(request!==generation)return;
-      el('gr-report-status').textContent=error.message;
-      if(!append){el('gr-bill-scope-summary').textContent='';el('gr-coverage').textContent='';}
-      if(!append){s.analytics=null;el('gr-kpi-row').innerHTML='<p>ยังไม่มีผลลัพธ์สำหรับตัวกรองนี้</p>';el('gr-chart-row').innerHTML='';el('vl-vendor-list').innerHTML='';el('dashboard-daily-chart').innerHTML='';el('dashboard-bills-tbody').innerHTML='<tr><td colspan="9">โหลดไม่สำเร็จ กด “โหลดใหม่” เพื่อลองอีกครั้ง</td></tr>';}
-    } finally {
-      if(request===generation){s.loading=false;s.loadingMore=false;el('gr-report-content').classList.remove('gr-is-loading');el('gr-report-content').setAttribute('aria-busy','false');updateGrDashboardLoadMoreState(false);}
-    }
+    const requestPromise=(async()=>{
+      try {
+        const res=await apiCall('getGrDashboardAnalytics',{...query,offset,limit:s.limit});
+        if(request!==generation)return;
+        if(!res?.success)throw new Error(res?.message||'โหลดข้อมูลไม่สำเร็จ');
+        if(res.schemaVersion!==2)throw new Error('Dashboard รุ่นใหม่ยังไม่พร้อม กรุณารีเฟรชหลังอัปเดตระบบ');
+        const previous=s.analytics;
+        const changed=key=>!append||!previous||JSON.stringify(previous[key])!==JSON.stringify(res[key]);
+        const summaryChanged=changed('summary');
+        const chartsChanged=!append||!previous||chartSpecs.some(spec=>JSON.stringify(previous[spec[3]])!==JSON.stringify(res[spec[3]]));
+        const dailyChanged=changed('dailyStats');
+        const vendorsChanged=changed('vendorBreakdown');
+        const receiversChanged=changed('receivers');
+        const bills=mergeGrDashboardBills(append?previous?.bills:[],res.bills);
+        s.analytics={...res,bills};s.offset=offset+res.bills.length;s.total=res.total;s.hasMore=s.offset<res.total;s.loaded=true;
+        if(!append)el('dashboard-active-period-label').textContent=`ช่วงวันที่ ${date(res.filters.dateFrom)} – ${date(res.filters.dateTo)}`;
+        if(summaryChanged)renderSummary(res.summary);
+        if(chartsChanged)renderCharts(res);
+        if(dailyChanged)renderGrDailyChart(res.dailyStats);
+        renderGrDashboardBillsTable(bills,append);
+        if(vendorsChanged&&currentVendorLeadtimeTab==='benchmarks')renderVendors(res);
+        const receiver=el('dashboard-bill-receiver');
+        if(receiversChanged){receiver.innerHTML='<option value="">พนักงานทั้งหมด</option>'+res.receivers.map(n=>`<option value="${html(n)}">${html(n)}</option>`).join('');receiver.value=s.receiver||'';
+          if(s.receiver&&!receiver.value){receiver.add(new Option(s.receiver,s.receiver));receiver.value=s.receiver;}}
+        el('gr-report-status').textContent='';
+        el('gr-bill-scope-summary').textContent=`${number(res.total)} บิล · รอบลิฟท์ที่ยืนยันได้ ${number(res.summary.liftRounds)} รอบ (รอบร่วมหลายบิลนับครั้งเดียว)`+(s.warehouse||s.sku?' · ยอดลังตามคลัง/SKU ที่เลือก รายละเอียดแสดงทั้งบิล':'');
+      } catch(error) {
+        if(request!==generation)return;
+        el('gr-report-status').textContent=error.message;
+        if(!append){el('gr-bill-scope-summary').textContent='';el('gr-coverage').textContent='';}
+        if(!append){s.analytics=null;el('gr-kpi-row').innerHTML='<p>ยังไม่มีผลลัพธ์สำหรับตัวกรองนี้</p>';el('gr-chart-row').innerHTML='';el('vl-vendor-list').innerHTML='';el('dashboard-daily-chart').innerHTML='';el('dashboard-bills-tbody').innerHTML='<tr><td colspan="9">โหลดไม่สำเร็จ กด “โหลดใหม่” เพื่อลองอีกครั้ง</td></tr>';}
+      } finally {
+        if(request===generation){s.loading=false;s.loadingMore=false;el('gr-report-content').classList.remove('gr-is-loading');el('gr-report-content').setAttribute('aria-busy','false');updateGrDashboardLoadMoreState(false);}
+      }
+    })();
+    const requestEntry={generation:request,promise:requestPromise};
+    inFlightRequests.set(requestKey,requestEntry);
+    const clearRequest=()=>{if(inFlightRequests.get(requestKey)===requestEntry)inFlightRequests.delete(requestKey);};
+    requestPromise.then(clearRequest,clearRequest);
+    return requestPromise;
   }
   function renderSummary(s) {
     const cards=[['approved','จำนวนบิลที่อนุมัติรับลงสินค้า',number(s.approvedBills),'บิล','ดูบิลที่อนุมัติ'],['issues','จำนวนบิล / GR ที่พบปัญหา',number(s.problemBills),'บิล','ดูบิลที่พบปัญหา'],['lift','จำนวนรอบที่ใช้ลิฟท์',number(s.liftRounds),'รอบ','ดูบิลที่ใช้ลิฟท์'],['lead','Leadtime เฉลี่ย',s.overallAvgLeadDays==null?'—':number(s.overallAvgLeadDays),'วัน',`จาก ${number(s.leadtimeSamples)} บิล`]];
