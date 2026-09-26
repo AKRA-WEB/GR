@@ -1132,7 +1132,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20260925.04';
+    const CURRENT_VERSION = '20260926.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
     async function checkAppVersion() {
@@ -2862,6 +2862,29 @@
         return approver;
     }
 
+    function getGrDashboardBillQuantitySummary(bill) {
+        const items = Array.isArray(bill?.items) ? bill.items : [];
+        const quantities = new Map();
+        items.forEach(item => {
+            const quantity = Number(item?.grQty);
+            if (!Number.isFinite(quantity) || quantity <= 0) return;
+            const unit = String(item?.unit || '').trim() || 'หน่วยไม่ระบุ';
+            const key = unit.toLocaleLowerCase('th-TH');
+            const current = quantities.get(key) || { unit, quantity: 0 };
+            current.quantity += quantity;
+            quantities.set(key, current);
+        });
+
+        if (quantities.size > 0) {
+            return [...quantities.values()]
+                .map(({ quantity, unit }) => `${quantity.toLocaleString()} ${esc(unit)}`)
+                .join(' · ');
+        }
+
+        const crates = Number(bill?.totalCrates || 0);
+        return crates > 0 ? `${crates.toLocaleString()} ลัง` : 'ไม่ระบุจำนวน';
+    }
+
     function groupGrDashboardBills(bills) { return Array.isArray(bills) ? bills : []; }
 
     function renderGrDashboardBillsTable(bills) {
@@ -2892,7 +2915,7 @@
             const vendor = b.vendor || '-';
             const ata = GrDashboard.date(b.ataDate || b.grDate);
             const wh = b.warehouse || 'W1';
-            const crates = Number(b.totalCrates || 0);
+            const receivedQuantity = getGrDashboardBillQuantitySummary(b);
             const itemsCount = Number(b.itemCount || (b.items ? b.items.length : 0));
             const receiver = b.receiver || '-';
             const approver = getGrDashboardApprover(b);
@@ -2912,7 +2935,7 @@
                     <td class="py-3 px-4 text-gray-700">${esc(ata)}</td>
                     <td class="py-3 px-4">${getWarehouseBadge(wh)}</td>
                     <td class="py-3 px-4 text-center">
-                        <span class="font-bold text-gray-900">${crates.toLocaleString()} ลัง</span>
+                        <span class="font-bold text-gray-900">${receivedQuantity}</span>
                         <span class="block text-[10px] text-gray-400">${itemsCount} รายการ</span>
                     </td>
                     <td class="py-3 px-4">
