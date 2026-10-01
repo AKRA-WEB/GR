@@ -30,7 +30,7 @@
             let current = typeof window === 'undefined' || window.appSession === session;
             try { if (bridge && bridge.getToken() !== token) current = false; } catch (_) { current = false; }
             if (!current) {
-                const error = new Error('บัญชีหรือเซสชันเปลี่ยนแล้ว กรุณาตรวจสอบผลรายการจาก Main ก่อนทำซ้ำ');
+                const error = new Error('บัญชีหรือเซสชันเปลี่ยนแล้ว กรุณาตรวจสอบผลรายการจาก BUYMORETH ก่อนทำซ้ำ');
                 error.reason = 'session_changed';
                 throw error;
             }
