@@ -1136,7 +1136,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261002.01';
+    const CURRENT_VERSION = '20261003.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1719,6 +1719,14 @@
         }
     };
     document.addEventListener('DOMContentLoaded', AuthGuard.init);
+
+    // Keep wheel scrolling from changing focused numeric fields, including newly rendered rows.
+    document.addEventListener('wheel', event => {
+        const input = event.target;
+        if (input && input.tagName === 'INPUT' && input.type === 'number' && input === document.activeElement) {
+            event.preventDefault();
+        }
+    }, { capture: true, passive: false });
 
     function can(perm) {
         if (!window.appSession) return false;
