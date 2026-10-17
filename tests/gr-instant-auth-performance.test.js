@@ -124,8 +124,10 @@ const mockAuthGuardContext = {
 };
 
 const authGuardCode = "var AuthGuard = " + html.match(/var AuthGuard = (\{[\s\S]*?\n    \};)/)[1];
+const authHelpers = html.slice(html.indexOf('    var grAuthAttempt ='), html.indexOf('    var AuthGuard ='));
+const authClassifier = html.slice(html.indexOf('    function grErrorState('), html.indexOf('    function grReadFailure('));
 vm.createContext(mockAuthGuardContext);
-vm.runInContext(authGuardCode, mockAuthGuardContext);
+vm.runInContext(authClassifier + '\n' + authHelpers + '\n' + authGuardCode, mockAuthGuardContext);
 
 (async () => {
   await mockAuthGuardContext.AuthGuard.init();

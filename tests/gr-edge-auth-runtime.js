@@ -2,10 +2,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {backendPath} = require('./helpers/backend-source.cjs');
+const {stripTypeScriptTypes} = require('node:module');
 
 const TEST_SECRET = 'test-main-jwt-secret-at-least-32-characters';
-const sharedPath = path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', '_shared', 'main-jwt.ts');
-const apiPath = path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', 'gr-api', 'index.ts');
+const sharedPath = backendPath('supabase', 'functions', '_shared', 'main-jwt.ts');
+const apiPath = backendPath('supabase', 'functions', 'gr-api', 'index.ts');
 
 const rpcCalls = [];
 const linePushBodies = [];
@@ -85,7 +87,7 @@ const context = vm.createContext({
   }
 });
 
-vm.runInContext(`${sharedSource}\n${apiSource}`, context);
+vm.runInContext(stripTypeScriptTypes(`${sharedSource}\n${apiSource}`), context);
 assert.equal(typeof handler, 'function', 'Edge Function handler must register');
 
 function invoke(body, origin = 'https://akra-web.github.io') {

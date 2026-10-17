@@ -1,10 +1,18 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const {backendPath} = require('./helpers/backend-source.cjs');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const {stripTypeScriptTypes} = require('node:module');
+const TEST_SECRET = 'fictional-gr-lifecycle-signing-secret-at-least-32';
 
 let handler;
 global.Deno = {
   env: { get: name => ({
     MAIN_VERIFY_URL: 'https://main.example/exec',
+    MAIN_JWT_SECRET: TEST_SECRET,
+    MAIN_IDENTITY_REQUIRED: 'true',
+    MAIN_CATALOG_REQUIRED: 'true',
     SUPABASE_URL: 'https://database.example',
     GR_SUPABASE_SECRET_KEY: 'server-only-key',
     GR_ALLOWED_ORIGINS: 'https://akra-web.github.io'
@@ -58,6 +66,15 @@ global.fetch = async (url, options = {}) => {
     assert.equal(options.headers.get('apikey'), 'server-only-key');
     assert.equal(options.headers.has('Authorization'), false, 'Modern Supabase secrets use apikey only');
   }
+  if (target.endsWith('/rest/v1/rpc/auth_validate_bound_session_v2')) {
+    const body = JSON.parse(options.body);
+    assert.equal(body.p_username, 'A1');
+    assert.equal(body.p_identity_id, '10000000-0000-4000-8000-000000000001');
+    assert.equal(body.p_session_id, '10000000-0000-4000-8000-000000000099');
+    assert.equal(body.p_session_version, 1);
+    assert.equal(body.p_authorization_revision, 'fixture');
+    return {ok:true,status:200,headers:new Headers(),json:async()=>({valid:true})};
+  }
   if (target.includes('/rest/v1/purchase_order_items?')) {
     return { ok: true, status: 200, headers: new Headers(), json: async () => [{ po_id: po.id }] };
   }
@@ -67,8 +84,10 @@ global.fetch = async (url, options = {}) => {
   if (target.includes('/rest/v1/purchase_orders?')) {
     return { ok: true, status: 200, headers: new Headers(), json: async () => [structuredClone(po)] };
   }
-  if (target.endsWith('/rest/v1/rpc/gr_receive_v1')) {
-    const payload = JSON.parse(options.body).p_payload;
+  if (target.endsWith('/rest/v1/rpc/gr_receive_bound_v1')) {
+    const body = JSON.parse(options.body), payload = body.p_payload;
+    assert.equal(body.p_identity_id, '10000000-0000-4000-8000-000000000001');
+    assert.equal(body.p_actor.id, 'A1');
     assert.deepEqual(payload.items.map(item => item.uid), ['item-b'], 'Only the submitted remainder may be mutated');
     const status = payload.targetStatus;
     po.items[1].status = status;
@@ -78,7 +97,10 @@ global.fetch = async (url, options = {}) => {
     po.status = po.items.every(item => item.status === 'GR Completed') ? 'GR Completed' : 'Partial GR';
     return { ok: true, status: 200, headers: new Headers(), json: async () => ({ success: true }) };
   }
-  if (target.endsWith('/rest/v1/rpc/gr_recall_v1')) {
+  if (target.endsWith('/rest/v1/rpc/gr_recall_bound_v1')) {
+    const body = JSON.parse(options.body);
+    assert.equal(body.p_identity_id, '10000000-0000-4000-8000-000000000001');
+    assert.equal(body.p_actor.id, 'A1');
     po.items.forEach(item => { item.status = 'Pending GR'; });
     po.receipts = [];
     po.status = 'Pending GR';
@@ -87,13 +109,21 @@ global.fetch = async (url, options = {}) => {
   throw new Error(`Unexpected fetch: ${target}`);
 };
 
-require(path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', 'gr-api', 'index.ts'));
+const moduleSource = [
+  fs.readFileSync(backendPath('supabase','functions','_shared','main-jwt.ts'),'utf8').replace(/^export\s+/gm,''),
+  fs.readFileSync(backendPath('supabase','functions','_shared','gr-push-kick.ts'),'utf8').replace(/^export\s+/gm,''),
+  fs.readFileSync(backendPath('supabase','functions','gr-api','index.ts'),'utf8').replace(/^import\b.*$/gm,'')
+].join('\n');
+const context = {console,Request,Response,Headers,URL,URLSearchParams,TextEncoder,TextDecoder,crypto:globalThis.crypto,atob,btoa,fetch:global.fetch,Deno:global.Deno};
+vm.createContext(context);vm.runInContext(stripTypeScriptTypes(moduleSource),context);
 
 async function invoke(action, data) {
+  const startedAt = Date.now();
+  const token = await context.signMainJwt({id:'A1',name:'Approver',roles:['SUPERVISOR'],identityId:'10000000-0000-4000-8000-000000000001',tokenVersion:2,sessionVersion:1,authorizationRevision:'fixture',apps:['app-gr'],perms:{'app-gr':['receiveGR','approveGR']},permissionCatalog:{'app-gr':['receiveGR','approveGR']},sessionId:'10000000-0000-4000-8000-000000000099',sessionStartedAt:startedAt,exp:Math.floor((startedAt+3600000)/1000)},TEST_SECRET);
   const response = await handler(new Request('https://database.example/functions/v1/gr-api', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: 'https://akra-web.github.io' },
-    body: JSON.stringify({ action, data, token: 'approver-token' })
+    body: JSON.stringify({ action, data, token })
   }));
   assert.equal(response.status, 200);
   return response.json();

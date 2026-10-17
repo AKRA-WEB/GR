@@ -26,7 +26,12 @@
         if (bridge) token = bridge.getToken();
         const session = typeof window !== 'undefined' ? window.appSession : undefined;
         const operation = async () => {
-            const result = await transportRequest(action, data, token);
+            const result = await transportRequest(action, data, token).catch(error => {
+                let current = typeof window === 'undefined' || window.appSession === session;
+                try { if (bridge && bridge.getToken() !== token) current = false; } catch (_) { current = false; }
+                if (!current) throw Object.assign(new Error('session_changed'), { reason: 'session_changed', cause: error });
+                throw error;
+            });
             let current = typeof window === 'undefined' || window.appSession === session;
             try { if (bridge && bridge.getToken() !== token) current = false; } catch (_) { current = false; }
             if (!current) {
@@ -43,14 +48,15 @@
     }
 
     async function transportRequest(action, data, token) {
-        if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+        if (!token) throw Object.assign(new Error('กรุณาเข้าสู่ระบบใหม่'), { reason: 'no_token', status: 401 });
         const isRead = READ_ACTIONS.has(action);
         const attempts = isRead ? 2 : 1;
         let lastError = null;
 
         for (let attempt = 1; attempt <= attempts; attempt++) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), isRead ? 25000 : 35000);
+            let timedOut = false;
+            const timeoutId = setTimeout(() => { timedOut = true; controller.abort(); }, isRead ? 25000 : 35000);
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -62,12 +68,14 @@
                 if (!response.ok) {
                     const error = new Error(payload.message || payload.reason || `GR API HTTP ${response.status}`);
                     error.reason = payload.reason || '';
+                    error.status = response.status;
                     throw error;
                 }
                 return payload;
             } catch (error) {
+                if (timedOut && error.name === 'AbortError') error.reason = 'request_timeout';
                 lastError = error;
-                if (attempt < attempts && (error.name === 'AbortError' || error instanceof TypeError)) {
+                if (attempt < attempts && (error.reason === 'request_timeout' || error instanceof TypeError)) {
                     await delay(250 * attempt);
                     continue;
                 }

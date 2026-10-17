@@ -10,7 +10,7 @@ var GrDashboard = (() => {
   const el=id=>document.getElementById(id);
   const html=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=value=>Number(value||0).toLocaleString('th-TH',{maximumFractionDigits:2});
-  function date(value) { return String(value||'').replace(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/,'$3/$2/$1') || '—'; }
+  function date(value) { return (typeof window !== 'undefined' && window.BMDateDisplay ? window.BMDateDisplay.date(value) : String(value||'').replace(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/,'$3/$2/$1')) || '—'; }
   function issueText(codes) { return !Array.isArray(codes) ? 'ยังไม่ได้ระบุ' : codes.length ? codes.map(c=>issues[c]||c).join(' · ') : 'ปกติ / ไม่พบปัญหา'; }
   function filters() { const s=grDashboardState;return {schemaVersion:2,preset:s.preset,dateFrom:s.dateFrom,dateTo:s.dateTo,exactDate:s.exactDate,warehouse:s.warehouse||'',receiver:s.receiver||'',issue:s.issue||'',liftOnly:!!s.liftOnly,search:s.search||'',vendor:s.vendor||'',sku:s.sku||''}; }
   function tab(name) {

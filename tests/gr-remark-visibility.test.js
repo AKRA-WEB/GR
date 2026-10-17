@@ -97,7 +97,8 @@ const sandbox = {
     window: {
         location: { search: '' },
         currentUser: 'TestReceiver',
-        scrollTo: () => {}
+        scrollTo: () => {},
+        addEventListener: () => {}
     },
     document: {
         getElementById: (id) => getEl(id),
@@ -123,6 +124,8 @@ const sandbox = {
 };
 
 vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../js/bm-date-display.js'),'utf8'),sandbox);
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../js/gr-dashboard-v2.js'),'utf8'),sandbox);
 vm.runInContext(mainScript, sandbox);
 
 // Setup sample PO data with billRemark and itemRemark

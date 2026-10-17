@@ -63,6 +63,7 @@ function cacheContext(options = {}) {
     grActiveDataRequestGeneration: 0, grCompletedLoaded: false, grCompletedLoadedFull: false, grCompletedHasMore: false,
     grCompletedNextOffset: 0, grCompletedLoadedFromCache: false, grDeliveryPlanningLoaded: false,
     grDeliveryPlanRenderPending: false, groupPendingPOs() {}, renderPOListForReceiving() {}, loadGRDeliveryPlanningBackground() {},
+    restoreGRDeliveryPlanning() {},
     PERF_MODE: false, perfLog() {}, document: { getElementById() { return null; } },
     apiCall: options.apiCall || (async () => ({ success: false, message: 'network_failed' }))
   });

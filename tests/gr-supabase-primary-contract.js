@@ -1,13 +1,16 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const {backendPath} = require('./helpers/backend-source.cjs');
+const vm = require('node:vm');
+const {stripTypeScriptTypes} = require('node:module');
 
 const root = path.join(__dirname, '..');
 const workspace = path.join(root, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const clientSource = fs.readFileSync(path.join(root, 'js', 'supabase-gr-client.js'), 'utf8');
-const migrationPath = path.join(workspace, 'database', 'supabase', 'migrations', '202608200001_gr_transactional_api.sql');
-const edgePath = path.join(workspace, 'database', 'supabase', 'functions', 'gr-api', 'index.ts');
+const migrationPath = backendPath('supabase', 'migrations', '202608200001_gr_transactional_api.sql');
+const edgePath = backendPath('supabase', 'functions', 'gr-api', 'index.ts');
 
 assert.match(html, /js\/supabase-gr-client\.js/, 'GR must load the Supabase-primary client');
 assert.match(html, /AkraSupabaseGR\.request\(action, payload, getSessionToken\(\)\)/,
@@ -79,11 +82,33 @@ assert.match(edge, /EdgeRuntime\.waitUntil\(notification\)/,
   'Completion notification must run after the Supabase commit without delaying the UI response');
 assert.doesNotMatch(edge, /eyJ[a-zA-Z0-9_-]{20,}/,
   'The Edge Function source must not embed credentials');
-assert.match(edge, /env\('GR_SUPABASE_SECRET_KEY'\)/,
-  'The Edge Function must require a newly provisioned server-only key rather than the exposed legacy key');
+assert.match(edge, /supabaseServiceKey\('SECRET_KEY',\s*'GR_SUPABASE_SECRET_KEY',\s*'SUPABASE_SERVICE_ROLE_KEY'\)/,
+  'The Edge Function must use the reviewed named-key helper with explicit migration fallbacks');
 assert.doesNotMatch(edge, /Authorization[^\n]+Bearer[^\n]+serviceKey/,
   'A modern Supabase secret key must be sent only in the apikey header');
 assert.match(edge, /hasOwnProperty\.call\(user\.perms, 'app-gr'\)/,
   'An explicit empty app permission contract must deny access instead of falling back to role');
 
-console.log('PASS gr-supabase-primary-contract: one authenticated Supabase authority and atomic GR mutations are wired');
+// Accepted security rollout20260924-008 AC1/AC3: named keys and strict bound sessions.
+const shared = stripTypeScriptTypes(fs.readFileSync(backendPath('supabase','functions','_shared','main-jwt.ts'),'utf8').replace(/^export\s+/gm,''));
+function sharedRuntime(values = {}) {
+  const context = {TextEncoder,TextDecoder,crypto:globalThis.crypto,atob,btoa,Deno:{env:{get:name=>values[name]}}};
+  vm.createContext(context);vm.runInContext(shared,context);return context;
+}
+(async()=>{
+  const named = sharedRuntime({SUPABASE_SECRET_KEYS:JSON.stringify({default:'sb_secret_fictional'}),SECRET_KEY:'fictional-old',GR_SUPABASE_SECRET_KEY:'fictional-gr'});
+  const key = named.supabaseServiceKey('SECRET_KEY','GR_SUPABASE_SECRET_KEY','SUPABASE_SERVICE_ROLE_KEY');
+  assert.equal(key,'sb_secret_fictional');
+  assert.deepEqual(JSON.parse(JSON.stringify(named.supabaseServiceHeaders(key))),{apikey:'sb_secret_fictional'});
+  for(const invalid of ['invalid-json',JSON.stringify({}),JSON.stringify({default:'wrong-kind'})])assert.throws(()=>sharedRuntime({SUPABASE_SECRET_KEYS:invalid,GR_SUPABASE_SECRET_KEY:'fictional-gr'}).supabaseServiceKey('GR_SUPABASE_SECRET_KEY'),/invalid_supabase_secret_keys/);
+  assert.equal(sharedRuntime({GR_SUPABASE_SECRET_KEY:'fictional-gr'}).supabaseServiceKey('SECRET_KEY','GR_SUPABASE_SECRET_KEY'),'fictional-gr');
+  assert.throws(()=>sharedRuntime().supabaseServiceKey('SECRET_KEY','GR_SUPABASE_SECRET_KEY'),/supabase_service_key_not_configured/);
+  const strict = sharedRuntime({MAIN_IDENTITY_REQUIRED:'true',MAIN_CATALOG_REQUIRED:'true'}), startedAt=Date.now(), secret='fictional-signing-secret-with-at-least-32-characters';
+  const claims={id:'fictional-worker',identityId:'10000000-0000-4000-8000-000000000001',tokenVersion:2,sessionVersion:1,authorizationRevision:'fixture',sessionId:'10000000-0000-4000-8000-000000000099',sessionStartedAt:startedAt,exp:Math.floor((startedAt+3600000)/1000),permissionCatalog:{'app-gr':['approveGR']}};
+  const token=await strict.signMainJwt(claims,secret), verified=await strict.verifyMainJwt(token,secret);
+  assert.equal(verified.id,claims.id);assert.equal(verified.identityId,claims.identityId);assert.equal(verified.sessionStartedAt,startedAt);assert.ok(Number.isSafeInteger(verified.sessionStartedAt));
+  assert.ok(verified.exp*1000<=startedAt+48*60*60*1000);assert.deepEqual(Array.from(verified.permissionCatalog['app-gr']),['approveGR']);
+  assert.equal(await strict.verifyMainJwt(token,secret+'wrong'),null);
+  const unbound={...claims};delete unbound.identityId;assert.equal(await strict.verifyMainJwt(await strict.signMainJwt(unbound,secret),secret),null);
+  console.log('PASS gr-supabase-primary-contract: one authenticated Supabase authority and atomic GR mutations are wired');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <script src="js/akra-shell-bridge.js?v=20261002.01"></script>
+    <script src="js/akra-shell-bridge.js?v=20261013.02"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
@@ -10,9 +10,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <title>BUYMORETH | รับสินค้า</title>
 
-  <link rel="stylesheet" href="tailwind.css">
-  <script src="js/supabase-gr-client.js?v=20261002.01" defer></script>
+  <link rel="stylesheet" href="assets/bm-tokens.css?v=20261013.02">
+  <link rel="stylesheet" href="tailwind.css?v=20261013.02">
+  <script src="js/supabase-gr-client.js?v=20261013.02" defer></script>
   <script src="js/gr-expiry.js" defer></script>
+  <script src="js/bm-date-display.js?v=20261013.02" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -312,7 +314,7 @@
       .gr-topbar__app-icon { width: 34px; height: 34px; }
       .gr-brand-lockup h1 { font-size: 14px; }
       .gr-topbar > div > div > .space-x-2 { gap: 4px; }
-      .gr-topbar > div > div > .space-x-2 > button { min-height: 34px; padding: 0 8px !important; font-size: 10px; }
+      .gr-topbar > div > div > .space-x-2 > button { min-height: 34px; padding: 0 8px !important; font-size: 12px; }
     }
 
     /* Bill queue grid refinement: equal-width cards, unchanged order and click behavior. */
@@ -482,7 +484,7 @@
 
   </style>
   <style id="gr-enterprise-ui">
-    :root { --gr-bg: #f5f7fa; --gr-orange: #2563eb; --gr-orange-soft: #eff6ff; --gr-ink: #172033; --gr-muted: #475569; --gr-line: #e2e8f0; }
+    :root { --gr-bg: #f5f7fa; --gr-orange: var(--bm-primary); --gr-orange-soft: #eff6ff; --gr-ink: var(--bm-text); --gr-muted: var(--bm-text-secondary); --gr-line: #e2e8f0; }
     body.gr-shell { background: var(--gr-bg) !important; letter-spacing: 0; }
     .gr-shell ::selection { background: #bfdbfe; color: #172033; }
     .gr-shell input, .gr-shell textarea { caret-color: #2563eb; }
@@ -509,7 +511,7 @@
     .gr-topbar button { color: #475569 !important; background: #f1f5f9 !important; border-color: transparent !important; box-shadow: none; }
     .gr-topbar button:hover { color: #1d4ed8 !important; background: #eff6ff !important; }
     .gr-topbar #logout-btn { color: #b42318 !important; background: #fff1f2 !important; }
-    .gr-topbar #local-preview-badge { font-size: 10px; color: #475569 !important; letter-spacing: 0; }
+    .gr-topbar #local-preview-badge { font-size: 12px; color: #475569 !important; letter-spacing: 0; }
     .gr-topbar #local-preview-badge:not(.hidden) { display: block !important; }
     .gr-main { width: calc(100% - 240px); max-width: none !important; margin: 0 0 0 240px; min-height: 0; padding: 28px 28px 48px !important; scrollbar-color: #cbd5e1 #f5f7fa; scrollbar-width: thin; }
     .gr-view-heading { margin-bottom: 22px; }
@@ -622,7 +624,7 @@
       .gr-sidebar { position: static; order: 1; width: 100%; padding: 10px 12px; gap: 0; flex-shrink: 0; }
       .gr-sidebar__brand { display: none; }
       .gr-sidebar__menu { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-      .gr-sidebar__menu button { flex-direction: column; justify-content: center; gap: 5px; min-height: 62px; padding: 8px 4px; font-size: 11px; text-align: center; }
+      .gr-sidebar__menu button { flex-direction: column; justify-content: center; gap: 5px; min-height: 62px; padding: 8px 4px; font-size: 12px; text-align: center; }
       .gr-topbar { order: 0; width: 100%; margin-left: 0; min-height: 64px; }
       .gr-topbar > div { width: calc(100% - 24px); }
       .gr-topbar > div > div { height: 64px; }
@@ -630,7 +632,7 @@
       .gr-topbar > div > div > .space-x-2 > p, .gr-topbar .space-x-2 button span { display: none; }
       .gr-topbar > div > div > .space-x-2 > button { width: 44px; min-width: 44px; min-height: 44px; justify-content: center; }
       .gr-topbar .gr-brand-lockup h1 { font-size: 14px; }
-      .gr-topbar #local-preview-badge { font-size: 8px; }
+      .gr-topbar #local-preview-badge { font-size: 12px; }
       .gr-main { order: 2; width: 100%; margin-left: 0; padding: 20px 12px 32px !important; }
       .gr-view-heading { gap: 8px; margin-bottom: 16px; }
       .gr-view-heading h2 { font-size: 21px !important; }
@@ -682,9 +684,49 @@
       #form-receiving .po-ordered-qty { padding-inline: 5px; font-size: 8px; }
       #form-receiving .po-ordered-qty strong { font-size: 9px; }
     }
+    /* Scoped follow-up: keep the established layout and make daily bill text readable. */
+    #receiving-list-view, #vendor-leadtime-tab-bills { --gr-muted: #475569; }
+    :is(#receiving-list-view, #vendor-leadtime-tab-bills, #form-receiving, #r-delivery-plan) :is([class*="text-[8px]"], [class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"]) { font-size: 12px !important; }
+    :is(#receiving-list-view, #vendor-leadtime-tab-bills, #r-delivery-plan) :is(.text-gray-400, .text-gray-500, .text-slate-400, .text-slate-500) { color: #475569 !important; }
+    #vendor-leadtime-tab-bills :is(.text-brand-orange, .text-orange-500, .text-orange-600) { color: #9a3412 !important; }
+    #vendor-leadtime-tab-bills :is(.text-brand-blue, .text-blue-500, .text-blue-600) { color: #1d4ed8 !important; }
+    #vendor-leadtime-tab-bills .gr-issue-badge { font-size: 12px; }
+    #vendor-leadtime-tab-bills thead th { color: var(--bm-text-secondary); }
+    #gr-bill-detail-modal :is([class*="text-[10px]"], [class*="text-[11px]"]) { font-size: var(--bm-text-xs) !important; }
+    #gr-bill-detail-modal :is(.text-gray-400, .text-gray-500) { color: var(--bm-text-secondary); }
+    #gr-bill-detail-modal .text-brand-orange { color: #9a3412; }
+    #dashboard-bills-tbody > tr > td:first-child .font-bold { font-size: 13px; }
+    .gr-bill-card__po, .gr-bill-card__footer, .gr-bill-card__location-label, .gr-bill-card__location, .gr-bill-card__location span { font-size: 12px !important; }
+    #wh-chips button, .gr-bill-card .gr-status-badge { font-size: var(--bm-text-xs) !important; }
+    #wh-chips button.bg-brand-orange > span { color: var(--bm-primary-hover); background: #fff; }
+    .gr-bill-card .gr-status-badge { color: var(--bm-text-secondary) !important; }
+    .gr-bill-card.status-card--overdue .gr-status-badge { color: var(--bm-error) !important; background: #fef2f2 !important; }
+    #receiving-list-view .gr-bill-card:is(.status-card--review, .status-card--draft) .gr-bill-card__po { color: var(--bm-on-primary) !important; }
+    .gr-bill-card .gr-bill-card__open { color: var(--bm-primary-hover) !important; }
+    .gr-bill-card .opacity-80, #r-delivery-plan .opacity-80 { opacity: 1; }
+    .gr-partial-plan-badge { color: #9a3412; }
+    .gr-bill-card.opacity-75 { opacity: 1; }
+    .gr-bill-card__vendor-name, .gr-bill-card__item p { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+    .gr-bill-card:focus-visible, #form-receiving button:focus-visible, #form-receiving input:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+    #form-receiving :is(label:has(.po-no-expiry), label:has(.ex-no-expiry)) { min-height: 28px; padding: 4px 2px; font-size: 12px !important; }
+    #form-receiving :is(.po-no-expiry, .ex-no-expiry) { width: 18px; height: 18px; flex-shrink: 0; accent-color: #2563eb; }
+    #form-receiving :is(label, .po-ordered-qty, .po-ordered-qty strong) { font-size: var(--bm-text-xs) !important; }
+    #form-receiving .text-red-500 { color: var(--bm-error); }
+    #form-receiving .text-brand-orange { color: #9a3412; }
+    #form-receiving > .sticky #btn-review { background: var(--bm-primary) !important; color: var(--bm-on-primary) !important; }
+    #form-receiving > .sticky #btn-review:hover { background: var(--bm-primary-hover) !important; }
+    #form-receiving button { min-width: 28px; min-height: 28px; }
+    .gr-receiving-actions { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+    #receiving-detail-view { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+    #form-receiving :is(input, textarea) { scroll-margin-bottom: 104px; }
+    .gr-load-error { padding: 16px; margin-bottom: 16px; border: 1px solid #fecaca; border-radius: 12px; background: #fff1f2; color: #881337; }
+    .gr-load-error p { margin-top: 4px; font-size: 14px; }
+    .gr-load-error button, #auth-error-action, #data-loader-retry, #btn-confirm-receive { background: #2563eb !important; color: #fff !important; }
+    .gr-load-error button { min-height: 36px; margin-top: 12px; padding: 8px 14px; border-radius: 8px; }
+    .gr-load-error button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
   </style>
   <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.04">
-  <script src="js/gr-dashboard-v2.js?v=20260925.04" defer></script>
+  <script src="js/gr-dashboard-v2.js?v=20261013.02" defer></script>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -694,12 +736,12 @@
       <p class="text-[#171C8F] font-medium text-lg">กำลังตรวจสอบสิทธิ์...</p>
   </div>
 
-  <div id="auth-error" class="fixed inset-0 bg-white z-[9999] hidden flex flex-col justify-center items-center p-6 text-center">
+  <div id="auth-error" role="alert" class="fixed inset-0 bg-white z-[9999] hidden flex flex-col justify-center items-center p-6 text-center">
       <div class="bg-red-50 p-8 rounded-2xl max-w-md border border-red-100 shadow-lg">
           <i data-lucide="shield-alert" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
-          <h2 class="text-xl font-bold text-gray-800 mb-2">ปฏิเสธการเข้าถึง</h2>
+          <h2 id="error-title" class="text-xl font-bold text-gray-800 mb-2">ปฏิเสธการเข้าถึง</h2>
           <p id="error-message" class="text-gray-600 mb-6">คุณไม่มีสิทธิ์เข้าใช้งานแอปพลิเคชันนี้</p>
-          <button onclick="window.AkraModule.home(APP_CONFIG.PORTAL_URL)" class="px-6 py-2.5 bg-[#171C8F] text-white rounded-lg font-medium hover:bg-[#11146B] transition shadow-md">กลับไปหน้าหลัก (Portal)</button>
+          <button id="auth-error-action" type="button" onclick="window.AkraModule.home(APP_CONFIG.PORTAL_URL)" class="px-6 py-2.5 bg-[#171C8F] text-white rounded-lg font-medium hover:bg-[#11146B] transition shadow-md">กลับหน้าหลัก</button>
       </div>
   </div>
 
@@ -743,15 +785,15 @@
           <div class="gr-filter-bento mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
             <input type="text" id="r-search-input" oninput="schedulePOListRender()" aria-label="ค้นหาบิลรับสินค้า" placeholder="ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
             <select id="r-status-filter" onchange="handleStatusFilterChange()" aria-label="กรองสถานะบิล" class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
-              <option value="">📌 ทุกสถานะ</option>
-              <option value="Overdue">🚨 นานผิดปกติ (Overdue)</option>
-              <option value="Draft GR">📦 กำลังลงสินค้า (Draft)</option>
-              <option value="Pending Review">⏳ รอตรวจสอบ</option>
-              <option value="GR Completed">✅ ลงสินค้าสำเร็จแล้ว</option>
-              <option value="Pending GR">🕒 รอรับเข้า</option>
+              <option value="">ทุกสถานะ</option>
+              <option value="Overdue">นานผิดปกติ (Overdue)</option>
+              <option value="Draft GR">กำลังลงสินค้า (Draft)</option>
+              <option value="Pending Review">รอตรวจสอบ</option>
+              <option value="GR Completed">ลงสินค้าสำเร็จแล้ว</option>
+              <option value="Pending GR">รอรับเข้า</option>
             </select>
             <select id="r-warehouse-filter" onchange="renderPOListForReceiving()" aria-label="กรองคลังรับสินค้า" class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
-              <option value="">🛒 ทุกคลัง (All)</option>
+              <option value="">ทุกคลัง (All)</option>
               <option value="W1">W1</option><option value="W2">W2</option><option value="W3">W3</option>
               <option value="W4">W4</option><option value="W5">W5</option><option value="C1">C1</option><option value="C2">C2</option>
             </select>
@@ -760,6 +802,8 @@
           <div id="delivery-plan-summary" class="gr-delivery-summary mb-5 px-1"></div>
 
           <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
+
+          <div id="gr-load-error" class="gr-load-error hidden" role="alert"></div>
 
           <div id="gr-reconciliation-notice" class="hidden mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-3"><span id="gr-reconciliation-message">บันทึกแล้ว กำลังอัปเดตข้อมูลบิล</span><button type="button" onclick="retryGRReconciliation()" class="rounded-md border border-amber-500 px-3 py-1.5 font-semibold hover:bg-amber-100">ลองโหลดข้อมูลใหม่</button></div>
@@ -936,7 +980,7 @@
               </div>
 
               <!-- Product Search Card -->
-              <form id="dashboard-product-form" class="glass-card p-4 sm:p-5" onsubmit="event.preventDefault(); searchProductReceiptHistory(true);" novalidate>
+              <form id="dashboard-product-form" class="glass-card p-4 sm:p-5" novalidate>
                 <label for="dashboard-product-input" class="block text-sm font-medium text-gray-700 mb-1.5">สินค้า <span class="text-red-500">*</span></label>
                 <p id="dashboard-product-hint" class="text-xs text-gray-500 mt-1">พิมพ์ SKU หรือชื่อสินค้า แล้วเลือกรายการที่ตรงกัน</p>
                 <div class="flex flex-col sm:flex-row gap-3 mt-2">
@@ -1082,7 +1126,8 @@
 
               <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">วันที่มาส่ง (ATA) <span class="text-red-500">*</span></label>
-                <input type="date" id="r-ata" required class="input-field text-base py-2.5 font-medium text-brand-orange border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange">
+                <input type="date" id="r-ata" required aria-describedby="r-ata-date-hint" class="input-field text-base py-2.5 font-medium text-brand-orange border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange">
+                <p id="r-ata-date-hint" class="text-xs text-slate-600 mt-1">วันที่ในรายงานแสดงเป็น พ.ศ. เช่น 12 ต.ค. 2569</p>
               </div>
 
               <div>
@@ -1115,7 +1160,7 @@
               </div>
 
               <!-- กลุ่มปุ่มจัดการ -->
-              <div class="pt-5 sticky bottom-0 bg-[#f3f4f6]/95 backdrop-blur-md p-3 -mx-3 sm:-mx-5 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] flex gap-2 overflow-x-auto hide-scroll rounded-t-2xl border-t border-gray-200">
+              <div class="gr-receiving-actions pt-5 sticky bottom-0 bg-[#f3f4f6]/95 backdrop-blur-md p-3 -mx-3 sm:-mx-5 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] flex gap-2 overflow-x-auto hide-scroll rounded-t-2xl border-t border-gray-200">
                 <button type="button" id="btn-draft" class="btn bg-white text-gray-600 hover:bg-gray-50 border border-gray-300 py-3.5 flex-1 min-w-[100px] whitespace-nowrap shadow-sm font-bold">📝 พักบิล</button>
                 <button type="button" id="btn-review" class="btn bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3.5 flex-1 shadow-md min-w-[120px] whitespace-nowrap">⏳ รับสินค้าเสร็จแล้ว</button>
                 <button type="button" id="btn-confirm-receive" class="btn bg-brand-orange hover:bg-[#CC4904] shadow-md shadow-brand-orange/30 text-white font-bold py-3.5 flex-1 min-w-[130px] whitespace-nowrap hidden">✅ ยืนยันรับสินค้า</button>
@@ -1136,7 +1181,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261003.01';
+    const CURRENT_VERSION = '20261014.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1504,6 +1549,12 @@
     var grReconcilingBillKeys = new Map();
     var grReconciliationRetryPromise = null;
     var grDeliveryPlanningLoaded = false;
+    var grDeliveryPlanningLoading = false;
+    var grDeliveryPlanningError = null;
+    var grDeliveryPlanningRetry = null;
+    var grDeliveryPlanningSnapshot = null;
+    var grDeliveryPlanningRequest = null;
+    var grDeliveryPlanningActiveGeneration = -1;
     var grDeliveryPlanRenderPending = false;
     var deliveryPlanFilter = '';
     var deliveryPlanDayOffset = null;
@@ -1550,6 +1601,41 @@
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
 
+    function grErrorState(error) {
+        const messageReason = !error?.status && /^(?:permission_denied|invalid_or_expired_token|invalid_session|session_changed|session_revoked|session_expired|current_session_required|session_replaced|main_signed_out|no_token|shell_session_unavailable|session_verify_timeout)$/.test(error?.message || '') ? error.message : '';
+        const reason = String(error?.reason || error?.code || messageReason || '').toLowerCase();
+        const status = Number(error?.status || error?.statusCode || 0);
+        if (reason === 'session_changed') return { type: 'changed', title: 'บัญชีหรือเซสชันเปลี่ยนแล้ว', body: 'กรุณาเปิด GR จาก BUYMORETH ใหม่', action: 'เข้าสู่ระบบอีกครั้ง' };
+        if (['invalid_or_expired_token', 'invalid_session', 'session_revoked', 'session_expired', 'current_session_required', 'session_replaced', 'main_signed_out', 'no_token', 'shell_session_unavailable'].includes(reason)) return { type: 'session', title: 'เซสชันหมดอายุหรือเปลี่ยนแล้ว', body: 'เข้าสู่ระบบ BUYMORETH อีกครั้ง', action: 'เข้าสู่ระบบอีกครั้ง' };
+        if (reason === 'permission_denied') return { type: 'permission', title: 'ไม่มีสิทธิ์ใช้ส่วนนี้', body: 'ติดต่อผู้ดูแลใน BUYMORETH เพื่อขอสิทธิ์', action: 'กลับหน้าหลัก' };
+        if (error?.name === 'AbortError' && reason !== 'request_timeout') return { type: 'cancelled', title: 'ยกเลิกการโหลดแล้ว', body: 'เลือกโหลดข้อมูลอีกครั้งเมื่อต้องการ', action: '' };
+        if (reason === 'request_timeout' || reason === 'session_verify_timeout' || reason === 'offline') return { type: 'network', title: 'เชื่อมต่อไม่ได้', body: 'ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง', action: 'ลองอีกครั้ง' };
+        // Specific business rejections must retain their existing handlers before HTTP fallback.
+        if (status === 409 || status === 429 || /^(?:validation_|invalid_payload|invalid_quantity|invalid_location|invalid_expiry|stale_count|conflict|duplicate_|already_|rate_limit|too_many_requests)/.test(reason)) return null;
+        if (status === 401) return grErrorState({ reason: 'invalid_session' });
+        if (status === 403) return grErrorState({ reason: 'permission_denied' });
+        if (status >= 500 || ['internal_error', 'server_error', 'service_unavailable', 'unknown_error'].includes(reason)) return { type: 'server', title: 'ระบบขัดข้องชั่วคราว', body: 'ลองอีกครั้งในอีกสักครู่ ถ้ายังไม่ได้ให้แจ้งผู้ดูแล', action: 'ลองอีกครั้ง' };
+        if (error?.name === 'TypeError') return grErrorState({ reason: 'offline' });
+        return null;
+    }
+    function grReadFailure(error) {
+        const state = grErrorState(error);
+        const result = { success: false, reason: error?.reason || error?.code || '', status: error?.status || 0, name: error?.name || '', message: state ? `${state.title} — ${state.body}` : (error?.reason ? (error.message || error.error || 'โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง') : 'โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง') };
+        if (state?.type === 'session') {
+            window.appSession = null;
+            showGRAuthFailure(error);
+        }
+        return result;
+    }
+    function showGRAuthFailure(error) {
+        const state = grErrorState(error) || { title: 'ตรวจสอบสิทธิ์ไม่สำเร็จ', body: 'กรุณาลองอีกครั้ง ถ้ายังไม่ได้ให้แจ้งผู้ดูแล', action: 'ลองอีกครั้ง', type: 'server' };
+        UI.showError(state.body);
+        document.getElementById('error-title').innerText = state.title;
+        const action = document.getElementById('auth-error-action');
+        action.innerText = state.action || 'กลับหน้าหลัก';
+        action.onclick = state.type === 'network' || state.type === 'server' ? () => AuthGuard.init() : () => state.type === 'session' || state.type === 'changed' ? window.AkraModule.authRequired(APP_CONFIG.PORTAL_URL) : window.AkraModule.home(APP_CONFIG.PORTAL_URL);
+        if (window.AkraModule?.embedded && (state.type === 'session' || state.type === 'changed')) window.AkraModule.authRequired(APP_CONFIG.PORTAL_URL);
+    }
     var UI = {
         showLoading: () => { document.body.classList.add('loading-active'); document.getElementById('auth-loading').classList.remove('hidden'); document.getElementById('auth-error').classList.add('hidden'); document.getElementById('app-content').classList.add('hidden'); },
         showError: (message) => { document.body.classList.remove('loading-active'); document.getElementById('app-content').classList.add('hidden'); document.getElementById('auth-loading').classList.add('hidden'); const errorSection = document.getElementById('auth-error'); errorSection.classList.remove('hidden'); document.getElementById('error-message').innerText = message; },
@@ -1625,19 +1711,46 @@
         return apiCall(action, payload);
     }
 
+    var grAuthAttempt = 0, grPendingVerification = null;
+    function grAuthRawSession() { try { return localStorage.getItem(APP_CONFIG.STORAGE_KEY); } catch (_) { return null; } }
+    function invalidateGRAuthStartup() { ++grAuthAttempt; grPendingVerification = null; }
+    window.addEventListener('storage', event => {
+        if (event.key !== null && ![APP_CONFIG.STORAGE_KEY, 'akra_main_session', 'akra_session_token'].includes(event.key)) return;
+        if (event.key !== null && event.oldValue === event.newValue) return;
+        invalidateGRAuthStartup();
+        if (!window.appSession) showGRAuthFailure({reason:window.AkraModule?.isMainSignedOut?.() ? 'main_signed_out' : 'session_changed'});
+    });
+
     var AuthGuard = {
         init: async () => {
-            const isVersionOk = await checkAppVersion();
-            if (!isVersionOk) return;
-            AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning', 'getVendorDeliveryInsights', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics'] });
-
-            lucide.createIcons();
-            UI.showLoading();
+            const attempt = ++grAuthAttempt;
+            const embedded = !!window.AkraModule?.embedded, mainStamp = window.AkraModule?.sessionStamp?.();
+            let expectedRaw = grAuthRawSession(), boundOwner = window.appSession, boundToken = boundOwner?.token, tokenToVerify = '', embeddedToken, tokenCaptured = false;
+            const current = () => {
+                try { return attempt === grAuthAttempt && embedded === !!window.AkraModule?.embedded && window.appSession === boundOwner && boundOwner?.token === boundToken
+                    && expectedRaw === grAuthRawSession() && mainStamp === window.AkraModule?.sessionStamp?.()
+                    && (!embedded || !tokenCaptured || embeddedToken === window.AkraModule.getToken()); } catch (_) { return false; }
+            };
             try {
+                if (grPendingVerification && (grPendingVerification.savedRaw !== expectedRaw || grPendingVerification.mainStamp !== mainStamp)) grPendingVerification = null;
+                if (window.AkraModule?.isMainSignedOut?.()) { grPendingVerification = null; throw new Error('main_signed_out'); }
+                const ssoToken = window.AkraModule?.getToken() || new URLSearchParams(window.location.search).get('sso');
+                embeddedToken = ssoToken; tokenCaptured = true;
+                let cachedSession = null; try { if (expectedRaw) cachedSession = JSON.parse(expectedRaw); } catch (_) {}
+                tokenToVerify = ssoToken || (!embedded && grPendingVerification?.token) || cachedSession?.token || cachedSession?.user?.token;
+                if (!embedded && tokenToVerify) grPendingVerification = {token:tokenToVerify,savedRaw:expectedRaw,mainStamp};
+                else if (embedded) grPendingVerification = null;
+                const isVersionOk = await checkAppVersion();
+                if (!current() || !isVersionOk) return;
+                AppVersionGuard.start({ current: CURRENT_VERSION, readActions: ['getInitialData', 'getProducts', 'getDeliveryPlanning', 'getVendorDeliveryInsights', 'getProductReceiptHistory', 'getVendorLeadtimeInsights', 'getVendorReceiptHistory', 'getGrDashboardAnalytics'] });
+                lucide.createIcons();
+                UI.showLoading();
                 if (window.AkraModule?.embedded) {
                     const user = await window.AkraModule.verifySession('app-gr');
-                    window.appSession = buildAppSession({ ...user, tokenVersion: 2 }, window.AkraModule.getToken());
-                    if (!hasGrAccess(window.appSession)) throw new Error('permission_denied');
+                    if (!current()) return;
+                    const session = buildAppSession({ ...user, tokenVersion: 2 }, embeddedToken);
+                    if (!hasGrAccess(session)) throw new Error('permission_denied');
+                    boundOwner = window.appSession = session; boundToken = session.token; grPendingVerification = null;
                     window.currentUser = user.name;
                     initialDataPrefetch = readApiCall('getInitialData', { includeProducts: false, includeCompleted: false, includeDeliveryPlanning: false, perf: PERF_MODE });
                     UI.showApp(user.name);
@@ -1650,38 +1763,29 @@
                     appData = previewData;
                     grProductsLoaded = true;
                     initialDataPrefetch = Promise.resolve(previewData);
-                    window.appSession = getLocalPreviewSession();
+                    boundOwner = window.appSession = getLocalPreviewSession(); boundToken = boundOwner.token; grPendingVerification = null;
                     window.currentUser = window.appSession.name;
+                    grPendingVerification = null;
                     UI.showApp(window.currentUser);
                     AuthGuard.bindEvents();
                     await openReceiving();
                     return;
                 }
-                const urlParams = new URLSearchParams(window.location.search);
-                const ssoToken = window.AkraModule?.getToken() || urlParams.get('sso');
-                const cachedRaw = localStorage.getItem(APP_CONFIG.STORAGE_KEY);
-                let cachedSession = null;
-                try { if (cachedRaw) cachedSession = JSON.parse(cachedRaw); } catch(e) {}
-
-                const tokenToVerify = ssoToken || (cachedSession && cachedSession.token) || (cachedSession && cachedSession.user && cachedSession.user.token);
-
-                if (ssoToken) {
-                    try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
-                }
-
+                if (ssoToken) { try { window.history.replaceState({}, document.title, window.location.pathname); } catch (_) {} }
                 if (!tokenToVerify) {
-                    UI.showError("กรุณาเข้าสู่ระบบผ่านหน้า Portal");
+                    showGRAuthFailure({ reason: 'no_token' });
                     return;
                 }
 
                 // Verify current Main identity/access before domain prefetch or cached rendering.
                 const user = await window.AkraModule.verifySession('app-gr', tokenToVerify);
-                if (localStorage.getItem(APP_CONFIG.STORAGE_KEY) !== cachedRaw) throw new Error('session_changed');
+                if (!current()) return;
                 const session = buildAppSession({ ...user, tokenVersion: 2 }, tokenToVerify);
                 if (user.mustChangePassword === true || !hasGrAccess(session)) throw new Error('permission_denied');
-                window.appSession = session;
+                boundOwner = window.appSession = session; boundToken = session.token; grPendingVerification = null;
                 window.currentUser = session.name;
                 try { localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(session)); } catch(e) {}
+                expectedRaw = grAuthRawSession();
                 initialDataPrefetch = readApiCall('getInitialData', {
                     includeCompleted: false,
                     includeProducts: false,
@@ -1693,6 +1797,9 @@
                 AuthGuard.bindEvents();
                 await openReceiving();
             } catch (error) {
+                if (!current()) return;
+                const failure = grErrorState(error);
+                if (!tokenToVerify || embedded || (failure && !['network','server'].includes(failure.type)) || error?.reason === 'mandatory_password_change_required') grPendingVerification = null;
                 window.appSession = null;
                 console.error("Auth Error:", error);
                 if (error && error.reason === 'mandatory_password_change_required') {
@@ -1700,22 +1807,23 @@
                     UI.showError('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นก่อนใช้งาน');
                     return;
                 }
-                UI.showError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบสิทธิ์ได้");
+                showGRAuthFailure(error);
             }
         },
         bindEvents: () => {
             window.AkraModule?.watchSession?.({appId:'app-gr', user:window.appSession, token:window.appSession?.token,
-                invalidated:() => { window.appSession = null; UI.showError('เซสชัน BUYMORETH เปลี่ยนแล้ว กรุณาเปิดแอปจาก BUYMORETH ใหม่'); },
+                invalidated:() => { invalidateGRAuthStartup(); window.appSession = null; showGRAuthFailure({ reason: 'session_changed' }); },
                 refreshed:token => { if (window.appSession) window.appSession.token = token; }
             });
             if (!window.AkraModule?.embedded) window.addEventListener('storage', event => {
                 if (event.key !== null && event.key !== APP_CONFIG.STORAGE_KEY) return;
                 if (event.key !== null && event.oldValue === event.newValue) return;
+                invalidateGRAuthStartup();
                 window.appSession = null;
-                UI.showError('บัญชีในแท็บอื่นเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่ผ่าน BUYMORETH');
+                showGRAuthFailure({ reason: 'session_changed' });
             });
             const logoutBtn = document.getElementById('logout-btn');
-            if (logoutBtn) { logoutBtn.addEventListener('click', () => { window.appSession = null; localStorage.removeItem(APP_CONFIG.STORAGE_KEY); window.AkraModule.home(APP_CONFIG.PORTAL_URL); }); }
+            if (logoutBtn) { logoutBtn.addEventListener('click', () => { invalidateGRAuthStartup(); window.appSession = null; localStorage.removeItem(APP_CONFIG.STORAGE_KEY); window.AkraModule.home(APP_CONFIG.PORTAL_URL); }); }
         }
     };
     document.addEventListener('DOMContentLoaded', AuthGuard.init);
@@ -1767,6 +1875,7 @@
     }
 
     function showDataLoading(text = 'กำลังโหลด...') {
+        document.getElementById('gr-load-error')?.classList.add('hidden');
         document.getElementById('data-loader-text').innerText = text;
         document.getElementById('data-loader-spinner').classList.remove('hidden');
         document.getElementById('data-loader-retry').classList.add('hidden');
@@ -1775,14 +1884,21 @@
         loader.classList.remove('hidden');
         loader.classList.add('flex');
     }
-    function showDataLoadFailure(message) {
-        document.getElementById('data-loader-text').innerText = message;
-        document.getElementById('data-loader-spinner').classList.add('hidden');
-        document.getElementById('data-loader-retry').classList.remove('hidden');
-        const loader = document.getElementById('data-loader');
-        if (loader.setAttribute) loader.setAttribute('aria-busy', 'false');
-        loader.classList.remove('hidden');
-        loader.classList.add('flex');
+    var grFailedReadRetry = null;
+    function retryGRFailedRead() {
+        const retry = grFailedReadRetry;
+        grFailedReadRetry = null;
+        if (retry) return retry();
+    }
+    function showDataLoadFailure(error, retry = () => openReceiving(true)) {
+        hideDataLoading();
+        const state = grErrorState(error) || { title: 'โหลดข้อมูลไม่สำเร็จ', body: error?.message || error?.error || 'กรุณาลองอีกครั้ง', action: 'ลองอีกครั้ง', type: 'read' };
+        if (state.type === 'changed' || state.type === 'session' || state.type === 'cancelled') return;
+        const notice = document.getElementById('gr-load-error');
+        if (!notice) return;
+        grFailedReadRetry = state.type === 'permission' ? () => window.AkraModule.home(APP_CONFIG.PORTAL_URL) : retry;
+        notice.innerHTML = `<strong>${esc(state.title)}</strong><p>${esc(state.body)}</p><button type="button" onclick="retryGRFailedRead()">${esc(state.action)}</button>`;
+        notice.classList.remove('hidden');
     }
     function hideDataLoading() {
         const loader = document.getElementById('data-loader');
@@ -2008,7 +2124,10 @@
     function mergeDeliveryPlanningIntoPendingPOs(planByUid) {
         (appData.pendingPOs || []).forEach(item => {
             const plan = (planByUid && planByUid[item.uid]) || null;
-            if (!plan) return;
+            if (!plan) {
+                for (const field of ['plannedDate','planSource','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
+                return;
+            }
             item.expectedDate = plan.expectedDate || '';
             item.plannedDate = plan.plannedDate || '';
             item.planSource = plan.planSource || 'no_data';
@@ -2020,30 +2139,89 @@
             item.vendorLeadConfidence = plan.vendorLeadConfidence || 'none';
         });
     }
-    async function loadGRDeliveryPlanningBackground(bypassCache = false) {
-        if (grDeliveryPlanningLoaded && !bypassCache) return;
-        const fetchStart = Date.now();
-        try {
-            const response = await apiCall('getDeliveryPlanning', { bypassCache: bypassCache, perf: PERF_MODE });
-            perfLog('delivery planning background fetch', fetchStart);
-            if (response.serverTimings) perfLog('delivery planning server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
-            if (response.success) {
-                appData.deliveryPlanning = response.deliveryPlanning;
-                mergeDeliveryPlanningIntoPendingPOs(response.planByUid);
-            }
-        } catch(e) { console.warn('GR delivery planning background load error', e); }
-        // Stop showing "loading" even on failure/timeout so the calendar doesn't hang forever;
-        // it falls back to the normal no-plan-yet state instead of a permanent spinner.
+    function grDeliveryPlanningScope() {
+        return isLocalPreviewMode() ? 'local-preview' : grSessionCacheScope();
+    }
+    function restoreGRDeliveryPlanning() {
+        if (!grDeliveryPlanningSnapshot || grDeliveryPlanningSnapshot.scope !== grDeliveryPlanningScope()) {
+            grDeliveryPlanningSnapshot = null;
+            grDeliveryPlanningLoaded = false;
+            grDeliveryPlanningError = null;
+            grDeliveryPlanningRetry = null;
+            return;
+        }
+        appData.deliveryPlanning = grDeliveryPlanningSnapshot.summary;
+        mergeDeliveryPlanningIntoPendingPOs(grDeliveryPlanningSnapshot.plans);
         grDeliveryPlanningLoaded = true;
-        // Rebuild groupedPOs regardless of which view is visible, so the merged plan data is not
-        // silently dropped if the user navigated to a detail view before this background call resolved.
-        groupPendingPOs();
+    }
+    function renderGRDeliveryPlanningState() {
         const listView = document.getElementById('receiving-list-view');
         if (listView && !listView.classList.contains('hidden')) {
             renderPOListForReceiving();
         } else {
             grDeliveryPlanRenderPending = true;
         }
+    }
+    function retryGRDeliveryPlanning() {
+        const retry = grDeliveryPlanningRetry;
+        grDeliveryPlanningRetry = null;
+        if (retry) return retry();
+    }
+    async function loadGRDeliveryPlanningBackground(bypassCache = false) {
+        const owner = window.appSession, scope = grDeliveryPlanningScope(), preview = isLocalPreviewMode();
+        let token;
+        try { token = getSessionToken(); } catch (_) { return; }
+        if (!owner || (!token && !preview) || !scope) return;
+        if (grDeliveryPlanningRequest?.running && grDeliveryPlanningRequest.current()) return grDeliveryPlanningRequest.promise;
+        restoreGRDeliveryPlanning();
+        if (grDeliveryPlanningLoaded && grDeliveryPlanningActiveGeneration === grActiveDataRequestGeneration && !bypassCache) return;
+        const activeGeneration = grActiveDataRequestGeneration, stamp = window.AkraModule?.sessionStamp?.();
+        const ownerCurrent = () => {
+            try { return window.appSession === owner && scope === grDeliveryPlanningScope() && preview === isLocalPreviewMode()
+                && token === getSessionToken() && stamp === window.AkraModule?.sessionStamp?.(); }
+            catch (_) { return false; }
+        };
+        const request = {promise:null, running:true, current:() => grDeliveryPlanningRequest === request && activeGeneration === grActiveDataRequestGeneration && ownerCurrent()};
+        grDeliveryPlanningRequest = request;
+        grDeliveryPlanningLoading = true;
+        grDeliveryPlanningError = null;
+        grDeliveryPlanningRetry = null;
+        renderGRDeliveryPlanningState();
+        request.promise = (async () => {
+            const fetchStart = Date.now();
+            try {
+                const response = await apiCall('getDeliveryPlanning', { bypassCache: bypassCache, perf: PERF_MODE });
+                if (!request.current()) return;
+                if (!response?.success) throw response || {};
+                if (!response.deliveryPlanning || typeof response.deliveryPlanning !== 'object' || Array.isArray(response.deliveryPlanning)
+                    || !response.planByUid || typeof response.planByUid !== 'object' || Array.isArray(response.planByUid)) throw new Error('invalid_delivery_planning_response');
+                perfLog('delivery planning background fetch', fetchStart);
+                if (response.serverTimings) perfLog('delivery planning server timings: ' + JSON.stringify(response.serverTimings), fetchStart);
+                grDeliveryPlanningSnapshot = {scope, summary:response.deliveryPlanning, plans:response.planByUid, knownUids:new Set(itemUids(appData.pendingPOs))};
+                restoreGRDeliveryPlanning();
+                grDeliveryPlanningActiveGeneration = activeGeneration;
+                groupPendingPOs();
+            } catch (error) {
+                if (!request.current()) return;
+                const failure = grErrorState(error) || {type:'read',title:'โหลดแผนรับสินค้าไม่สำเร็จ',body:'ลองโหลดแผนรับสินค้าอีกครั้ง',action:'ลองอีกครั้ง'};
+                if (failure.type === 'session' || failure.type === 'changed') return;
+                if (failure.type === 'permission') {
+                    grDeliveryPlanningSnapshot = null;
+                    grDeliveryPlanningLoaded = false;
+                    appData.deliveryPlanning = {};
+                    (appData.pendingPOs || []).forEach(item => {
+                        for (const field of ['plannedDate','planSource','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
+                    });
+                    groupPendingPOs();
+                }
+                grDeliveryPlanningError = failure;
+                grDeliveryPlanningRetry = () => grDeliveryPlanningRequest === request && ownerCurrent() ? failure.type === 'permission' ? window.AkraModule.home(APP_CONFIG.PORTAL_URL) : loadGRDeliveryPlanningBackground(true) : undefined;
+            } finally {
+                if (request.current()) { grDeliveryPlanningLoading = false; renderGRDeliveryPlanningState(); }
+            }
+        })();
+        try { return await request.promise; }
+        finally { request.running = false; }
     }
     function itemUids(items) {
         const seen = {};
@@ -2227,14 +2405,18 @@
             grDeliveryPlanRenderPending = false;
             renderPOListForReceiving();
         }
+        if (viewId === 'receiving-list-view' && grReceivingReturnIndex !== null) {
+            document.getElementById(`gr-bill-card-${grReceivingReturnIndex}`)?.focus();
+            grReceivingReturnIndex = null;
+        }
     }
 
     function getWarehousePalette(warehouse) {
         return {
             W1: { background: '#fef3c7', text: '#78350f', textOnLight: '#78350f', border: '#f59e0b', badgeClass: 'bg-yellow-50 text-yellow-900 border border-yellow-300' },
-            W2: { background: '#f97316', text: '#ffffff', textOnLight: '#c2410c', border: '#f97316', badgeClass: 'bg-orange-500 text-white' },
+            W2: { background: '#c2410c', text: '#ffffff', textOnLight: '#c2410c', border: '#c2410c', badgeClass: 'bg-orange-500 text-white' },
             W3: { background: '#facc15', text: '#713f12', textOnLight: '#713f12', border: '#eab308', badgeClass: 'bg-yellow-400 text-yellow-900' },
-            W4: { background: '#22c55e', text: '#ffffff', textOnLight: '#15803d', border: '#22c55e', badgeClass: 'bg-green-500 text-white' },
+            W4: { background: '#15803d', text: '#ffffff', textOnLight: '#15803d', border: '#15803d', badgeClass: 'bg-green-500 text-white' },
             W5: { background: '#6b7280', text: '#ffffff', textOnLight: '#4b5563', border: '#6b7280', badgeClass: 'bg-gray-500 text-white' },
             C1: { background: '#7dd3fc', text: '#075985', textOnLight: '#075985', border: '#38bdf8', badgeClass: 'bg-sky-200 text-sky-900 border border-sky-300' },
             C2: { background: '#1d4ed8', text: '#ffffff', textOnLight: '#1d4ed8', border: '#1d4ed8', badgeClass: 'bg-blue-700 text-white' }
@@ -2454,7 +2636,7 @@
                         <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="calendar-days" class="w-4 h-4 text-brand-orange"></i> แผนรับสินค้า</h3>
                         <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีระบบจะแสดงวันที่คาดว่าจะเข้าโดยอิงจากประวัติส่งของ</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                            ${!grDeliveryPlanningLoaded ? `<span class="text-gray-400">กำลังโหลด...</span>` : `
+                            ${!grDeliveryPlanningLoaded ? `<span class="text-gray-600">${grDeliveryPlanningError ? 'ยังโหลดแผนไม่สำเร็จ' : 'กำลังโหลด...'}</span>` : `
                             <span class="inline-flex items-center gap-1 text-red-700"><span class="w-2 h-2 rounded-full bg-red-600"></span> Vendor ยืนยัน ${esc(confirmed)}</span>
                             <span class="inline-flex items-center gap-1 text-brand-blue"><span class="w-2 h-2 rounded-full bg-brand-blue"></span> คาดการณ์ ${esc(estimated)}</span>
                             <span class="text-gray-400">${esc(summary.sampleCount || 0)} ตัวอย่าง · ${esc(summary.vendorCount || 0)} Vendor</span>
@@ -2468,8 +2650,9 @@
                         </button>
                     </div>
                 </div>
+                ${grDeliveryPlanningError ? `<div id="gr-delivery-plan-error" role="${grDeliveryPlanningError.type === 'cancelled' ? 'status' : 'alert'}" class="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"><strong>${esc(grDeliveryPlanningError.title)}</strong><p>${esc(grDeliveryPlanningError.body)}</p>${grDeliveryPlanningLoaded ? '<p class="mt-1">แสดงแผนที่โหลดไว้ก่อนหน้านี้</p>' : ''}<button type="button" onclick="retryGRDeliveryPlanning()" style="min-height:44px" class="mt-2 px-3 py-2 rounded-lg border border-gray-300 bg-white font-bold">${esc(grDeliveryPlanningError.action || 'ลองอีกครั้ง')}</button></div>` : ''}
                 <div id="delivery-plan-calendar-body" class="${isDeliveryPlanVisible ? '' : 'hidden'} mt-3">
-                    ${!grDeliveryPlanningLoaded ? `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-400">กำลังโหลดแผนรับสินค้า...</div>` : `
+                    ${!grDeliveryPlanningLoaded ? `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-6 text-center text-sm text-gray-600">${grDeliveryPlanningLoading || !grDeliveryPlanningError ? 'กำลังโหลดแผนรับสินค้า...' : 'ยังไม่มีข้อมูลแผนรับสินค้าที่โหลดสำเร็จ'}</div>` : `
                     ${overdue ? `<button type="button" onclick="setDeliveryPlanFilter('overdue')" aria-pressed="${deliveryPlanFilter === 'overdue' ? 'true' : 'false'}" class="mb-3 w-full rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${deliveryPlanFilter === 'overdue' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:border-red-200'}">มีบิลเลยแผน ${overdue} บิล</button>` : ''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                         ${calendarHtml}
@@ -2480,10 +2663,16 @@
         `;
         lucide.createIcons({ root: container });
     }
+    function isGRDeliveryPlanUnknown(group) {
+        return group.status !== 'GR Completed' && grDeliveryPlanningLoaded && grDeliveryPlanningSnapshot?.knownUids
+            && (group.items || []).some(item => !grDeliveryPlanningSnapshot.knownUids.has(String(item.uid || '').trim()));
+    }
     function deliveryPlanText(group) {
+        if (!grDeliveryPlanningLoaded && grDeliveryPlanningError) return 'ยังโหลดแผนรับสินค้าไม่สำเร็จ';
+        if (isGRDeliveryPlanUnknown(group)) return 'ยังไม่ทราบแผนรับสินค้า';
         if (!group.plannedDate) return 'ยังประเมินไม่ได้';
         if (group.status === 'GR Completed') return 'รับเข้าแล้ว';
-        if (group.daysUntil === null || group.daysUntil === undefined) return group.plannedDate;
+        if (group.daysUntil === null || group.daysUntil === undefined) return displayGRDate(group.plannedDate);
         var days = Number(group.daysUntil);
         if (days === 0) return 'วันนี้';
         if (days > 0) return 'อีก ' + days + ' วัน';
@@ -2495,13 +2684,15 @@
         return 'ข้อมูลไม่พอ';
     }
     function deliveryPlanBadge(group) {
+        if (!grDeliveryPlanningLoaded && grDeliveryPlanningError) return '<span class="text-sm text-gray-600">ยังโหลดแผนรับสินค้าไม่สำเร็จ</span>';
+        if (isGRDeliveryPlanUnknown(group)) return '<span class="text-sm text-gray-600">ยังไม่ทราบแผนรับสินค้า</span>';
         if (!group.plannedDate) {
             return `<div class="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">ยังไม่มีแผนรับ</div>`;
         }
         if (group.planSource === 'partial') {
-            return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg bg-brand-orangeLight text-brand-orange border-brand-orange/30">
+            return `<div class="gr-partial-plan-badge text-[11px] font-bold border px-2 py-1 rounded-lg bg-brand-orangeLight text-brand-orange border-brand-orange/30">
                 <span>ยืนยัน ${esc(group.confirmedItemCount)}/${esc(group.totalItemCount)} รายการ</span>
-                <span class="font-medium opacity-80"> · เข้าไว ${esc(group.plannedDate)}</span>
+                <span class="font-medium opacity-80"> · เข้าไว ${esc(displayGRDate(group.plannedDate))}</span>
             </div>`;
         }
         var cls = group.planSource === 'confirmed' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-brand-blue border-brand-blueLight';
@@ -2509,7 +2700,7 @@
             ? 'วันที่คาดว่าจะเข้า: ' + deliveryPlanText(group)
             : deliveryPlanText(group) + ' · ' + deliverySourceText(group.planSource);
         return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg ${cls}">
-            <span>${esc(group.plannedDate)}</span>
+            <span>${esc(displayGRDate(group.plannedDate))}</span>
             <span class="font-medium opacity-80"> · ${esc(metaText)}</span>
         </div>`;
     }
@@ -2597,7 +2788,7 @@
 
     async function apiCall(action, payload = null) {
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
-      if (!navigator.onLine) return { success: false, message: 'Offline' };
+      if (!navigator.onLine) return isReadApiAction(action) ? grReadFailure({ reason: 'offline' }) : { success: false, message: 'Offline', reason: 'offline' };
       if (isLocalPreviewMode()) {
         if (action === 'getGrDashboardAnalytics' && payload?.schemaVersion === 2) {
           const response = await fetch('/__gr-dashboard-preview?filters=' + encodeURIComponent(JSON.stringify(payload)));
@@ -2613,10 +2804,12 @@
           return { success: false, message: 'ไม่พบตัวเชื่อมต่อฐานข้อมูล GR กรุณารีโหลดหน้า' };
         }
         try {
-          return await window.AkraSupabaseGR.request(action, payload, getSessionToken());
+          const result = await window.AkraSupabaseGR.request(action, payload, getSessionToken());
+          return isReadApiAction(action) && result?.success === false ? grReadFailure(result) : result;
         } catch (error) {
           console.error('Supabase GR request failed:', { action, reason: error && error.reason });
-          return { success: false, message: error && error.message ? error.message : 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
+          if (isReadApiAction(action)) return grReadFailure(error);
+          return { success: false, reason: error?.reason || '', status: error?.status || 0, message: error?.message || 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
         }
       }
 
@@ -2662,11 +2855,10 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
+        document.getElementById('gr-load-error')?.classList.add('hidden');
         const loadGeneration = ++grActiveDataRequestGeneration;
         const sessionScope = grSessionCacheScope();
-        // Reset so a stale true from a previous fetch cannot make the loading-state UI skip
-        // straight to "no plan" while cached active data (which never carries plan fields) renders.
-        grDeliveryPlanningLoaded = false;
+        restoreGRDeliveryPlanning();
         const cachedData = getCache('CACHE_GR_ACTIVE_DATA_V3', GR_CACHE_TTL);
         const cachedProducts = getCache('CACHE_GR_PRODUCTS_V1', GR_PRODUCTS_CACHE_TTL);
         if (grProductsDataScope !== sessionScope) {
@@ -2691,6 +2883,7 @@
                     grProductsLoadedFromFreshFetch = false;
                     grProductsDataScope = sessionScope;
                 } else appData.products = [];
+                restoreGRDeliveryPlanning();
                 groupPendingPOs();
                 renderPOListForReceiving();
                 showView('receiving-list-view');
@@ -2728,6 +2921,7 @@
             setCache('CACHE_GR_ACTIVE_DATA_V3', response);
             appData = response;
             appData.products = grProductsLoaded ? productsAlreadyLoaded : (cachedProducts ? (cachedProducts.products || []) : []);
+            restoreGRDeliveryPlanning();
             grCompletedLoaded = false;
             grCompletedLoadedFull = false;
             grCompletedHasMore = false;
@@ -2744,12 +2938,9 @@
             if (!cacheUsable && !isManualRefresh && receivingViewWasOpen) showView('receiving-list-view');
             loadGRProductsBackground();
             if (!cacheUsable || isManualRefresh) hideDataLoading();
-        } else if (!cacheUsable) {
+        } else {
             if (coldStart) { document.getElementById('pending-count').innerText = '0 บิล'; document.getElementById('po-list-container').innerHTML = ''; }
-            showNotification('ดึงข้อมูลไม่สำเร็จ: ' + (response.message || response.error || 'กรุณาลองใหม่'), 'error');
-            showDataLoadFailure('โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง');
-        } else if (isManualRefresh) {
-            hideDataLoading();
+            showDataLoadFailure(response);
         }
         if (!hasAuthoritativeActiveData && hasPendingGRReconciliation()) renderGRReconciliationNotice('บันทึกแล้ว แต่ยังโหลดสถานะบิลล่าสุดไม่ได้ กดเพื่อลองอ่านข้อมูลอีกครั้ง');
         // Independent of whether the active fetch succeeded: if cachedData already rendered the
@@ -2894,6 +3085,9 @@
     function productHistoryDisplay(value) {
         return value === null || value === undefined || value === '' ? 'ไม่ได้บันทึก' : esc(value);
     }
+    function displayGRDate(value) {
+        return window.BMDateDisplay ? window.BMDateDisplay.date(value) : String(value ?? '');
+    }
 
     function renderProductReceiptHistory() {
         const container = document.getElementById('dashboard-product-results');
@@ -2915,7 +3109,7 @@
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 border-b border-gray-100 pb-3 mb-3">
                 <div>
                   <p class="text-xs font-medium text-gray-500">ครั้งที่ ${index + 1}</p>
-                  <h4 class="font-bold text-gray-800 mt-0.5">${productHistoryDisplay(row.receiptDate)}</h4>
+                  <h4 class="font-bold text-gray-800 mt-0.5">${productHistoryDisplay(displayGRDate(row.receiptDate))}</h4>
                 </div>
                 <span class="self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">รับเข้าสำเร็จ</span>
               </div>
@@ -2927,7 +3121,7 @@
                 <div><dt class="text-xs text-gray-500">คลังตาม PO / ตำแหน่งรับจริง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
                 <div><dt class="text-xs text-gray-500">Vendor</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.vendor)}</dd></div>
                 <div><dt class="text-xs text-gray-500">เลข PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poNumber)}</dd></div>
-                <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poDate)}</dd></div>
+                <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(displayGRDate(row.poDate))}</dd></div>
                 <div><dt class="text-xs text-gray-500">สต็อกเดิม</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryOldStockDisplay(row)}</dd></div>
                 <div class="col-span-2 lg:col-span-4"><dt class="text-xs text-gray-500">หมายเหตุ</dt><dd class="font-medium text-gray-800 mt-0.5 whitespace-pre-wrap">${productHistoryDisplay(cleanDirectPoRemark(row.remark))}</dd></div>
               </dl>
@@ -2942,7 +3136,7 @@
                 <p class="text-sm text-gray-500 mt-1">SKU: ${productHistoryDisplay(productHistoryState.product && productHistoryState.product.sku)}</p>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 lg:max-w-3xl">
-                <div class="rounded-xl bg-brand-orangeLight px-3 py-3"><p class="text-xs text-brand-orange">วันที่รับล่าสุด</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiptDate)}</p></div>
+                <div class="rounded-xl bg-brand-orangeLight px-3 py-3"><p class="text-xs text-brand-orange">วันที่รับล่าสุด</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(displayGRDate(latest.receiptDate))}</p></div>
                 <div class="rounded-xl bg-emerald-50 px-3 py-3"><p class="text-xs text-emerald-700">วันหมดอายุ / รหัส Lot</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.expDate)}${latest.lotCode ? ` · Lot: ${productHistoryDisplay(latest.lotCode)}` : ''}</p></div>
                 <div class="rounded-xl bg-blue-50 px-3 py-3"><p class="text-xs text-brand-blue">จำนวนรับ</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.quantity)} ${latest.unit ? esc(latest.unit) : ''}</p></div>
                 <div class="rounded-xl bg-gray-50 px-3 py-3"><p class="text-xs text-gray-500">ผู้รับสินค้า</p><p class="mt-1 font-bold text-gray-900">${productHistoryDisplay(latest.receiver)}</p></div>
@@ -3540,7 +3734,7 @@
             grCompletedLoadedFromCache = false;
             groupPendingPOs();
         } else {
-            showNotification('ดึงข้อมูลบิลที่รับเข้าสำเร็จไม่สำเร็จ', 'error');
+            showDataLoadFailure(response, async () => { await ensureCompletedLoaded(loadMore); renderPOListForReceiving(); });
         }
     }
 
@@ -3637,11 +3831,11 @@
                 </div>` : '';
 
             htmlStr += `
-            <div class="${cardClass}" onclick="openReceivingDetail(${idx})">
+            <div id="gr-bill-card-${idx}" class="${cardClass}" role="button" tabindex="0" aria-label="เปิดบิล ${esc(group.poNumber || '-')} ${esc(group.vendor)}" onclick="activateGRBillCard(event, ${idx})" onkeydown="activateGRBillCard(event, ${idx})">
                 <div class="gr-bill-card__header">
                     <div class="gr-bill-card__top">
                         <div class="gr-bill-card__identity">
-                            <span class="gr-bill-card__vendor"><i data-lucide="building-2" class="w-3.5 h-3.5"></i><span class="gr-bill-card__vendor-name">${group.vendor}</span></span>
+                            <span class="gr-bill-card__vendor"><i data-lucide="building-2" aria-hidden="true" class="w-3.5 h-3.5"></i><span class="gr-bill-card__vendor-name">${esc(group.vendor)}</span></span>
                             <span class="gr-bill-card__po text-[11px] font-bold text-gray-500 uppercase tracking-wider">PO: ${group.poNumber || '-'}</span>
                         </div>
                         ${statusBadge}
@@ -3656,7 +3850,7 @@
                 <div class="mb-2">${deliveryPlanBadge(group)}</div>
                 ${billRemarkHtml}
                 <div class="gr-bill-card__footer mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
-                    <p class="text-gray-400">สั่งเมื่อ: ${group.poDate}</p>
+                    <p class="text-gray-400">สั่งเมื่อ: ${esc(displayGRDate(group.poDate))}</p>
                     <span class="gr-bill-card__open ${isPendingReview ? 'text-brand-orange' : (isCompleted ? 'text-emerald-600' : 'text-brand-blue')} font-bold flex items-center bg-white px-2 py-0.5 rounded border shadow-sm">เปิดบิล <i data-lucide="chevron-right" class="w-3 h-3 ml-0.5"></i></span>
                 </div>
             </div>`;
@@ -3671,6 +3865,16 @@
         renderWarehouseChips();
     }
 
+    var grReceivingReturnIndex = null;
+    function activateGRBillCard(event, index) {
+        if (event.target !== event.currentTarget && event.target?.closest?.('button, a, input, select, textarea')) return;
+        if (event.type === 'keydown') {
+            if (event.repeat || (event.key !== 'Enter' && event.key !== ' ')) return;
+            event.preventDefault();
+        } else if (event.type !== 'click') return;
+        grReceivingReturnIndex = index;
+        openReceivingDetail(index);
+    }
     function openReceivingDetail(index) {
         const group = groupedPOs[index];
         if (!group) return;
@@ -3689,7 +3893,7 @@
                 <div class="mt-1">${getWarehouseBadge(group.warehouse)}</div>
             </div>
         `;
-        document.getElementById('r-display-date').innerText = group.poDate;
+        document.getElementById('r-display-date').innerText = displayGRDate(group.poDate);
         document.getElementById('r-display-po').innerText = `${group.poNumber || '-'}`;
         document.getElementById('r-group-index').value = index;
         document.getElementById('r-delivery-plan').innerHTML = `
@@ -3697,7 +3901,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div>
                         <p class="text-[11px] font-bold text-brand-blue uppercase tracking-wide">แผนรับสินค้า</p>
-                        <p class="text-sm font-bold text-gray-800 mt-0.5">${esc(group.plannedDate || 'ยังประเมินไม่ได้')}</p>
+                        <p class="text-sm font-bold text-gray-800 mt-0.5">${esc(displayGRDate(group.plannedDate) || 'ยังประเมินไม่ได้')}</p>
                     </div>
                     ${deliveryPlanBadge(group)}
                 </div>
@@ -3830,7 +4034,7 @@
                     <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
                     <div><span class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
                     <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? esc(item.noExpiry ? (item.lotCode || '') : (item.exp || '')) : ''}" oninput="handleExpiryInputChange(this)">
-                    <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="po-no-expiry" ${isSavedData && item.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
+                    <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="po-no-expiry" aria-label="ไม่มีวันหมดอายุ ${esc(item.product)}" ${isSavedData && item.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
                     <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="po-old-stock-label">${needsSecondOldStock ? `สต๊อกเก่า ${esc(parsedLoc.wh || group.warehouse)}` : 'สต๊อกเก่า'}</span> <span class="text-red-500">*</span></label>
                     <input type="number" min="0" class="input-field po-old-stock py-2 bg-white border-gray-200 focus:border-brand-blue" data-warehouse="${esc(parsedLoc.wh || group.warehouse)}" placeholder="ใส่ 0 หากไม่มี" value="${esc(oldStock1)}"></div>
@@ -4447,7 +4651,7 @@
                 grCompletedHasMore = false;
                 grCompletedNextOffset = 0;
                 grCompletedLoadedFromCache = false;
-                grDeliveryPlanningLoaded = false;
+                restoreGRDeliveryPlanning();
                 groupPendingPOs();
                 clearCurrentGRReconciliations();
                 renderPOListForReceiving();

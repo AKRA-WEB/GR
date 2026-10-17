@@ -2,10 +2,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {backendPath} = require('./helpers/backend-source.cjs');
+const {stripTypeScriptTypes} = require('node:module');
 
 const TEST_SECRET = 'test-main-jwt-secret-at-least-32-characters';
-const sharedPath = path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', '_shared', 'main-jwt.ts');
-const apiPath = path.join(__dirname, '..', '..', 'database', 'supabase', 'functions', 'gr-api', 'index.ts');
+const sharedPath = backendPath('supabase', 'functions', '_shared', 'main-jwt.ts');
+const apiPath = backendPath('supabase', 'functions', 'gr-api', 'index.ts');
 
 const sharedSource = fs.readFileSync(sharedPath, 'utf8').replace(/^export\s+/gm, '');
 const apiSource = fs.readFileSync(apiPath, 'utf8')
@@ -16,6 +18,7 @@ const apiSource = fs.readFileSync(apiPath, 'utf8')
 function createHarness(options = {}) {
   const linePushBodies = [];
   const lineTasks = [];
+  const authCalls = [], domainCalls = [];
   let flexShouldFail = options.flexShouldFail || false;
   let handler = null;
 
@@ -54,6 +57,8 @@ function createHarness(options = {}) {
         get(name) {
           return {
             MAIN_JWT_SECRET: TEST_SECRET,
+            MAIN_IDENTITY_REQUIRED: 'true',
+            MAIN_CATALOG_REQUIRED: 'true',
             SUPABASE_URL: 'https://database.example',
             GR_SUPABASE_SECRET_KEY: 'server-only-key',
             GR_ALLOWED_ORIGINS: 'https://akra-web.github.io',
@@ -67,6 +72,19 @@ function createHarness(options = {}) {
     fetch: async (url, fetchOpts = {}) => {
       const target = String(url);
       if (target.includes('/rest/v1/rpc/')) {
+        const body = JSON.parse(fetchOpts.body);
+        if (target.endsWith('/auth_validate_bound_session_v2')) {
+          authCalls.push(body);
+          assert.equal(body.p_username, 'SUPER1');
+          assert.equal(body.p_identity_id, '10000000-0000-4000-8000-000000000001');
+          assert.equal(body.p_session_id, '10000000-0000-4000-8000-000000000099');
+          assert.equal(body.p_authorization_revision, 'fixture');
+          return new Response(JSON.stringify({valid:options.sessionValid !== false}), {status:200});
+        }
+        domainCalls.push({target,body});
+        assert.ok(target.endsWith('/gr_receive_bound_v1'), 'notifications follow only the bound GR writer');
+        assert.equal(body.p_identity_id, '10000000-0000-4000-8000-000000000001');
+        assert.equal(body.p_actor.id, 'SUPER1');
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -84,13 +102,16 @@ function createHarness(options = {}) {
     }
   });
 
-  vm.runInContext(`${sharedSource}\n${apiSource}`, context);
+  vm.runInContext(stripTypeScriptTypes(`${sharedSource}\n${apiSource}`), context);
 
   async function invoke(payload) {
     const token = await context.signMainJwt({
       id: 'SUPER1',
       name: 'Supervisor Tester',
       roles: ['SUPERVISOR'],
+      ...(options.unbound ? {} : {identityId:'10000000-0000-4000-8000-000000000001',tokenVersion:2,sessionVersion:1,authorizationRevision:'fixture',sessionId:'10000000-0000-4000-8000-000000000099',sessionStartedAt:Date.now()}),
+      apps: ['app-gr'],
+      permissionCatalog: {'app-gr':['approveGR','receiveGR']},
       perms: { 'app-gr': ['approveGR', 'receiveGR'] },
       exp: Math.floor(Date.now() / 1000) + 3600
     }, TEST_SECRET);
@@ -98,14 +119,14 @@ function createHarness(options = {}) {
     const res = await handler(new Request('https://database.example/functions/v1/gr-api', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'https://akra-web.github.io' },
-      body: JSON.stringify({ ...payload, token })
+      body: JSON.stringify({ ...payload, token:options.unsigned ? 'unsigned-fixture' : token })
     }));
 
     await Promise.all(lineTasks.splice(0));
     return res;
   }
 
-  return { invoke, linePushBodies, setFlexShouldFail(v) { flexShouldFail = v; } };
+  return { invoke, linePushBodies, authCalls, domainCalls, setFlexShouldFail(v) { flexShouldFail = v; } };
 }
 
 (async () => {
@@ -268,6 +289,14 @@ function createHarness(options = {}) {
     console.log('PASS Test 5: Draft and Pending Review produce zero notifications');
   }
 
+  for (const options of [{unsigned:true},{unbound:true},{sessionValid:false}]) {
+    const harness = createHarness(options);
+    const denied = await harness.invoke({action:'bulkReceivePO',data:{targetStatus:'GR Completed',items:[{uid:'fixture',grQty:1}]}});
+    assert.equal(denied.status,401);
+    assert.equal(harness.domainCalls.length,0,'denied identity/session must make zero domain RPCs');
+    assert.equal(harness.linePushBodies.length,0,'denied identity/session must send no notification');
+    assert.equal(harness.authCalls.length,options.unbound||options.unsigned?0:1,'session validation is separate from domain mutation');
+  }
   console.log('\nALL GR LINE Flex Message Tests Passed Successfully! 🚀');
 })().catch(err => {
   console.error(err);

@@ -114,6 +114,7 @@ const sandbox = {
     clearTimeout: () => {},
     setTimeout: (fn) => { fn(); return 1; },
     window: {
+        addEventListener() {},
         location: { search: '' },
         currentUser: 'TestAdmin',
         confirm: () => true,
