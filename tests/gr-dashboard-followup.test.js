@@ -18,7 +18,7 @@ assert.match(script, /function\s+loadGrDashboardMore\s*\(/, 'dashboard must expo
 assert.match(script, /function\s+groupGrDashboardBills\s*\(/, 'dashboard must group same-round receipt rows');
 assert.match(script, /function\s+getGrDashboardApprover\s*\(/, 'dashboard must normalize untrusted receiver-derived approvers');
 assert.match(script, /dashboard-chart-item-label/, 'daily chart must expose item totals separately from bill totals');
-assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(56px, 1fr\)\)`/, 'daily chart must keep historical dates horizontally accessible');
+assert.match(script, /gridTemplateColumns\s*=\s*`repeat\(\$\{Math\.max\(1, list\.length\)\}, minmax\(82px, 1fr\)\)`/, 'daily chart must reserve its styled cell width and keep readable historical dates horizontally accessible');
 assert.match(script, /const GR_DASHBOARD_PAGE_SIZE = 20/, 'dashboard must load the 20 latest bills first');
 assert.match(script, /normalizeDashboardSearchText/, 'dashboard search must normalize partial Thai/vendor input');
 assert.match(html, /max-w-6xl/, 'bill detail modal must use a wider desktop layout');

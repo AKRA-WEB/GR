@@ -551,13 +551,13 @@
     .dashboard-preview-surface .dashboard-preview-header .dashboard-preview-heading-block { min-width: 0; }
     .dashboard-preview-surface .dashboard-preview-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dashboard-slate-500); font-size: 12px; font-weight: 500; }
     .dashboard-preview-surface .dashboard-preview-kicker strong { border-radius: 999px; background: #ffedd5; color: #9a3412; padding: 3px 10px; font-weight: 600; }
-    .dashboard-preview-surface .dashboard-preview-live { display: inline-flex; align-items: center; gap: 5px; color: #059669; }
+    .dashboard-preview-surface .dashboard-preview-live { display: inline-flex; align-items: center; gap: 5px; color: #047857; }
     .dashboard-preview-surface .dashboard-preview-live::before { content: ''; width: 7px; height: 7px; border-radius: 999px; background: #10b981; }
     .dashboard-preview-surface .dashboard-preview-header h2 { margin-top: 4px; color: var(--dashboard-slate-900) !important; font-size: 24px !important; line-height: 1.25 !important; letter-spacing: -.025em !important; }
     .dashboard-preview-surface .dashboard-preview-header p { color: var(--dashboard-slate-500) !important; font-size: 13px; }
     .dashboard-preview-surface .dashboard-preview-tabs { align-self: stretch !important; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0 2px; border: 0 !important; border-top: 1px solid var(--dashboard-slate-200) !important; background: transparent !important; }
     .dashboard-preview-surface .dashboard-preview-tabs button { border-radius: 10px !important; font-family: inherit; }
-    .dashboard-preview-surface .dashboard-preview-tabs button.bg-white { background: var(--dashboard-orange) !important; color: #fff !important; box-shadow: 0 3px 8px rgba(249, 115, 22, .18) !important; }
+    .dashboard-preview-surface .dashboard-preview-tabs button.bg-white { background: #c2410c !important; color: #fff !important; box-shadow: 0 3px 8px rgba(249, 115, 22, .18) !important; }
     .dashboard-preview-surface .dashboard-preview-tabs button:not(.bg-white) { color: var(--dashboard-slate-500) !important; }
     .dashboard-preview-surface .dashboard-preview-filter { padding: 9px 12px !important; border-radius: 12px !important; box-shadow: none !important; background: rgba(241,245,249,.78) !important; }
     .dashboard-preview-surface .dashboard-preview-filter button { border-radius: 9px !important; font-family: inherit; }
@@ -586,18 +586,18 @@
     .dashboard-preview-surface .text-slate-400 { color: var(--dashboard-slate-400) !important; }
     .dashboard-preview-surface .text-slate-600 { color: var(--dashboard-slate-500) !important; }
     .dashboard-preview-surface .dashboard-wh-swatch { width: 12px; height: 12px; flex: 0 0 auto; border-radius: 999px; }
-    .dashboard-preview-surface .dashboard-preview-daily-chart { display: grid !important; align-items: end; grid-auto-columns: minmax(56px, 1fr); gap: 8px !important; min-height: 192px; margin: 24px 0 !important; overflow-x: auto; }
+    .dashboard-preview-surface .dashboard-preview-daily-chart { display: grid !important; align-items: end; grid-auto-columns: minmax(82px, 1fr); gap: 8px !important; height: auto; min-height: 290px; margin: 24px 0 !important; overflow-x: auto; }
     .dashboard-preview-surface .dashboard-chart-day { width: 56px; justify-self: center; }
     .dashboard-preview-surface .dashboard-chart-bar { width: 100%; max-width: 32px; border-radius: 8px 8px 2px 2px; background: #e2e8f0; transition: background .2s ease, box-shadow .2s ease; }
     .dashboard-preview-surface .dashboard-chart-day:hover .dashboard-chart-bar { background: #60a5fa; }
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-bar { background: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
-    .dashboard-preview-surface .dashboard-chart-amount { color: var(--dashboard-slate-400); font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-amount { color: var(--dashboard-slate-600, #475569); font-size: 12px; font-weight: 700; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-amount { color: #2563eb; }
-    .dashboard-preview-surface .dashboard-chart-day-label { color: var(--dashboard-slate-500); font-size: 10px; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-day-label { color: var(--dashboard-slate-500); font-size: 12px; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-day-label { color: var(--dashboard-slate-900); font-weight: 700; }
-    .dashboard-preview-surface .dashboard-chart-bill-label { border-radius: 4px; background: #f1f5f9; color: var(--dashboard-slate-600, #475569); padding: 1px 4px; font-size: 9px; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-bill-label { border-radius: 4px; background: #f1f5f9; color: var(--dashboard-slate-600, #475569); padding: 1px 4px; font-size: 12px; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-day.is-selected .dashboard-chart-bill-label { background: #ffedd5; color: #c2410c; font-weight: 700; }
-    .dashboard-preview-surface .dashboard-chart-item-label { color: var(--dashboard-slate-400); font-size: 9px; white-space: nowrap; }
+    .dashboard-preview-surface .dashboard-chart-item-label { color: var(--dashboard-slate-600, #475569); font-size: 12px; white-space: nowrap; }
     .dashboard-preview-surface .dashboard-chart-bill-dot { width: 8px; height: 8px; margin-bottom: 5px; border-radius: 999px; background: #fb923c; }
     .dashboard-preview-surface .dashboard-preview-bills { overflow: hidden; }
     .dashboard-preview-surface .dashboard-preview-bills > div:first-child { background: rgba(248,250,252,.7) !important; border-bottom-color: var(--dashboard-slate-200) !important; padding: 20px !important; }
@@ -879,7 +879,7 @@
 
                   <!-- Daily Bars Container -->
                   <div id="dashboard-daily-chart" class="dashboard-preview-daily-chart my-4 grid grid-cols-7 gap-2 items-end h-48 pt-4 px-2 overflow-x-auto custom-scrollbar">
-                    <div class="w-full text-xs text-gray-400 text-center py-10">กำลังโหลดสถิติรายวัน...</div>
+                    <div class="w-full text-xs text-gray-600 text-center py-10">กำลังโหลดสถิติรายวัน...</div>
                   </div>
 
                   <div class="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-gray-500">
@@ -1184,7 +1184,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261017.02';
+    const CURRENT_VERSION = '20261017.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -3279,13 +3279,13 @@
         const list = Array.isArray(dailyStats) ? dailyStats : [];
         if (list.length === 0) {
             if (container.style) container.style.gridTemplateColumns = '';
-            container.innerHTML = `<div class="w-full text-xs text-gray-400 text-center py-10">ไม่มีสถิติรายวันในช่วงเวลานี้</div>`;
+            container.innerHTML = `<div class="w-full text-xs text-gray-600 text-center py-10">ไม่มีสถิติรายวันในช่วงเวลานี้</div>`;
             return;
         }
 
         if (container.style) {
-            container.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(56px, 1fr))`;
-            container.style.minWidth = list.length > 1 ? `${list.length * 64}px` : '100%';
+            container.style.gridTemplateColumns = `repeat(${Math.max(1, list.length)}, minmax(82px, 1fr))`;
+            container.style.minWidth = '0';
         }
 
         let maxBills = 1;
