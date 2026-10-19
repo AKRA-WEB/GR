@@ -52,6 +52,10 @@
 .gr-issue-options label {display:flex;align-items:center;gap:8px;min-height:40px;font-size:14px}.gr-issue-options input {width:18px;height:18px;accent-color:#ea580c}
 #gr-issue-review textarea {width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:10px;font-size:14px;margin-top:6px}
 .gr-issue-badge {display:inline-block;background:#fff7ed;color:#9a3412;padding:4px 7px;border-radius:5px;font-size:11px;white-space:normal;max-width:170px}
+.gr-bill-status--green {background:#d1fae5;color:#065f46}
+.gr-bill-status--yellow {background:#fef9c3;color:#854d0e}
+.gr-bill-status--orange {background:#ffedd5;color:#9a3412}
+.gr-bill-status--red {background:#fee2e2;color:#991b1b}
 #vendor-leadtime-view :focus-visible,#gr-issue-review :focus-visible {outline:2px solid #c2410c;outline-offset:3px}
 @media (min-width:641px) and (max-width:1100px) {.gr-carousel{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px) {

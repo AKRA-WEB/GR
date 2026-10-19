@@ -728,8 +728,8 @@
     .gr-load-error button { min-height: 36px; margin-top: 12px; padding: 8px 14px; border-radius: 8px; }
     .gr-load-error button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
   </style>
-  <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.04">
-  <script src="js/gr-dashboard-v2.js?v=20261019.01" defer></script>
+  <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20261019.02">
+  <script src="js/gr-dashboard-v2.js?v=20261019.02" defer></script>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -1185,7 +1185,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261019.01';
+    const CURRENT_VERSION = '20261019.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -3497,7 +3497,7 @@
                         <span class="text-[10px] text-gray-400">ผู้อนุมัติรับเข้า</span>
                     </td>
                     <td class="py-3 px-4 text-center">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold gr-bill-status--${GrDashboard.issueSeverity(b.issueCodes)}">
                             ${esc(GrDashboard.issueText(b.issueCodes))}
                         </span>
                     </td>
