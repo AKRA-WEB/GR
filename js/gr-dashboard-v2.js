@@ -172,6 +172,9 @@ var GrDashboard = (() => {
   }
   function writeMetadata(payload) {
     if(appData?.grSchemaVersion!==2)throw new Error('ระบบรับสินค้าอยู่ระหว่างอัปเดต กรุณารีเฟรชข้อมูลก่อนบันทึก');
+    if(payload.appendReviewSet){
+      if(payload.targetStatus!=='Pending Review'||['issueReview','lift','replaceExtras','extraItems'].some(key=>Object.prototype.hasOwnProperty.call(payload,key)))throw new Error('รับเพิ่มได้เฉพาะรายการใหม่เข้าชุดรอตรวจสอบเดิม กรุณาโหลดข้อมูลล่าสุด');
+    } else {
     const checked=Array.from(document.querySelectorAll('[name="gr-issue-code"]:checked'),x=>x.value);
     if(canApproveGR())payload.issueReview={confirmed:true,codes:checked,note:el('gr-issue-note')?.value.trim()||''};
     if(payload.targetStatus==='GR Completed'&&!payload.issueReview)throw new Error('กรุณาเลือก “ปกติ / ไม่พบปัญหา” หรือหมายเหตุปัญหาก่อนยืนยัน');
@@ -183,6 +186,7 @@ var GrDashboard = (() => {
         payload.lift={rounds:Number(raw),payment:Number(raw)>0?payment:null};
       }
     } else payload.lift={rounds:0,payment:null};
+    }
     const serialized=JSON.stringify(payload);if(serialized!==lastPayload||!mutationId){lastPayload=serialized;mutationId=crypto.randomUUID();}
     payload.requestId=mutationId;return payload;
   }

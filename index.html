@@ -729,7 +729,7 @@
     .gr-load-error button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
   </style>
   <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20260925.04">
-  <script src="js/gr-dashboard-v2.js?v=20261013.02" defer></script>
+  <script src="js/gr-dashboard-v2.js?v=20261019.01" defer></script>
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -1122,6 +1122,7 @@
                 <p class="text-sm font-bold text-brand-blue" id="r-display-po">-</p>
               </div>
               <div id="r-delivery-plan"></div>
+              <p id="r-append-review-context" class="hidden text-sm text-brand-blue" role="status"></p>
             </div>
             
             <form id="form-receiving" class="gr-receiving-form space-y-6" novalidate>
@@ -1143,7 +1144,7 @@
                 <div id="r-items-container" class="space-y-3"></div>
               </div>
 
-              <div class="mt-8 bg-brand-orangeLight/30 p-4 rounded-xl border border-brand-orange/20">
+              <div id="r-extra-items-section" class="mt-8 bg-brand-orangeLight/30 p-4 rounded-xl border border-brand-orange/20">
                 <h3 class="font-bold text-brand-orange mb-3 flex items-center gap-1.5"><i data-lucide="gift" class="w-4 h-4"></i> ของแถม / สินค้านอกบิล</h3>
                 <div id="r-extra-items-container" class="space-y-3 mb-4"></div>
                 <button type="button" onclick="addExtraItemRow()" class="w-full border-2 border-dashed border-brand-orange/40 text-brand-orange bg-white hover:bg-brand-orangeLight/50 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-1.5 active:scale-95"><i data-lucide="plus" class="w-4 h-4"></i> เพิ่มรายการนอกบิล</button>
@@ -1184,7 +1185,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261017.03';
+    const CURRENT_VERSION = '20261019.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1718,7 +1719,7 @@
 
     var grAuthAttempt = 0, grPendingVerification = null;
     function grAuthRawSession() { try { return localStorage.getItem(APP_CONFIG.STORAGE_KEY); } catch (_) { return null; } }
-    function invalidateGRAuthStartup() { ++grAuthAttempt; grPendingVerification = null; }
+    function invalidateGRAuthStartup() { ++grAuthAttempt; grPendingVerification = null; grAppendReviewSnapshot = null; }
     window.addEventListener('storage', event => {
         if (event.key !== null && ![APP_CONFIG.STORAGE_KEY, 'akra_main_session', 'akra_session_token'].includes(event.key)) return;
         if (event.key !== null && event.oldValue === event.newValue) return;
@@ -1728,6 +1729,7 @@
 
     var AuthGuard = {
         init: async () => {
+            grAppendReviewSnapshot = null;
             const attempt = ++grAuthAttempt;
             const embedded = !!window.AkraModule?.embedded, mainStamp = window.AkraModule?.sessionStamp?.();
             let expectedRaw = grAuthRawSession(), boundOwner = window.appSession, boundToken = boundOwner?.token, tokenToVerify = '', embeddedToken, tokenCaptured = false;
@@ -1818,7 +1820,7 @@
         bindEvents: () => {
             window.AkraModule?.watchSession?.({appId:'app-gr', user:window.appSession, token:window.appSession?.token,
                 invalidated:() => { invalidateGRAuthStartup(); window.appSession = null; showGRAuthFailure({ reason: 'session_changed' }); },
-                refreshed:token => { if (window.appSession) window.appSession.token = token; }
+                refreshed:token => { grAppendReviewSnapshot = null; if (window.appSession) window.appSession.token = token; }
             });
             if (!window.AkraModule?.embedded) window.addEventListener('storage', event => {
                 if (event.key !== null && event.key !== APP_CONFIG.STORAGE_KEY) return;
@@ -1931,6 +1933,51 @@
     var productHistoryOptionsSource = null;
     var productHistoryInputHandlerAttached = false;
     var grExtraProductSuggestionId = 0;
+    var grAppendReviewSnapshot = null;
+    function clearGRAppendReviewSnapshot() { grAppendReviewSnapshot = null; }
+    function grAppendReviewTarget(group) {
+        const uuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value || '');
+        if (!group || group.status !== 'Pending GR' || !group.items?.length) return null;
+        let target = null;
+        for (const item of group.items) {
+            const value = item.appendReviewSet;
+            if (item.status !== 'Pending GR' || !uuid(item.uid) || !uuid(item.poId) || !value
+                || value.poId !== item.poId || !uuid(value.receivingEventId) || typeof value.fingerprint !== 'string' || !/^[0-9a-f]{32}$/.test(value.fingerprint)
+                || !Number.isSafeInteger(value.itemCount) || value.itemCount < 1
+                || !/^\d{4}-\d{2}-\d{2}$/.test(value.ata || '') || typeof value.receiverName !== 'string'
+                || !value.receiverName || !GR_WAREHOUSES.includes(value.warehouse)
+                || typeof value.grNumber !== 'string' || !value.grNumber
+                || (value.remark !== null && typeof value.remark !== 'string')) return null;
+            const candidate = { poId: value.poId, receivingEventId: value.receivingEventId, fingerprint: value.fingerprint,
+                itemCount: value.itemCount, grNumber: value.grNumber, ata: value.ata, receiverName: value.receiverName,
+                warehouse: value.warehouse, remark: value.remark };
+            if (target && JSON.stringify(target) !== JSON.stringify(candidate)) return null;
+            target = candidate;
+        }
+        if (new Set(group.items.map(item => item.uid)).size !== group.items.length) return null;
+        return target;
+    }
+    function grAppendReviewRows(items) {
+        return (items || []).map(item => ({ uid: item.uid, poId: item.poId || '', status: item.status,
+            receivingEventId: item.receivingEventId || '' })).sort((a, b) => String(a.uid).localeCompare(String(b.uid)));
+    }
+    function isGRAppendReviewOwnerCurrent(snapshot) {
+        try {
+            return !!snapshot?.owner && !!snapshot.scope && window.appSession === snapshot.owner && getSessionToken() === snapshot.token
+                && grSessionCacheScope() === snapshot.scope && window.AkraModule?.sessionStamp?.() === snapshot.stamp;
+        } catch (_) { return false; }
+    }
+    function isCurrentGRAppendReviewSnapshot(group) {
+        const snapshot = grAppendReviewSnapshot;
+        if (!snapshot || !isGRAppendReviewOwnerCurrent(snapshot) || snapshot.generation !== grActiveDataRequestGeneration
+            || group !== snapshot.group || JSON.stringify(grAppendReviewTarget(group)) !== JSON.stringify(snapshot.target)
+            || JSON.stringify(grAppendReviewRows(group.items)) !== snapshot.rows) return false;
+        const loadedPending = (appData.pendingPOs || []).filter(item => item.poId === snapshot.target.poId && item.status === 'Pending GR');
+        const loadedReview = (appData.pendingPOs || []).filter(item => item.receivingEventId === snapshot.target.receivingEventId);
+        return JSON.stringify(grAppendReviewRows(loadedPending)) === snapshot.rows
+            && JSON.stringify(grAppendReviewRows(loadedReview)) === snapshot.reviewRows
+            && JSON.stringify(grAppendReviewTarget({ status: 'Pending GR', items: loadedPending })) === JSON.stringify(snapshot.target);
+    }
     function grSessionCacheScope() {
         const user = window.appSession;
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user?.identityId || '') ||
@@ -2401,6 +2448,7 @@
     }
     
     function showView(viewId) {
+        if (viewId !== 'receiving-detail-view') clearGRAppendReviewSnapshot();
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         document.querySelectorAll('main > section').forEach(div => div.classList.add('hidden'));
         document.getElementById(viewId).classList.remove('hidden');
@@ -2793,6 +2841,10 @@
 
     async function apiCall(action, payload = null) {
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
+      if (action === 'bulkReceivePO' && payload?.appendReviewSet && !isCurrentGRAppendReviewSnapshot(currentActiveGroup)) {
+        clearGRAppendReviewSnapshot();
+        return { success: false, reason: 'append_review_snapshot_changed', message: 'ข้อมูลชุดรับหรือเซสชันเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนรับเพิ่ม' };
+      }
       if (!navigator.onLine) return isReadApiAction(action) ? grReadFailure({ reason: 'offline' }) : { success: false, message: 'Offline', reason: 'offline' };
       if (isLocalPreviewMode()) {
         if (action === 'getGrDashboardAnalytics' && payload?.schemaVersion === 2) {
@@ -2860,6 +2912,7 @@
     }
 
     async function openReceiving(isManualRefresh = false) {
+        clearGRAppendReviewSnapshot();
         document.getElementById('gr-load-error')?.classList.add('hidden');
         const loadGeneration = ++grActiveDataRequestGeneration;
         const sessionScope = grSessionCacheScope();
@@ -3956,12 +4009,27 @@
         currentActiveGroup = group; 
         const currentGroupStatus = group.status; // ใช้ตัวแปร status ของกลุ่มตรงๆ
         group.items = getBillModalItems(group);
+        clearGRAppendReviewSnapshot();
+        const appendTarget = grAppendReviewTarget(group);
+        document.getElementById('form-receiving').dataset.appendReview = appendTarget ? 'true' : '';
+        const appendContext = document.getElementById('r-append-review-context');
+        appendContext.classList.toggle('hidden', !appendTarget);
+        document.getElementById('r-extra-items-section').classList.toggle('hidden', !!appendTarget);
+        document.getElementById('gr-issue-review').classList.toggle('hidden', !!appendTarget);
+        if (appendTarget) {
+            grAppendReviewSnapshot = Object.freeze({ target: Object.freeze(appendTarget), group,
+                rows: JSON.stringify(grAppendReviewRows(group.items)),
+                reviewRows: JSON.stringify(grAppendReviewRows((appData.pendingPOs || []).filter(item => item.receivingEventId === appendTarget.receivingEventId))),
+                owner: window.appSession, token: getSessionToken(), scope: grSessionCacheScope(),
+                stamp: window.AkraModule?.sessionStamp?.(), generation: grActiveDataRequestGeneration });
+            appendContext.innerText = `รับเพิ่มเข้าชุด ${appendTarget.grNumber} ที่รอตรวจสอบอยู่ ${appendTarget.itemCount} รายการ · คลัง ${appendTarget.warehouse} · บันทึกเฉพาะรายการใหม่ แล้วตรวจสอบและยืนยันทั้งชุดครั้งเดียว ข้อมูลส่วนหัวและรายการเดิมคงเดิม`;
+        }
         
         document.getElementById('r-display-vendor-header').innerHTML = `
             <div class="bg-gray-100 p-2 rounded-lg text-gray-500"><i data-lucide="building-2" class="w-5 h-5"></i></div>
             <div class="flex flex-col pr-2">
                 <span class="font-bold text-gray-800 text-base leading-tight">${group.vendor}</span>
-                <div class="mt-1">${getWarehouseBadge(group.warehouse)}</div>
+                <div class="mt-1">${getWarehouseBadge(appendTarget?.warehouse || group.warehouse)}</div>
             </div>
         `;
         document.getElementById('r-display-date').innerText = displayGRDate(group.poDate);
@@ -3995,7 +4063,12 @@
         document.getElementById('r-ata').value = (firstItem.ata && firstItem.ata.includes('/')) ? parseDateToInput(firstItem.ata) : new Date().toISOString().split('T')[0];
         document.getElementById('r-receiver').value = firstItem?.receiverName || window.currentUser;
         document.getElementById('r-remark').value = savedReceivingRemark.note;
-        GrDashboard.review(firstItem, currentGroupStatus === 'GR Completed');
+        if (appendTarget) {
+            document.getElementById('r-ata').value = appendTarget.ata;
+            document.getElementById('r-receiver').value = appendTarget.receiverName;
+            document.getElementById('r-remark').value = appendTarget.remark || '';
+        }
+        GrDashboard.review(firstItem, currentGroupStatus === 'GR Completed' || !!appendTarget);
 
         // เช็ค Overdue ปกติ 
         const isOverdue = group.items.some(i => i.displayStatus === 'Overdue');
@@ -4003,7 +4076,10 @@
         const statusEl = document.getElementById('r-display-status');
         
         // กำหนดป้ายสถานะด้านบนของ Modal
-        if (currentGroupStatus === 'Pending Review') {
+        if (appendTarget) {
+            statusEl.innerText = `รับเพิ่ม · ${appendTarget.grNumber}`;
+            statusEl.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-brand-blueLight text-brand-blue border border-brand-blue/20 shadow-sm';
+        } else if (currentGroupStatus === 'Pending Review') {
             statusEl.innerText = '⏳ รอตรวจสอบ (คลังสินค้า)';
             statusEl.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-brand-orangeLight text-brand-orange border border-brand-orange/30 shadow-sm';
         } else if (currentGroupStatus === 'GR Completed') {
@@ -4022,7 +4098,7 @@
 
         // ----- ฟอร์มค่าลิฟท์ (เฉพาะ W2) -----
         const liftFeeSection = document.getElementById('r-lift-fee-section');
-        if (group.warehouse === 'W2') {
+        if (group.warehouse === 'W2' && !appendTarget) {
             const creditKeywords = ['tfm', 'สาลีไทย', 'เกตุวานิช', 'kvc', 'แหลมทอง', 'เพียวฟู้ดส์', 'purefoods', 'พ่อโจ้'];
             let defaultLiftFee = 'จ่ายสด';
             
@@ -4135,7 +4211,7 @@
         });
         container.innerHTML = htmlStr;
 
-        const loadedExtras = mergeBillExtras([group.extraItems || [], ...group.items.map(item => item.extraItems || [])]);
+        const loadedExtras = appendTarget ? [] : mergeBillExtras([group.extraItems || [], ...group.items.map(item => item.extraItems || [])]);
         document.getElementById('r-extra-items-container').innerHTML = '';
         currentBillHadLoadedExtras = loadedExtras.length > 0;
         loadedExtras.forEach(item => addExtraItemRow(item));
@@ -4165,6 +4241,7 @@
         
         const canReceive = canReceiveGR();
         const isAdmin = canApproveGR();
+        btnReview.innerText = appendTarget ? '⏳ รวมเข้าชุดรอตรวจสอบ' : '⏳ รับสินค้าเสร็จแล้ว';
         
         if (currentGroupStatus === 'GR Completed') {
             if (isAdmin) {
@@ -4188,6 +4265,13 @@
                 btnReset.classList.remove('hidden');
             }
             setInputDisabledStatus(!canReceive);
+        }
+        if (appendTarget) {
+            btnDraft.classList.add('hidden');
+            btnConfirm.classList.add('hidden');
+            ['r-ata', 'r-receiver', 'r-remark'].forEach(id => { document.getElementById(id).disabled = true; });
+            const addExtraBtn = document.querySelector('button[onclick="addExtraItemRow()"]');
+            if (addExtraBtn) addExtraBtn.disabled = true;
         }
         
         showView('receiving-detail-view');
@@ -4302,6 +4386,7 @@
     }
 
     function addExtraItemRow(initial = {}) {
+        if (document.getElementById('form-receiving').dataset.appendReview === 'true') return;
         const container = document.getElementById('r-extra-items-container'); const div = document.createElement('div');
         const defWh = (currentActiveGroup && currentActiveGroup.warehouse) || '';
         const parsedLoc = parseLoc(initial.locIn || '');
@@ -4492,6 +4577,12 @@
     async function submitReceiving(e, targetStatus) {
       e.preventDefault();
       if (receivingMutationInFlight) return;
+      const appendMode = document.getElementById('form-receiving').dataset.appendReview === 'true';
+      const appendSnapshot = appendMode ? grAppendReviewSnapshot : null;
+      if (appendMode && (targetStatus !== 'Pending Review' || !isCurrentGRAppendReviewSnapshot(currentActiveGroup))) {
+          clearGRAppendReviewSnapshot();
+          return showNotification('ข้อมูลชุดรับหรือเซสชันเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนรับเพิ่ม', 'warning');
+      }
       const isApprovalAction = targetStatus === 'GR Completed';
       if (isApprovalAction ? !canApproveGR() : !canReceiveGR()) {
           return showNotification("ไม่มีสิทธิ์ดำเนินการนี้", "error");
@@ -4501,11 +4592,12 @@
       const ataInput = document.getElementById('r-ata'); const receiverInput = document.getElementById('r-receiver');
       ataInput.classList.remove('input-error'); receiverInput.classList.remove('input-error');
 
-      const ata = ataInput.value; const receiverName = receiverInput.value.trim(); 
-      let remark = document.getElementById('r-remark').value.trim();
+      const ata = appendMode ? appendSnapshot.target.ata : ataInput.value;
+      const receiverName = appendMode ? appendSnapshot.target.receiverName : receiverInput.value.trim();
+      let remark = appendMode ? (appendSnapshot.target.remark || '') : document.getElementById('r-remark').value.trim();
       
       const liftFeeContainer = document.getElementById('lift-fee-container');
-      if (liftFeeContainer) {
+      if (liftFeeContainer && !appendMode) {
           const selectedLiftFee = document.querySelector('input[name="lift-fee"]:checked');
           const liftRounds = document.getElementById('lift-fee-rounds').value.trim();
           const rounds = parseInt(liftRounds);
@@ -4525,6 +4617,14 @@
       const group = currentActiveGroup || groupedPOs[index];
       if (!group) return showNotification("ไม่พบข้อมูลกลุ่มสินค้า กรุณาลองใหม่อีกครั้ง", "error");
       if (grReconcilingBillKeys.get(poBillGroupKey(group)) === grSessionCacheScope()) return showNotification('บันทึกบิลนี้แล้ว กำลังตรวจสอบสถานะล่าสุด', 'warning');
+      if (appendMode) {
+          const rows = Array.from(document.querySelectorAll('.po-item-row'), row => row.dataset.uid).sort();
+          const expectedUids = group.items.map(item => item.uid).sort();
+          if (JSON.stringify(rows) !== JSON.stringify(expectedUids) || document.querySelectorAll('.extra-item-row').length) {
+              clearGRAppendReviewSnapshot();
+              return showNotification('รายการสินค้าเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนรับเพิ่ม', 'warning');
+          }
+      }
       let formHasError = false;
       let expiryHasError = false;
       let expiryChoiceHasError = false;
@@ -4656,12 +4756,18 @@
       const finalRemark = remark.trim();
 
       const bulkPayload = {
-          ata: Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: finalRemark, targetStatus: targetStatus,
-          groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: group.warehouse, billRef: usableBillRefUid(group.refPrUid) },
+          ata: appendMode ? ata : Utilities_formatDateFrontEnd(ata), receiverName: receiverName, remark: appendMode ? appendSnapshot.target.remark : finalRemark, targetStatus: targetStatus,
+          groupInfo: { poDate: group.poDate, vendor: group.vendor, poNumber: group.poNumber, warehouse: appendMode ? appendSnapshot.target.warehouse : group.warehouse, billRef: appendMode ? appendSnapshot.target.poId : usableBillRefUid(group.refPrUid) },
           groupPoUids: itemUids(group.items),
           items: poItemsData, extraItems: extraItemsData,
           replaceExtras: currentBillHadLoadedExtras || extraItemsData.length > 0
       };
+      if (appendMode) {
+          const { poId, receivingEventId, fingerprint, itemCount } = appendSnapshot.target;
+          bulkPayload.appendReviewSet = { poId, receivingEventId, fingerprint, itemCount };
+          delete bulkPayload.extraItems;
+          delete bulkPayload.replaceExtras;
+      }
 
       try { GrDashboard.writeMetadata(bulkPayload); } catch (error) { return showNotification(error.message, 'warning'); }
 
@@ -4674,12 +4780,17 @@
 
       try {
           const res = await apiCall('bulkReceivePO', bulkPayload);
+          if (appendMode && !isGRAppendReviewOwnerCurrent(appendSnapshot)) return;
+          if (appendMode && grAppendReviewSnapshot !== appendSnapshot) {
+              if (res.reason === 'append_review_snapshot_changed') showNotification(res.message, 'warning');
+              return;
+          }
           hideDataLoading();
           
           if(res.success) { 
               let msg = "บันทึกสำเร็จ!";
               if(targetStatus === 'Draft GR') msg = "พักบิล (Draft) เรียบร้อย";
-              else if(targetStatus === 'Pending Review') msg = "ส่งให้ตรวจสอบเรียบร้อยแล้ว!";
+              else if(targetStatus === 'Pending Review') msg = appendMode ? 'รวมรายการใหม่เข้าชุดรอตรวจสอบแล้ว ตรวจสอบและยืนยันทั้งชุดครั้งเดียว' : "ส่งให้ตรวจสอบเรียบร้อยแล้ว!";
               else msg = "ยืนยันรับเข้าคลังเรียบร้อย! (บิลย้ายไปที่แท็บ 'รับแล้ว')";
               
               showNotification(msg, "success"); 
@@ -4691,15 +4802,21 @@
               
               openReceivingInBackground();
           } 
-          else { showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error"); }
+          else {
+              if (appendMode && res.status === 409) clearGRAppendReviewSnapshot();
+              showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error");
+          }
       } finally {
           receivingMutationInFlight = false;
-          hideDataLoading();
-          actionButtons.forEach(btn => { btn.disabled = false; });
+          if (!appendMode || isGRAppendReviewOwnerCurrent(appendSnapshot)) {
+              hideDataLoading();
+              actionButtons.forEach(btn => { btn.disabled = false; });
+          }
       }
     }
 
     async function openReceivingInBackground() {
+        clearGRAppendReviewSnapshot();
         const loadGeneration = ++grActiveDataRequestGeneration;
         const sessionScope = grSessionCacheScope();
         const productsAlreadyLoaded = grProductsDataScope === sessionScope ? appData.products : [];
