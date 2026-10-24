@@ -116,6 +116,47 @@ assert.strictEqual(nonLeap2026.valid, false);
 assert.ok(nonLeap2026.error.includes('28 วัน'));
 console.log('✓ AC5 Passed: Blank values remain optional; leap days correctly preserved or rejected');
 
+// Exercise the actual UI helpers with both compact PO and legacy extra field nesting.
+const fs = require('node:fs');
+const vm = require('node:vm');
+const html = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
+const helpers = html.slice(html.indexOf('    function initExpiryInputPreview('), html.indexOf('    async function submitReceiving('));
+const ui = vm.createContext({ GrExpiry, esc: String, window: {} });
+vm.runInContext(helpers, ui);
+for (const compact of [true, false]) {
+  const classes = new Set();
+  const classList = { remove: name => classes.delete(name), add: name => classes.add(name), toggle: (name, on) => on ? classes.add(name) : classes.delete(name) };
+  const preview = { innerHTML: '' }, label = { textContent: '' }, star = { classList };
+  const checkbox = { checked: true, disabled: false };
+  const input = { value: 'G2C', dataset: {}, classList, hasAttribute: () => false, focus() {} };
+  const inner = { querySelector: selector => selector === '.exp-preview-wrap' ? preview : selector === '.exp-field-label' ? label : selector === '.exp-required-star' ? star : selector === '.po-no-expiry, .ex-no-expiry' && !compact ? checkbox : null };
+  const scope = { querySelector: selector => selector === '.po-exp, .ex-exp' ? input : selector === '.po-no-expiry, .ex-no-expiry' ? checkbox : inner.querySelector(selector) };
+  input.parentElement = inner;
+  input.closest = selector => compact && selector === '.gr-expiry-field' ? scope : null;
+  checkbox.parentElement = { parentElement: scope };
+  ui.initExpiryInputPreview(input);
+  assert.equal(input.placeholder, 'รหัส Lot เช่น G2C (ถ้ามี)', 'Saved no-expiry state initializes the Lot input');
+  assert.equal(label.textContent, 'รหัส Lot (ถ้ามี)');
+  assert.match(preview.innerHTML, /รหัส Lot: G2C/);
+  input.value = 'LOT-123';
+  ui.handleExpiryInputChange(input);
+  assert.match(preview.innerHTML, /รหัส Lot: LOT-123/);
+  checkbox.checked = false;
+  ui.handleNoExpiryChange(checkbox);
+  assert.equal(input.value, 'LOT-123', 'Toggling expiry meaning preserves raw text');
+  input.value = '31/12/2569';
+  ui.handleExpiryInputChange(input);
+  assert.ok(preview.innerHTML.includes(GrExpiry.parseExpiryInput(input.value).previewText));
+  input.value = 'X'.repeat(201);
+  ui.handleExpiryInputChange(input);
+  assert.equal(classes.has('input-error'), false, 'overlong labels wait for save validation');
+  assert.equal(preview.innerHTML, '');
+  classList.add('input-error');
+  ui.handleExpiryInputChange(input);
+  assert.equal(classes.has('input-error'), true, 'preview does not erase an existing save warning');
+}
+console.log('✓ Compact PO and extra expiry controls preserve saved state, Lot preview and date switching');
+
 console.log('\n=============================================');
 console.log('✓ ALL GR FRONTEND EXPIRY UNIT TESTS PASSED!');
 console.log('=============================================');

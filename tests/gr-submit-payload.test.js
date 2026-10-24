@@ -196,6 +196,20 @@ async function createTest() {
 
         context.groupedPOs = [{ poDate: '2026-09-08', vendor: 'Vendor', poNumber: 'PO-1', warehouse: 'W1', refPrUid: 'PR-1', items: [{ uid: 'uuid-1', status: 'Pending GR', sku: 'SKU-1', product: 'P1' }] }];
 
+        if (options.sharedStockRoundTrip) {
+            const row = mockDoc.querySelectorAll('.po-item-row')[0];
+            const queryAll = mockDoc.querySelectorAll;
+            mockDoc.querySelectorAll = selector => selector === '.po-item-row' ? [row] : queryAll(selector);
+            poOldStock.dataset.warehouse = 'W1';
+            poOldStock2.dataset.warehouse = 'W5';
+            context.syncSplitOldStock(row);
+            row.querySelector('.po-loc-wh').value = 'W5';
+            context.syncSplitOldStock(row);
+            poOldStock.value = '9';
+            context.syncSplitOldStock(row);
+            row.querySelector('.po-loc-wh').value = 'W1';
+            context.syncSplitOldStock(row);
+        }
         // Run the function
         await context.submitReceiving({ preventDefault: () => {} }, options.targetStatus || 'GR Completed');
         
@@ -276,6 +290,10 @@ async function createTest() {
     assert.equal(result.calls.length, 1, 'split warehouse counts must reach API');
     assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W1, '0');
     assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W5, '7');
+    result = await runTestWithExpValue(validExpiry, { split: true, poQty2: '2', poOldStock: '0', poOldStock2: '6', sharedStockRoundTrip: true });
+    assert.equal(result.calls.length, 1);
+    assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W1, '0');
+    assert.equal(result.calls[0].payload.items[0].oldStockByWarehouse.W5, '9', 'serializer submits the latest shared-warehouse edit after separating');
 
     result = await runTestWithExpValue(validExpiry, { split: true, poQty2: '2', poOldStock: '0', poWarehouse2: 'W1', poOldStock2: '' });
     assert.equal(result.calls.length, 1, 'two locations in the same warehouse share one checked count');

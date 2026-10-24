@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="tailwind.css?v=20261013.02">
   <script src="js/supabase-gr-client.js?v=20261013.02" defer></script>
   <script src="js/gr-expiry.js" defer></script>
+  <script src="js/gr-receiving-ux.js?v=20261024.03" defer></script>
+  <link rel="stylesheet" href="assets/gr-receiving-ux.css?v=20261024.03">
   <script src="js/bm-date-display.js?v=20261013.02" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
@@ -194,7 +196,7 @@
       .gr-warehouse-chips { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
       #wh-chips button { min-height: 44px; padding: 0 13px !important; }
       #delivery-plan-summary button { min-height: 44px; }
-      #form-receiving .po-item-row > .grid.grid-cols-2 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+      #form-receiving .po-item-row > .grid.grid-cols-2, #form-receiving .po-item-row > details > .gr-item-body > .grid.grid-cols-2 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
       #form-receiving .po-item-row .grid.grid-cols-3 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
       #form-receiving .po-item-row .grid.grid-cols-3 .po-loc-zone,
       #form-receiving .po-item-row .po-split .po-loc-zone2,
@@ -729,7 +731,9 @@
     .gr-load-error button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
   </style>
   <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20261019.02">
-  <script src="js/gr-dashboard-v2.js?v=20261019.02" defer></script>
+  <script src="js/gr-dashboard-v2.js?v=20261023.01" defer></script>
+  <script src="js/gr-workflow-ui.js?v=20261023.01" defer></script>
+  <link rel="stylesheet" href="assets/gr-workflow-ui.css?v=20261023.01">
 </head>
 <body class="gr-shell text-gray-800 antialiased h-screen flex flex-col leading-relaxed loading-active">
 
@@ -753,8 +757,9 @@
       <aside class="gr-sidebar" aria-label="เมนูระบบรับสินค้า">
         <div class="gr-sidebar__brand"><i data-lucide="package-check"></i><span>รับสินค้า</span></div>
         <nav class="gr-sidebar__menu" aria-label="ส่วนงาน GR">
-          <button type="button" class="gr-nav-receiving" onclick="showView('receiving-list-view')"><i data-lucide="inbox"></i><span>รายการรับสินค้า</span></button>
-          <button type="button" class="gr-nav-vendor" onclick="openVendorLeadtimeDashboard()" aria-label="เปิด Dashboard และ Leadtime"><i data-lucide="trending-up"></i><span>Dashboard GR</span></button>
+          <button type="button" class="gr-nav-receiving" onclick="showView('receiving-list-view')"><i data-lucide="inbox"></i><span>งานรับสินค้า</span></button>
+          <button type="button" class="gr-nav-vendor" onclick="openVendorLeadtimeDashboard()" aria-label="ประวัติและรายงาน"><i data-lucide="trending-up"></i><span>ประวัติและรายงาน</span></button>
+          <button type="button" class="gr-nav-planning" onclick="openDeliveryPlanView()"><i data-lucide="calendar-days"></i><span>แผนสินค้าเข้า</span></button>
         </nav>
       </aside>
       <nav class="gr-topbar bg-brand-orange text-white shadow-md sticky top-0 z-20">
@@ -781,14 +786,14 @@
         
         <section id="receiving-list-view" class="block">
           <div class="gr-view-heading px-1">
-            <div><h2 class="gr-view-title text-lg font-semibold text-brand-orange">รายการบิลรอรับสินค้า</h2><p class="gr-view-subtitle">จัดลำดับบิลตามสถานะ แผนส่ง และคลังรับเข้า เพื่อเปิดงานต่อได้ทันที</p></div>
+            <div><h2 class="gr-view-title text-lg font-semibold text-brand-orange">งานรับสินค้า</h2><p class="gr-view-subtitle">ค้นหาและเลือกบิลเพื่อรับสินค้าเข้าคลัง</p></div>
             <div class="gr-count-block"><span id="pending-count">0 บิล</span></div>
           </div>
 
           <div class="gr-filter-bento mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
-            <input type="text" id="r-search-input" oninput="schedulePOListRender()" aria-label="ค้นหาบิลรับสินค้า" placeholder="ค้นหาชื่อสินค้า, Vendor, เลข PO..." class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
+            <input type="text" id="r-search-input" oninput="schedulePOListRender()" aria-label="ค้นหาบิลรับสินค้า" placeholder="ค้นหาชื่อสินค้า, ผู้ขาย, เลข PO..." class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
             <select id="r-status-filter" onchange="handleStatusFilterChange()" aria-label="กรองสถานะบิล" class="gr-control-field input-field m-0 text-sm py-2.5 bg-white shadow-sm font-medium border-gray-200">
-              <option value="">ทุกสถานะ</option>
+              <option value="">ทุกงานที่ยังไม่เสร็จ</option>
               <option value="Overdue">นานผิดปกติ (Overdue)</option>
               <option value="Draft GR">กำลังลงสินค้า (Draft)</option>
               <option value="Pending Review">รอตรวจสอบ</option>
@@ -802,7 +807,7 @@
             </select>
           </div>
 
-          <div id="delivery-plan-summary" class="gr-delivery-summary mb-5 px-1"></div>
+          <div class="flex flex-wrap items-center gap-2"><button type="button" id="gr-clear-list-filters" class="gr-reset-filters" onclick="clearReceivingFilters()" hidden>ล้างตัวกรองทั้งหมด</button><button type="button" class="gr-reset-filters" onclick="openVendorLeadtimeDashboard(); switchVendorLeadtimeTab('bills')">ดูประวัติบิลสำเร็จ</button></div>
 
           <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
 
@@ -815,6 +820,11 @@
           <div id="po-list-container" class="gr-bill-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
 
+        <section id="delivery-plan-view" class="gr-secondary-view hidden" aria-label="แผนสินค้าเข้า">
+          <h2 class="gr-view-title">แผนสินค้าเข้า</h2>
+          <p class="text-sm text-slate-600 mb-4">กำหนดรับของงานที่ยังไม่เสร็จ · เลือกวันเพื่อดูบิล</p>
+          <div id="delivery-plan-summary" class="gr-delivery-summary mb-5"></div>
+        </section>
         <!-- Comprehensive GR Dashboard & Analytics Section -->
         <section id="vendor-leadtime-view" class="gr-secondary-view hidden dashboard-preview-surface" aria-labelledby="vendor-leadtime-title">
           <div class="flex flex-col gap-4">
@@ -829,9 +839,9 @@
                   <span class="dashboard-preview-live">ข้อมูลตามช่วงวันที่ที่เลือก</span>
                 </div>
                 <h2 id="vendor-leadtime-title" class="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
-                  Dashboard ภาพรวมการรับสินค้าเข้าคลัง
+                  ประวัติและรายงาน
                 </h2>
-                <p class="text-sm text-gray-500 mt-1 max-w-2xl">วิเคราะห์บิลรับเข้าสะสม ยอดรวมจำนวนลัง การกระจายคลังสินค้า และประสิทธิภาพการส่งมอบของ Vendor</p>
+                <p class="text-sm text-gray-500 mt-1 max-w-2xl">วิเคราะห์บิลรับเข้าสะสม ยอดรวมจำนวนลัง การกระจายคลังสินค้า และประสิทธิภาพการส่งมอบของผู้ขาย</p>
               </div>
               
               <!-- Tab Navigation -->
@@ -840,20 +850,21 @@
                   ภาพรวมการรับสินค้า
                 </button>
                 <button type="button" id="tab-btn-vendor-benchmarks" onclick="switchVendorLeadtimeTab('benchmarks')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent">
-                  Leadtime และสถิติ Vendor
+                  สถิติผู้ขาย
                 </button>
                 <button type="button" id="tab-btn-product-drilldown" onclick="switchVendorLeadtimeTab('product')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg transition text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent">
                   ค้นหาประวัติสินค้ารายตัว
                 </button>
-                <button type="button" id="tab-btn-approved-bills" onclick="switchVendorLeadtimeTab('bills')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg border border-transparent">Approved GR Bills</button>
+                <button type="button" id="tab-btn-approved-bills" onclick="switchVendorLeadtimeTab('bills')" class="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-bold rounded-lg border border-transparent">บิลสำเร็จ</button>
               </div>
             </div>
 
 
+            <details id="gr-report-filter-disclosure" open><summary class="gr-report-filter-summary">ตัวกรองรายงาน <span id="gr-report-filter-summary"></span></summary>
             <div id="gr-report-filters" class="gr-report-filter">
               <label>วันที่<select id="dashboard-date-preset" onchange="setDashboardPreset(this.value)"><option value="today">วันนี้</option><option value="yesterday">เมื่อวาน</option><option value="7d">7 วันล่าสุด</option><option value="30d">30 วันล่าสุด</option><option value="thisMonth">เดือนนี้</option><option value="lastMonth">เดือนที่แล้ว</option><option value="custom">กำหนดเอง</option></select></label>
               <div id="dashboard-custom-date-box" class="hidden"><label>เริ่มวันที่<input type="date" id="dashboard-date-from"></label><label>ถึงวันที่<input type="date" id="dashboard-date-to"></label><button type="button" onclick="applyDashboardCustomDate()">ใช้ช่วงวันที่</button></div>
-              <label class="gr-search">ค้นหา<input type="search" id="dashboard-bill-search" maxlength="200" oninput="filterDashboardBillsTable()" placeholder="GR, PO, Vendor, SKU, ชื่อสินค้า"></label>
+              <label class="gr-search">ค้นหา<input type="search" id="dashboard-bill-search" maxlength="200" oninput="filterDashboardBillsTable()" placeholder="GR, PO, ผู้ขาย, SKU, ชื่อสินค้า"></label>
               <label>คลังรับจริง<select id="dashboard-bill-wh" onchange="filterDashboardBillsTable()"><option value="">คลังทั้งหมด</option><option>W1</option><option>W2</option><option>W3</option><option>W4</option><option>W5</option><option>C1</option><option>C2</option><option value="UNKNOWN">ไม่ทราบการกระจาย</option></select></label>
               <label>พนักงานผู้รับ<select id="dashboard-bill-receiver" onchange="filterDashboardBillsTable()"><option value="">พนักงานทั้งหมด</option></select></label>
               <label>หมายเหตุ / ปัญหาบิล<select id="dashboard-bill-issue" onchange="filterDashboardBillsTable()"><option value="">สถานะทั้งหมด</option><option value="normal">ปกติ / ไม่พบปัญหา</option><option value="any">พบปัญหาทุกประเภท</option><option value="SHORT_DELIVERY">ของไม่ครบ</option><option value="BACKORDER">ค้างส่ง</option><option value="DAMAGED">พบสินค้าเสียหาย</option><option value="BILL_CORRECTION">แก้บิล</option><option value="RETURNED">ตีกลับ</option><option value="NO_PO">ไม่มี PO</option><option value="unknown">ยังไม่ได้ระบุ</option></select></label>
@@ -861,6 +872,7 @@
               <button type="button" onclick="GrDashboard.reset()">ล้างตัวกรอง</button><button type="button" onclick="loadGrDashboardAnalytics(true)">โหลดใหม่</button>
               <p id="dashboard-active-period-label" class="gr-date-range">กำลังอ่านช่วงวันที่…</p><p id="gr-filter-chips"></p>
             </div>
+            </details>
             <p id="gr-report-status" role="status" aria-live="polite"></p>
             <div id="vendor-leadtime-tab-overview"><div id="gr-report-content" aria-busy="false">
               <h3 class="gr-section-heading">สรุปการรับสินค้า</h3><div id="gr-kpi-row" class="gr-carousel" aria-label="ตัวเลขสรุป"></div><div class="gr-carousel-controls"><button type="button" onclick="GrDashboard.move('gr-kpi-row',-1)" aria-label="ใบก่อนหน้า">←</button><span id="gr-kpi-row-position">1 / 4 · ปัดเพื่อดูเพิ่ม</span><button type="button" onclick="GrDashboard.move('gr-kpi-row',1)" aria-label="ใบถัดไป">→</button></div>
@@ -868,7 +880,7 @@
                 <div class="dashboard-preview-panel glass-card p-4 sm:p-5 flex flex-col justify-between ">
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
                     <div>
-                      <h3 class="font-bold text-gray-900 text-sm">สถิติการรับสินค้าแยกตามวัน (Daily Inbound Volume)</h3>
+                      <h3 class="font-bold text-gray-900 text-sm">สถิติการรับสินค้าแยกตามวัน</h3>
                       <p class="text-xs text-gray-500 mt-0.5">คลิกที่แท่งแต่ละวันเพื่อกรองดูบิลที่มาส่งในวันนั้นโดยเฉพาะ</p>
                     </div>
                     <div class="flex items-center gap-3 text-xs text-gray-600 font-medium">
@@ -896,7 +908,7 @@
               <div class="dashboard-preview-bills glass-card overflow-hidden border border-gray-200">
                 <div class="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
                   <div>
-                    <h3 class="font-bold text-gray-900 text-sm">รายการบิลรับสินค้าเข้าคลังที่อนุมัติแล้ว (Approved GR Bills)</h3>
+                    <h3 class="font-bold text-gray-900 text-sm">บิลรับสินค้าที่อนุมัติแล้ว</h3>
                     <p id="gr-bill-scope-summary" class="text-xs text-gray-500 mt-1"></p>
                     <p class="text-xs text-gray-500 mt-0.5">คลิกที่แถวบิลหรือกดปุ่ม ดูรายละเอียด เพื่อตรวจสอบรายการสินค้า โลเคชั่นจัดเก็บ และผู้ดำเนินการ</p>
                   </div>
@@ -908,9 +920,9 @@
                     <thead class="bg-gray-100/90 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200">
                       <tr>
                         <th class="py-3 px-4">เลขที่เอกสาร</th>
-                        <th class="py-3 px-4">ผู้จัดจำหน่าย (Vendor)</th>
-                        <th class="py-3 px-4">วันที่รับเข้า (ATA)</th>
-                        <th class="py-3 px-4">คลังปลายทาง</th>
+                        <th class="py-3 px-4">ผู้ขาย</th>
+                        <th class="py-3 px-4">วันรับจริง</th>
+                        <th class="py-3 px-4">คลังของบิล</th>
                         <th class="py-3 px-4 text-center">จำนวนที่รับ</th>
                         <th class="py-3 px-4">ผู้รับลงสินค้า</th>
                         <th class="py-3 px-4">ผู้อนุมัติรับเข้า</th>
@@ -945,16 +957,16 @@
               <!-- Search & Filter Controls -->
               <div class="glass-card p-4 sm:p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label for="vl-search-input" class="block text-sm font-medium text-gray-600 mb-1.5">ค้นหา Vendor</label>
+                  <label for="vl-search-input" class="block text-sm font-medium text-gray-600 mb-1.5">ค้นหาผู้ขาย</label>
                   <input type="search" id="vl-search-input" oninput="renderVendorLeadtimeList()" placeholder="พิมพ์ชื่อผู้ขาย เช่น UFM, ไร่ทิพย์..." class="input-field m-0 text-sm bg-white border-gray-200">
                 </div>
                 <div>
-                  <label for="vl-confidence-filter" class="block text-sm font-medium text-gray-600 mb-1.5">ความน่าเชื่อถือข้อมูล</label>
+                  <label for="vl-confidence-filter" class="block text-sm font-medium text-gray-600 mb-1.5">จำนวนบิลที่มีข้อมูลระยะเวลาส่ง</label>
                   <select id="vl-confidence-filter" onchange="renderVendorLeadtimeList()" class="input-field m-0 text-sm bg-white border-gray-200">
-                    <option value="">ทั้งหมด (All Confidence)</option>
-                    <option value="high">สูง (High - 8+ บิล)</option>
-                    <option value="medium">ปานกลาง (Medium - 3-7 บิล)</option>
-                    <option value="low">เบื้องต้น (Low - 1-2 บิล)</option>
+                    <option value="">ทุกจำนวนข้อมูล</option>
+                    <option value="high">8 บิลขึ้นไป</option>
+                    <option value="medium">3–7 บิล</option>
+                    <option value="low">1–2 บิล</option>
                   </select>
                 </div>
                 <div>
@@ -964,7 +976,7 @@
                     <option value="lead_asc">Leadtime เร็วสุด (น้อยไปมาก)</option>
                     <option value="lead_desc">Leadtime ช้าสุด (มากไปน้อย)</option>
                     <option value="ontime_desc">อัตราตรงเวลาสูงสุด</option>
-                    <option value="name_asc">ชื่อ Vendor (ก-ฮ / A-Z)</option>
+                    <option value="name_asc">ชื่อผู้ขาย (ก-ฮ / A-Z)</option>
                   </select>
                 </div>
               </div>
@@ -978,8 +990,7 @@
               
               <!-- Lazy load notice banner -->
               <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 flex items-center justify-between">
-                <span>โหมดโหลดข้อมูลตามความต้องการ: ระบบจะเรียกข้อมูลประวัติจากฐานข้อมูลเมื่อค้นหา เพื่อความลื่นไหลสูงสุด</span>
-                <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono font-bold">Lazy Load Active</span>
+                <span>ค้นหาสินค้าเพื่อดูวันรับ จำนวน และใบ GR ย้อนหลัง</span>
               </div>
 
               <!-- Product Search Card -->
@@ -1036,15 +1047,15 @@
                   <span id="modal-bill-vendor" class="font-bold text-gray-800 block mt-0.5">-</span>
                 </div>
                 <div>
-                  <span class="text-gray-400 block text-[11px]">วันที่รับสินค้า (ATA):</span>
+                  <span class="text-gray-400 block text-[11px]">วันรับจริง:</span>
                   <span id="modal-bill-ata" class="font-bold text-gray-800 block mt-0.5">-</span>
                 </div>
                 <div>
-                  <span class="text-gray-400 block text-[11px]">คลังปลายทาง:</span>
+                  <span class="text-gray-400 block text-[11px]">คลังของบิล:</span>
                   <span id="modal-bill-wh" class="font-bold block mt-0.5">-</span>
                 </div>
                 <div>
-                  <span class="text-gray-400 block text-[11px]">Lead Time:</span>
+                  <span class="text-gray-400 block text-[11px]">ระยะเวลาตั้งแต่สั่งถึงรับ:</span>
                   <span id="modal-bill-leadtime" class="font-bold text-purple-700 block mt-0.5">-</span>
                 </div>
                 <div class="col-span-2 pt-2 border-t border-gray-200">
@@ -1129,9 +1140,14 @@
               <input type="hidden" id="r-group-index">
 
               <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">วันที่มาส่ง (ATA) <span class="text-red-500">*</span></label>
+                <label for="r-ata" class="block text-sm font-medium text-gray-700 mb-1.5">วันที่รับสินค้า <span class="text-red-500">*</span></label>
                 <input type="date" id="r-ata" required aria-describedby="r-ata-date-hint" class="input-field text-base py-2.5 font-medium text-brand-orange border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange">
                 <p id="r-ata-date-hint" class="text-xs text-slate-600 mt-1">วันที่ในรายงานแสดงเป็น พ.ศ. เช่น 12 ต.ค. 2569</p>
+              </div>
+
+              <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <label for="r-receiver" class="block text-sm font-medium text-gray-700 mb-1.5">ชื่อผู้รับสินค้า <span class="text-red-500">*</span></label>
+                <input type="text" id="r-receiver" required class="input-field text-base py-2.5 font-medium border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ชื่อพนักงาน...">
               </div>
 
               <div>
@@ -1141,6 +1157,14 @@
                         <i data-lucide="volume-2" class="w-4 h-4"></i> ฟังทั้งหมด
                     </button>
                 </h3>
+                <div class="gr-receiving-progress">
+                  <p id="gr-item-progress" aria-live="polite"></p>
+                  <p class="gr-progress-note">กรอกต่อได้ทุกรายการ · กรอกครบคือข้อมูลครบ ยังไม่ได้บันทึกรับสินค้า</p>
+                  <div class="gr-progress-actions">
+                    <button type="button" id="gr-fold-complete" onclick="GrReceivingUX.foldComplete(this.closest('form'))" disabled>ย่อรายการที่กรอกครบ</button>
+                    <button type="button" id="gr-expand-items" onclick="GrReceivingUX.expandItems(this.closest('form'))" disabled>แสดงทั้งหมด</button>
+                  </div>
+                </div>
                 <div id="r-items-container" class="space-y-3"></div>
               </div>
 
@@ -1154,15 +1178,11 @@
               <div id="gr-issue-review"></div>
 
               <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุท้ายบิล (แวท, เลขที่ใบกำกับ ฯลฯ)</label>
+                <label for="r-remark" class="block text-sm font-medium text-gray-700 mb-1.5">หมายเหตุท้ายบิล (แวท, เลขที่ใบกำกับ ฯลฯ)</label>
                 <textarea id="r-remark" class="input-field text-sm py-3 border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" rows="2" placeholder="ระบุหมายเหตุ..."></textarea>
               </div>
 
-              <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">ชื่อผู้รับสินค้า <span class="text-red-500">*</span></label>
-                <input type="text" id="r-receiver" required class="input-field text-base py-2.5 font-medium border-gray-200 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ชื่อพนักงาน...">
-              </div>
-
+              <p id="gr-receiving-summary" aria-live="polite"></p>
               <!-- กลุ่มปุ่มจัดการ -->
               <div class="gr-receiving-actions pt-5 sticky bottom-0 bg-[#f3f4f6]/95 backdrop-blur-md p-3 -mx-3 sm:-mx-5 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] flex gap-2 overflow-x-auto hide-scroll rounded-t-2xl border-t border-gray-200">
                 <button type="button" id="btn-draft" class="btn bg-white text-gray-600 hover:bg-gray-50 border border-gray-300 py-3.5 flex-1 min-w-[100px] whitespace-nowrap shadow-sm font-bold">📝 พักบิล</button>
@@ -1185,7 +1205,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261019.02';
+    const CURRENT_VERSION = '20261024.03';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1571,7 +1591,7 @@
     var productHistoryBillRequestGeneration = 0;
     var grBillDetailReturnFocus = null;
     var grDashboardSearchTimer = null;
-    var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
+    var productHistoryState = { product: null, latest: null, history: [], total: 0, nextOffset: 0, nextCursor: null, orderVersion: null, hasMore: false, error: '' };
     var vendorLeadtimeInsights = null;
     var vendorLeadtimeLoaded = false;
     var currentVendorLeadtimeTab = 'overview';
@@ -2177,12 +2197,15 @@
         (appData.pendingPOs || []).forEach(item => {
             const plan = (planByUid && planByUid[item.uid]) || null;
             if (!plan) {
-                for (const field of ['plannedDate','planSource','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
+                for (const field of ['plannedDate','planSource','planReason','confirmationSource','historyPeriodDays','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
                 return;
             }
             item.expectedDate = plan.expectedDate || '';
             item.plannedDate = plan.plannedDate || '';
             item.planSource = plan.planSource || 'no_data';
+            item.planReason = plan.planReason || '';
+            item.confirmationSource = plan.confirmationSource || '';
+            item.historyPeriodDays = plan.historyPeriodDays || null;
             item.daysUntil = plan.daysUntil;
             item.isPlanOverdue = !!plan.isPlanOverdue;
             item.vendorAvgLeadDays = plan.vendorAvgLeadDays || '';
@@ -2212,6 +2235,8 @@
             renderPOListForReceiving();
         } else {
             grDeliveryPlanRenderPending = true;
+            const planView = document.getElementById('delivery-plan-view');
+            if (planView && !planView.classList.contains('hidden')) renderDeliveryPlanSummary();
         }
     }
     function retryGRDeliveryPlanning() {
@@ -2262,7 +2287,7 @@
                     grDeliveryPlanningLoaded = false;
                     appData.deliveryPlanning = {};
                     (appData.pendingPOs || []).forEach(item => {
-                        for (const field of ['plannedDate','planSource','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
+                        for (const field of ['plannedDate','planSource','planReason','confirmationSource','historyPeriodDays','daysUntil','isPlanOverdue','vendorAvgLeadDays','vendorP75LeadDays','vendorLeadSampleCount','vendorLeadConfidence']) delete item[field];
                     });
                     groupPendingPOs();
                 }
@@ -2452,6 +2477,7 @@
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         document.querySelectorAll('main > section').forEach(div => div.classList.add('hidden'));
         document.getElementById(viewId).classList.remove('hidden');
+        window.GrWorkflowUI?.navigation(viewId);
         document.getElementById('gr-main').scrollTop = 0;
         window.scrollTo(0, 0);
         if (viewId === 'receiving-list-view' && grDeliveryPlanRenderPending) {
@@ -2462,6 +2488,21 @@
             document.getElementById(`gr-bill-card-${grReceivingReturnIndex}`)?.focus();
             grReceivingReturnIndex = null;
         }
+    }
+
+    function openDeliveryPlanView() {
+        showView('delivery-plan-view');
+        isDeliveryPlanVisible = true;
+        renderDeliveryPlanSummary();
+    }
+
+    function clearReceivingFilters() {
+        document.getElementById('r-search-input').value = '';
+        document.getElementById('r-status-filter').value = '';
+        document.getElementById('r-warehouse-filter').value = '';
+        deliveryPlanFilter = '';
+        deliveryPlanDayOffset = null;
+        renderPOListForReceiving();
     }
 
     function getWarehousePalette(warehouse) {
@@ -2543,10 +2584,10 @@
         parsed = parsed || { wh: '', floor: '', zone: '' };
         var wh = parsed.wh || defaultWh || '';
         return `
-            <div class="grid grid-cols-3 gap-2">
-                <select class="input-field ${prefix}-loc-wh py-2 text-sm border-gray-200 focus:border-brand-blue m-0" ${prefix === 'po' ? 'onchange="syncSplitOldStock(this.closest(\'.po-item-row\'))"' : ''}>${whSelectOptions(wh)}</select>
-                <select class="input-field ${prefix}-loc-floor py-2 text-sm border-gray-200 focus:border-brand-blue m-0">${floorSelectOptions(parsed.floor)}</select>
-                <input type="text" class="input-field ${prefix}-loc-zone py-2 text-sm border-gray-200 focus:border-brand-blue m-0" placeholder="โซน (ไม่บังคับ)" value="${parsed.zone || ''}">
+            <div class="gr-destination-fields gr-location-fields">
+                <label><span class="gr-field-label">คลังที่รับ</span><select class="input-field ${prefix}-loc-wh py-2 text-sm border-gray-200 focus:border-brand-blue m-0" ${prefix === 'po' ? 'onchange="syncSplitOldStock(this.closest(\'.po-item-row\'))"' : ''}>${whSelectOptions(wh)}</select></label>
+                <label><span class="gr-field-label">ชั้น</span><select class="input-field ${prefix}-loc-floor py-2 text-sm border-gray-200 focus:border-brand-blue m-0">${floorSelectOptions(parsed.floor)}</select></label>
+                <label><span class="gr-field-label">โซน (ไม่บังคับ)</span><input type="text" class="input-field ${prefix}-loc-zone py-2 text-sm border-gray-200 focus:border-brand-blue m-0" placeholder="โซน" value="${esc(parsed.zone || '')}"></label>
             </div>`;
     }
 
@@ -2566,16 +2607,16 @@
         var counts = {};
         GR_WAREHOUSES.forEach(function (w) { counts[w] = 0; });
         var total = 0;
-        var defaultListGroups = getActiveReceivingBillGroups();
+        var defaultListGroups = getFilteredReceivingGroups(true);
         defaultListGroups.forEach(function (g) {
             if (counts[g.warehouse] === undefined) counts[g.warehouse] = 0;
             counts[g.warehouse]++;
             total++;
         });
         var badge = function (n) { return `<span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] bg-black/10">${n}</span>`; };
-        var html = `<button type="button" onclick="setWarehouseFilter('')" class="${chipCls(active === '')}">ทั้งหมด${badge(total)}</button>`;
+        var html = `<span class="w-full text-sm text-slate-600">จำนวนบิลตามการค้นหาและสถานะ ก่อนเลือกคลัง</span><button type="button" aria-pressed="${active === ''}" onclick="setWarehouseFilter('')" class="${chipCls(active === '')}">ทั้งหมด${badge(total)}</button>`;
         GR_WAREHOUSES.forEach(function (w) {
-            html += `<button type="button" onclick="setWarehouseFilter('${w}')" class="${chipCls(active === w, w)}" style="${getWarehouseChipStyle(w, active === w)}">${w}${badge(counts[w] || 0)}</button>`;
+            html += `<button type="button" aria-pressed="${active === w}" onclick="setWarehouseFilter('${w}')" class="${chipCls(active === w, w)}" style="${getWarehouseChipStyle(w, active === w)}">${w}${badge(counts[w] || 0)}</button>`;
         });
         container.innerHTML = html;
     }
@@ -2606,7 +2647,7 @@
         };
     }
     function deliveryPlanTone(group) {
-        return group.planSource === 'confirmed' ? 'confirmed' : (group.plannedDate ? 'estimated' : 'none');
+        return group.planSource === 'confirmed' || group.planSource === 'partial' ? group.planSource : (group.plannedDate ? 'estimated' : 'none');
     }
     function calendarDayClass(active) {
         return active
@@ -2618,11 +2659,11 @@
             return '<span class="text-[10px] text-gray-400">ไม่มีแผน</span>';
         }
         return dayGroups.slice(0, 2).map(function (group) {
-            var isConfirmed = deliveryPlanTone(group) === 'confirmed';
+            var isConfirmed = ['confirmed','partial'].includes(deliveryPlanTone(group));
             var cls = isConfirmed
                 ? 'bg-red-50 text-red-700 border-red-100'
                 : 'bg-blue-50 text-brand-blue border-brand-blueLight';
-            var label = isConfirmed ? 'ยืนยัน' : 'คาดการณ์';
+            var label = group.planSource === 'partial' ? 'ยืนยันบางรายการ' : isConfirmed ? 'ยืนยัน' : 'คาดการณ์';
             return `<span class="block truncate rounded-md border px-1.5 py-0.5 ${cls}">${esc(label)} · ${esc(group.vendor || '-')}</span>`;
         }).join('') + (dayGroups.length > 2 ? `<span class="block text-[10px] font-bold text-gray-500">+${dayGroups.length - 2} บิล</span>` : '');
     }
@@ -2635,6 +2676,7 @@
         deliveryPlanFilter = deliveryPlanFilter === filter ? '' : filter;
         deliveryPlanDayOffset = null;
         renderPOListForReceiving();
+        showView('receiving-list-view');
     }
     function setDeliveryPlanDayFilter(offset) {
         offset = Number(offset);
@@ -2645,6 +2687,7 @@
         deliveryPlanFilter = 'day';
         deliveryPlanDayOffset = offset;
         renderPOListForReceiving();
+        showView('receiving-list-view');
     }
     function toggleDeliveryPlanVisibility() {
         isDeliveryPlanVisible = !isDeliveryPlanVisible;
@@ -2657,13 +2700,14 @@
         var planGroups = getDeliveryPlanGroups();
         var overdue = activeGroups.filter(function (g) { return g.isPlanOverdue; }).length;
         var confirmed = planGroups.filter(function (g) { return g.planSource === 'confirmed'; }).length;
-        var estimated = planGroups.filter(function (g) { return g.planSource !== 'confirmed'; }).length;
+        var partial = planGroups.filter(function (g) { return g.planSource === 'partial'; }).length;
+        var estimated = planGroups.filter(function (g) { return g.planSource === 'estimated_p75'; }).length;
         var summary = (appData.deliveryPlanning || {});
         var calendarHtml = '';
         for (var offset = 0; offset < 14; offset++) {
             var meta = formatCalendarDate(offset);
-            var dayGroups = planGroups.filter(function (g) { return Number(g.daysUntil) === offset; });
-            var confirmedCount = dayGroups.filter(function (g) { return g.planSource === 'confirmed'; }).length;
+            var dayGroups = planGroups.filter(function (g) { return g.daysUntil !== null && g.daysUntil !== undefined && g.daysUntil !== '' && Number(g.daysUntil) === offset; });
+            var confirmedCount = dayGroups.filter(function (g) { return g.planSource === 'confirmed' || g.planSource === 'partial'; }).length;
             var estimatedCount = dayGroups.length - confirmedCount;
             var active = deliveryPlanFilter === 'day' && deliveryPlanDayOffset === offset;
             calendarHtml += `
@@ -2687,12 +2731,12 @@
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="calendar-days" class="w-4 h-4 text-brand-orange"></i> แผนรับสินค้า</h3>
-                        <p class="text-[11px] text-gray-500">ใช้วันที่ Vendor ยืนยันก่อน ถ้าไม่มีระบบจะแสดงวันที่คาดว่าจะเข้าโดยอิงจากประวัติส่งของ</p>
+                        <p class="text-sm text-gray-600">วันที่ผู้ขายยืนยันมาก่อนเสมอ · การคาดการณ์เป็นวันรับครั้งแรก ไม่ใช่คำยืนยันว่าสินค้าจะครบทั้งบิล</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                             ${!grDeliveryPlanningLoaded ? `<span class="text-gray-600">${grDeliveryPlanningError ? 'ยังโหลดแผนไม่สำเร็จ' : 'กำลังโหลด...'}</span>` : `
-                            <span class="inline-flex items-center gap-1 text-red-700"><span class="w-2 h-2 rounded-full bg-red-600"></span> Vendor ยืนยัน ${esc(confirmed)}</span>
+                            <span class="inline-flex items-center gap-1 text-red-700">ยืนยันครบ ${esc(confirmed)} บิล · ยืนยันบางรายการ ${esc(partial)} บิล</span>
                             <span class="inline-flex items-center gap-1 text-brand-blue"><span class="w-2 h-2 rounded-full bg-brand-blue"></span> คาดการณ์ ${esc(estimated)}</span>
-                            <span class="text-gray-400">${esc(summary.sampleCount || 0)} ตัวอย่าง · ${esc(summary.vendorCount || 0)} Vendor</span>
+                            <span class="text-gray-600">ยังไม่มีวันเข้า ${esc(activeGroups.length - planGroups.length)} บิล</span>
                             `}
                         </div>
                     </div>
@@ -2707,8 +2751,15 @@
                 <div id="delivery-plan-calendar-body" class="${isDeliveryPlanVisible ? '' : 'hidden'} mt-3">
                     ${!grDeliveryPlanningLoaded ? `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-6 text-center text-sm text-gray-600">${grDeliveryPlanningLoading || !grDeliveryPlanningError ? 'กำลังโหลดแผนรับสินค้า...' : 'ยังไม่มีข้อมูลแผนรับสินค้าที่โหลดสำเร็จ'}</div>` : `
                     ${overdue ? `<button type="button" onclick="setDeliveryPlanFilter('overdue')" aria-pressed="${deliveryPlanFilter === 'overdue' ? 'true' : 'false'}" class="mb-3 w-full rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${deliveryPlanFilter === 'overdue' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:border-red-200'}">มีบิลเลยแผน ${overdue} บิล</button>` : ''}
-                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                    ${summary.population === 'active_items' ? `<p class="text-sm text-gray-700 mb-3">งานคงค้าง ${esc(summary.pendingItemCount)} รายการ · มีวันยืนยัน ${esc(summary.confirmedCount)} · ยังไม่มีวันยืนยัน ${esc(summary.unplannedItemCount)}<br>${summary.evidenceStatus === 'unavailable' ? 'ยังโหลดข้อมูลประวัติประกอบการประเมินไม่สำเร็จ' : `ประวัติรับครั้งแรก ${esc(summary.sampleCount)} PO อิสระ ใน ${esc(summary.historyPeriodDays)} วัน · จำนวนประวัติไม่ใช่ค่าความแม่นยำ`}</p>` : ''}
+                    ${summary.modelStatus === 'validation_pending' ? '<p class="text-sm text-gray-700 mb-3">ยังไม่มีค่าคาดการณ์ที่ผ่านการตรวจสอบ หากยังไม่มีวันเข้า ให้ตรวจสอบกับผู้ขาย</p>' : ''}
+                    ${!activeGroups.length ? '<p class="text-sm text-gray-700">ไม่มีงานรับสินค้าคงค้าง</p>' : !planGroups.length ? '<p class="text-sm text-gray-700">มีงานรอรับ แต่ยังไม่มีวันที่ใช้จัดลงปฏิทิน ดูเหตุผลในแต่ละบิลด้านล่าง</p>' : ''}
+                    <label class="gr-plan-mobile-day">ดูบิลตามวัน<select class="input-field" aria-label="เลือกวันดูบิลรับสินค้า" onchange="if(this.value!=='')setDeliveryPlanDayFilter(Number(this.value))"><option value="">เลือกวันใน 14 วันข้างหน้า</option>${Array.from({length:14},(_,i)=>`<option value="${i}">${esc(formatCalendarDate(i).label)} ${esc(formatCalendarDate(i).shortDate)}</option>`).join('')}</select></label>
+                    <div class="gr-plan-calendar grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 ${!planGroups.length ? 'hidden' : ''}">
                         ${calendarHtml}
+                    </div>
+                    <div class="gr-plan-agenda" aria-label="รายการแผนรับสินค้า">
+                      ${activeGroups.slice().sort((a,b) => (a.plannedDate ? Number(a.daysUntil) : Infinity) - (b.plannedDate ? Number(b.daysUntil) : Infinity)).map(g => `<button type="button" onclick="openReceivingDetail(${Number(g.index)})"><strong>${esc(g.poNumber || '-')} · ${esc(g.vendor || '-')}</strong><span>${esc(receivingStatusLabel(g.status))} · คลังตาม PO ${esc(g.warehouse || '-')} · ${esc(g.totalItemCount || g.items.length)} รายการ</span>${deliveryPlanBadge(g)}${!g.plannedDate ? `<span>${esc(deliveryPlanReason(g))}</span>` : ''}</button>`).join('')}
                     </div>
                     `}
                 </div>
@@ -2732,9 +2783,18 @@
         return 'เลยมา ' + Math.abs(days) + ' วัน';
     }
     function deliverySourceText(source) {
-        if (source === 'confirmed') return 'Vendor ยืนยัน';
-        if (source === 'estimated_p75') return 'วันที่คาดว่าจะเข้า';
+        if (source === 'confirmed') return 'ผู้ขายยืนยัน';
+        if (source === 'partial') return 'ผู้ขายยืนยันบางรายการ';
+        if (source === 'estimated_p75') return 'คาดการณ์รับครั้งแรก';
         return 'ข้อมูลไม่พอ';
+    }
+    function deliveryPlanReason(group) {
+        const reason = group.planReason || (group.items || []).find(item => item.planReason)?.planReason;
+        if (reason === 'history_unavailable') return 'ยังโหลดประวัติประกอบการประเมินไม่สำเร็จ';
+        if (reason === 'receiving_in_progress') return 'กำลังบันทึกหรือตรวจรับ ไม่ใช้วันคาดการณ์รับครั้งแรกแทนวันรับส่วนที่เหลือ';
+        if (reason === 'insufficient_history') return 'ยังไม่มีวันยืนยัน และประวัติส่งของที่ใช้ประเมินยังน้อย';
+        if (reason === 'model_not_validated') return 'ยังไม่มีวันยืนยัน และค่าคาดการณ์ยังไม่ผ่านการตรวจสอบ';
+        return 'ยังไม่มีวันที่ยืนยันหรือข้อมูลที่ใช้ประเมินได้';
     }
     function deliveryPlanBadge(group) {
         if (!grDeliveryPlanningLoaded && grDeliveryPlanningError) return '<span class="text-sm text-gray-600">ยังโหลดแผนรับสินค้าไม่สำเร็จ</span>';
@@ -2745,12 +2805,12 @@
         if (group.planSource === 'partial') {
             return `<div class="gr-partial-plan-badge text-[11px] font-bold border px-2 py-1 rounded-lg bg-brand-orangeLight text-brand-orange border-brand-orange/30">
                 <span>ยืนยัน ${esc(group.confirmedItemCount)}/${esc(group.totalItemCount)} รายการ</span>
-                <span class="font-medium opacity-80"> · เข้าไว ${esc(displayGRDate(group.plannedDate))}</span>
+                <span class="font-medium opacity-80"> · วันแรกที่ยืนยัน ${esc(displayGRDate(group.plannedDate))} · ยังไม่ใช่วันครบทั้งบิล</span>
             </div>`;
         }
         var cls = group.planSource === 'confirmed' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-brand-blue border-brand-blueLight';
         var metaText = group.planSource === 'estimated_p75'
-            ? 'วันที่คาดว่าจะเข้า: ' + deliveryPlanText(group)
+            ? 'คาดการณ์รับครั้งแรก: ' + deliveryPlanText(group)
             : deliveryPlanText(group) + ' · ' + deliverySourceText(group.planSource);
         return `<div class="text-[11px] font-bold border px-2 py-1 rounded-lg ${cls}">
             <span>${esc(displayGRDate(group.plannedDate))}</span>
@@ -2790,17 +2850,18 @@
         if (!wrap) return;
         var hidden = wrap.classList.toggle('hidden');
         btn.innerHTML = hidden
-            ? '<i data-lucide="split" class="w-3.5 h-3.5"></i> แยกคลัง'
-            : '<i data-lucide="x" class="w-3.5 h-3.5"></i> ยกเลิกแยกคลัง';
+            ? '<i data-lucide="split" class="w-3.5 h-3.5"></i> แบ่งรับสองปลายทาง'
+            : '<i data-lucide="x" class="w-3.5 h-3.5"></i> ปิดปลายทางที่ 2';
         // Clarify that the main qty becomes warehouse-1 qty while split is open.
         var qtyInput = row.querySelector('.po-qty');
         var qtyLabel = qtyInput && qtyInput.parentElement.querySelector('label');
-        if (qtyLabel) qtyLabel.textContent = hidden ? 'จำนวนรับจริง' : 'จำนวน (คลังที่ 1)';
-        if (hidden) {
-            var qty2Inp = row.querySelector('.po-qty2');
-            if (qty2Inp) qty2Inp.value = '';
-        }
+        if (qtyLabel) qtyLabel.textContent = (hidden ? 'จำนวนรับ' : 'จำนวนปลายทาง 1') + ' (' + (row.querySelector('.po-unit')?.value || 'ไม่ระบุหน่วย') + ')';
+        // Hidden destination values stay in this form for reopening, but the serializer excludes them.
+        btn.setAttribute?.('aria-expanded', String(!hidden));
         syncSplitOldStock(row);
+        const form = document.getElementById('form-receiving');
+        window.GrReceivingUX?.refreshSummary(form);
+        window.GrReceivingUX?.refreshErrors(form);
         lucide.createIcons({ root: btn });
     }
 
@@ -2813,22 +2874,27 @@
         var firstInput = row.querySelector('.po-old-stock');
         var firstLabel = row.querySelector('.po-old-stock-label');
         if (!wrap || !wh1 || !wh2 || !secondField || !secondInput || !firstInput) return;
+        const counts = row.grOldStockCounts || (row.grOldStockCounts = new Map());
+        counts.set(firstInput.dataset.warehouse, firstInput.value);
+        if (secondInput.dataset.warehouse !== firstInput.dataset.warehouse) counts.set(secondInput.dataset.warehouse, secondInput.value);
         if (firstInput.dataset.warehouse !== wh1.value) {
-            firstInput.value = '';
+            firstInput.value = counts.get(wh1.value) ?? '';
             firstInput.dataset.warehouse = wh1.value;
             firstInput.classList.remove('input-error');
         }
-        if (secondInput.dataset.warehouse !== wh2.value) {
-            secondInput.value = '';
+        if (secondInput.dataset.warehouse !== wh2.value || secondInput.value !== (counts.get(wh2.value) ?? '')) {
+            secondInput.value = counts.get(wh2.value) ?? '';
             secondInput.dataset.warehouse = wh2.value;
             secondInput.classList.remove('input-error');
         }
-        var needsSecond = !wrap.classList.contains('hidden') && wh1.value !== wh2.value;
+        var qty2 = row.querySelector('.po-qty2');
+        var needsSecond = !wrap.classList.contains('hidden') && wh1.value !== wh2.value && Number(qty2?.value) > 0;
         secondField.classList.toggle('hidden', !needsSecond);
-        if (!needsSecond) { secondInput.value = ''; secondInput.classList.remove('input-error'); }
-        if (firstLabel) firstLabel.textContent = needsSecond ? `สต๊อกเก่า ${wh1.value}` : 'สต๊อกเก่า';
+        if (!needsSecond) secondInput.classList.remove('input-error');
+        if (firstLabel) firstLabel.textContent = `สต๊อกเก่า ${wh1.value}`;
         var secondLabel = secondField.querySelector('label');
         if (secondLabel) secondLabel.textContent = `สต๊อกเก่า ${wh2.value} *`;
+        window.GrReceivingUX?.refreshSummary(document.getElementById('form-receiving'));
     }
 
     function isReadApiAction(action) {
@@ -3090,7 +3156,7 @@
         status.textContent = reset ? 'กำลังค้นหาประวัติการรับสินค้า...' : 'กำลังโหลดประวัติเพิ่ม...';
         if (reset) {
             ++productHistoryBillRequestGeneration;
-            productHistoryState = { product, latest: null, history: [], total: 0, nextOffset: 0, hasMore: false, error: '' };
+            productHistoryState = { product, latest: null, history: [], total: 0, nextOffset: 0, nextCursor: null, orderVersion: null, hasMore: false, error: '' };
             document.getElementById('dashboard-product-results').innerHTML = '<div class="glass-card p-5 animate-pulse"><div class="h-4 bg-gray-200 rounded w-1/3 mb-4"></div><div class="h-3 bg-gray-100 rounded w-full mb-2"></div><div class="h-3 bg-gray-100 rounded w-2/3"></div></div>';
             loadMore.classList.add('hidden');
         }
@@ -3099,6 +3165,7 @@
             sku: product.sku || '',
             productName: product.name || '',
             offset: reset ? 0 : productHistoryState.nextOffset,
+            cursor: reset ? null : productHistoryState.nextCursor,
             limit: PRODUCT_HISTORY_PAGE_SIZE
         });
         if (generation !== productHistoryRequestGeneration) return;
@@ -3107,20 +3174,24 @@
         loadMore.disabled = false;
         if (!response.success) {
             productHistoryState.error = response.message || response.error || 'ดึงประวัติสินค้าไม่สำเร็จ';
+            if (response.reason === 'history_changed' || response.reason === 'invalid_history_cursor') {
+                productHistoryState.hasMore = false;
+                productHistoryState.nextCursor = null;
+            }
             status.textContent = productHistoryState.error;
             renderProductReceiptHistory();
             return;
         }
 
         productHistoryState.product = product;
-        if (reset || !productHistoryState.latest) productHistoryState.latest = response.latest || null;
+        if (reset || response.orderVersion === 2 || !productHistoryState.latest) productHistoryState.latest = response.latest || null;
         const incomingHistory = response.history || [];
         if (reset) {
             productHistoryState.history = incomingHistory;
         } else {
-            const historyUids = new Set(productHistoryState.history.map(row => String(row.grUid || '').trim()).filter(Boolean));
+            const historyUids = new Set(productHistoryState.history.map(row => String(row.itemId || row.grUid || '').trim()).filter(Boolean));
             incomingHistory.forEach(row => {
-                const uid = String(row.grUid || '').trim();
+                const uid = String(row.itemId || row.grUid || '').trim();
                 if (uid && historyUids.has(uid)) return;
                 if (uid) historyUids.add(uid);
                 productHistoryState.history.push(row);
@@ -3128,6 +3199,8 @@
         }
         productHistoryState.total = Number(response.total || 0);
         productHistoryState.nextOffset = Number(response.nextOffset || productHistoryState.history.length);
+        productHistoryState.nextCursor = response.nextCursor || null;
+        productHistoryState.orderVersion = response.orderVersion || null;
         productHistoryState.hasMore = !!response.hasMore;
         productHistoryState.error = '';
         status.textContent = productHistoryState.total
@@ -3189,8 +3262,9 @@
     function renderProductReceiptHistory() {
         const container = document.getElementById('dashboard-product-results');
         const loadMore = document.getElementById('product-history-load-more');
-        if (productHistoryState.error) {
-            container.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-6 text-center"><p class="text-sm font-medium text-red-700">${esc(productHistoryState.error)}</p><button type="button" onclick="searchProductReceiptHistory(true)" class="mt-3 px-4 py-2 rounded-lg bg-white border border-red-200 text-sm font-bold text-red-700">ลองใหม่</button></div>`;
+        const failureHtml = productHistoryState.error ? `<div role="alert" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-6 text-center"><p class="text-sm font-medium text-red-700">${esc(productHistoryState.error)}</p><button type="button" onclick="searchProductReceiptHistory(true)" class="mt-3 px-4 py-2 rounded-lg bg-white border border-red-200 text-sm font-bold text-red-700">ค้นหาใหม่</button></div>` : '';
+        if (productHistoryState.error && !productHistoryState.latest) {
+            container.innerHTML = failureHtml;
             loadMore.classList.add('hidden');
             return;
         }
@@ -3221,8 +3295,8 @@
                 <div><dt class="text-xs text-gray-500">วันหมดอายุ / รหัส Lot</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.expDate)}${row.lotCode ? ` · Lot: ${productHistoryDisplay(row.lotCode)}` : ''}</dd></div>
                 <div><dt class="text-xs text-gray-500">ผู้รับสินค้า</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.receiver)}</dd></div>
                 <div><dt class="text-xs text-gray-500">จำนวนรับ</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.quantity)} ${row.unit ? esc(row.unit) : ''}</dd></div>
-                <div><dt class="text-xs text-gray-500">คลังตาม PO / ตำแหน่งรับจริง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
-                <div><dt class="text-xs text-gray-500">Vendor</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.vendor)}</dd></div>
+                <div><dt class="text-xs text-gray-500">คลังของบิล / ตำแหน่งรับจริง</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.warehouse)} / ${productHistoryDisplay(row.location)}</dd></div>
+                <div><dt class="text-xs text-gray-500">ผู้ขาย</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.vendor)}</dd></div>
                 <div><dt class="text-xs text-gray-500">เลข PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(row.poNumber)}</dd></div>
                 <div><dt class="text-xs text-gray-500">วันที่ PO</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryDisplay(displayGRDate(row.poDate))}</dd></div>
                 <div><dt class="text-xs text-gray-500">สต็อกเดิม</dt><dd class="font-medium text-gray-800 mt-0.5">${productHistoryOldStockDisplay(row)}</dd></div>
@@ -3230,7 +3304,7 @@
               </dl>
             </li>`).join('');
 
-        container.innerHTML = `
+        container.innerHTML = `${failureHtml}
           <article class="glass-card p-4 sm:p-6 border-l-4 border-l-brand-orange">
             <p class="text-xs font-bold uppercase tracking-wide text-brand-orange">รับเข้าล่าสุด</p>
             <div class="mt-2 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -3247,10 +3321,11 @@
             </div>
           </article>
           <section class="mt-4" aria-labelledby="product-history-list-title">
+            ${productHistoryState.orderVersion === 2 ? '<p class="text-sm text-slate-600 mb-2">เรียงตามวันรับจริงจากใหม่ไปเก่า · ค้นหาใหม่เพื่อดูรายการที่เพิ่งเพิ่มหรือแก้ไข</p>' : ''}
             <div class="flex items-center justify-between gap-3 mb-3 px-1"><h3 id="product-history-list-title" class="font-bold text-gray-800">รายการย้อนหลัง</h3><span class="text-xs text-gray-500">${esc(productHistoryState.history.length)} / ${esc(productHistoryState.total)} รายการ</span></div>
             <ol class="space-y-3">${rows}</ol>
           </section>`;
-        loadMore.classList.toggle('hidden', !productHistoryState.hasMore);
+        loadMore.classList.toggle('hidden', !productHistoryState.hasMore || !!productHistoryState.error);
         lucide.createIcons({ root: container });
     }
 
@@ -3480,7 +3555,7 @@
                     </td>
                     <td class="py-3 px-4">
                         <div class="font-semibold text-gray-800">${esc(vendor)}</div>
-                        <div class="text-[10px] text-gray-400">สั่งเมื่อ: ${esc(GrDashboard.date(b.poDate))} (Leadtime: ${lead})</div>
+                        <div class="text-[10px] text-gray-400">สั่งเมื่อ: ${esc(GrDashboard.date(b.poDate))} · รับใน ${lead}</div>
                     </td>
                     <td class="py-3 px-4 text-gray-700">${esc(ata)}</td>
                     <td class="py-3 px-4">${getWarehouseBadge(wh)}</td>
@@ -3510,6 +3585,7 @@
         }).join('');
         if (append) tbody.insertAdjacentHTML('beforeend', rowsHtml);
         else tbody.innerHTML = rowsHtml;
+        window.GrWorkflowUI?.responsiveTable('dashboard-bills-tbody', ['เลข GR / PO', 'ผู้ขาย / วันที่สั่ง', 'วันรับจริง', 'คลังของบิล', 'จำนวนที่รับ', 'ผู้รับสินค้า', 'ผู้อนุมัติ', 'สถานะ / ปัญหา', 'รายละเอียด']);
     }
 
     function openGrBillDetailModal(grId, bill = null, trigger = null) {
@@ -3568,7 +3644,7 @@
                         <td class="py-2 px-3 text-gray-400 w-8">${idx + 1}</td>
                         <td class="py-2 px-3 font-mono font-medium text-gray-600 whitespace-nowrap">${esc(it.sku || '-')}</td>
                         <td class="py-2 px-3 font-semibold text-gray-800 min-w-[280px]">${esc(it.product || it.product_name || '-')}</td>
-                        <td class="py-2 px-3 text-center font-bold text-brand-blue whitespace-nowrap">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ลัง')}</td>
+                        <td class="py-2 px-3 text-center font-bold text-brand-blue whitespace-nowrap">${esc(it.grQty || it.gr_qty || 0)} ${esc(it.unit || 'ไม่ระบุหน่วย')}</td>
                         <td class="py-2 px-3 text-center font-semibold text-slate-700 whitespace-nowrap">${esc(formatGrDashboardOldStock(it))}</td>
                         <td class="py-2 px-3 text-gray-600 min-w-[220px]">${esc(it.locIn || it.location_in || '-')}</td>
                         <td class="py-2 px-3 text-gray-600 whitespace-nowrap">${esc(it.noExpiry ? `ไม่มีวันหมดอายุ${it.lotCode ? ` · Lot: ${it.lotCode}` : ''}` : (it.expRaw || it.expDate || it.exp_date || '-'))}</td>
@@ -3578,6 +3654,7 @@
         }
 
         const modal = document.getElementById('gr-bill-detail-modal');
+        window.GrWorkflowUI?.responsiveTable('modal-items-body', ['รายการ', 'SKU', 'สินค้า', 'จำนวนรับ / หน่วย', 'สต๊อกเก่า', 'ปลายทางรับจริง', 'วันหมดอายุ / Lot']);
         if (modal) {
             document.getElementById('app-content').appendChild(modal);
             modal.classList.remove('hidden');
@@ -3715,6 +3792,7 @@
                 expectedDate: po.expectedDate || '',
                 plannedDate: po.plannedDate || '',
                 planSource: po.planSource || 'no_data',
+                planReason: po.planReason || '',
                 daysUntil: (po.daysUntil === null || po.daysUntil === undefined) ? null : Number(po.daysUntil),
                 isPlanOverdue: !!po.isPlanOverdue,
                 vendorAvgLeadDays: po.vendorAvgLeadDays || '',
@@ -3867,8 +3945,7 @@
         renderPOListForReceiving();
     }
 
-    function renderPOListForReceiving() {
-        const container = document.getElementById('po-list-container');
+    function getFilteredReceivingGroups(ignoreWarehouse = false) {
         const filterWh = document.getElementById('r-warehouse-filter').value; 
         const filterStatus = document.getElementById('r-status-filter').value; 
         const search = document.getElementById('r-search-input').value.trim().toLowerCase();
@@ -3879,7 +3956,7 @@
             const isPendingReview = g.status === 'Pending Review';
             const isCompleted = g.status === 'GR Completed';
             
-            if(filterWh && g.warehouse !== filterWh) return false;
+            if(!ignoreWarehouse && filterWh && g.warehouse !== filterWh) return false;
             
             if (filterStatus) {
                 if(filterStatus === 'Overdue' && !hasOverdue) return false;
@@ -3888,18 +3965,32 @@
                 if(filterStatus === 'GR Completed' && !isCompleted) return false;
                 if(filterStatus === 'Pending GR' && (hasOverdue || isDraft || isPendingReview || isCompleted)) return false;
             } else {
-                // By default, don't show completed bills in the list to avoid cluttering, unless searching.
-                if (isCompleted && !search) return false;
+                // Search and default status use the same open-work population.
+                if (isCompleted) return false;
             }
             
             if(search && !g.searchText.includes(search)) return false;
             if (deliveryPlanFilter === 'overdue' && !g.isPlanOverdue) return false;
-            if (deliveryPlanFilter === 'day' && Number(g.daysUntil) !== Number(deliveryPlanDayOffset)) return false;
+            if (deliveryPlanFilter === 'day' && (!g.plannedDate || g.daysUntil === null || g.daysUntil === undefined || g.daysUntil === '' || Number(g.daysUntil) !== Number(deliveryPlanDayOffset))) return false;
             return true;
         });
         if (!filterStatus) displayGroups = selectOneStatusGroupPerBill(displayGroups);
 
-        document.getElementById('pending-count').innerText = `${displayGroups.length} บิล`;
+        return displayGroups;
+    }
+
+    function renderPOListForReceiving() {
+        const container = document.getElementById('po-list-container');
+        const filterStatus = document.getElementById('r-status-filter').value;
+        const hasFilters = Boolean(filterStatus || document.getElementById('r-warehouse-filter').value || document.getElementById('r-search-input').value.trim() || deliveryPlanFilter);
+        const displayGroups = getFilteredReceivingGroups();
+        const beforeWarehouse = getFilteredReceivingGroups(true).length;
+        const clearButton = document.getElementById('gr-clear-list-filters');
+        if (clearButton) clearButton.hidden = !hasFilters;
+
+        document.getElementById('pending-count').innerText = filterStatus === 'GR Completed'
+            ? `แสดง ${displayGroups.length} บิล · จากประวัติที่โหลดแล้ว ${beforeWarehouse} บิล`
+            : `แสดง ${displayGroups.length} จาก ${beforeWarehouse} บิลตามการค้นหาและสถานะ`;
         let htmlStr = '';
 
         displayGroups.forEach(group => {
@@ -3942,7 +4033,7 @@
                 const rawItemRemark = item.itemRemark || (item.poRemark && item.poRemark !== group.billRemark ? item.poRemark : '');
                 const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
                 const itemRemarkHtml = itemRemarkText ? `<span class="block text-[11px] text-amber-800 font-normal pl-4 italic">↳ หมายเหตุ: ${esc(itemRemarkText)}</span>` : '';
-                productsHtml += `<div class="gr-bill-card__item"><p class="font-medium text-gray-800 text-[13px] leading-snug truncate"><span class="text-gray-400 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-500 text-xs font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemRemarkHtml}</div>`;
+                productsHtml += `<div class="gr-bill-card__item"><p class="font-medium text-gray-800 text-base leading-snug break-words"><span class="text-gray-500 mr-1">${i+1}.</span> ${esc(item.product)} <span class="text-gray-600 text-sm font-normal">(${itemQtyVal} ${esc(item.unit || '')})</span></p>${itemRemarkHtml}</div>`;
             });
             if(group.items.length > 3) productsHtml += `<p class="text-xs text-gray-400 mt-1 font-medium italic">...อีก ${group.items.length - 3} รายการ</p>`;
             productsHtml += '</div>';
@@ -3965,13 +4056,13 @@
                         ${statusBadge}
                     </div>
                     <div class="gr-bill-card__meta">
-                        <span class="gr-bill-card__location-label">คลังรับสินค้า</span>
+                        <span class="gr-bill-card__location-label">คลังตาม PO</span>
                         <span class="gr-bill-card__location"><i data-lucide="map-pin" class="w-3.5 h-3.5"></i>${getWarehouseBadge(group.warehouse)}</span>
                     </div>
                 </div>
                 ${statusSplitNote}
                 ${productsHtml}
-                <div class="mb-2">${deliveryPlanBadge(group)}</div>
+                <div class="mb-2">${isCompleted ? `<p class="text-sm font-bold text-emerald-800">รับจริงเมื่อ ${esc(displayGRDate(group.items.find(item => item.ata)?.ata || group.items[0]?.grDate || ''))}</p>` : deliveryPlanBadge(group)}</div>
                 ${billRemarkHtml}
                 <div class="gr-bill-card__footer mt-auto pt-3 border-t border-gray-100 flex justify-between text-[11px] text-gray-500 items-end">
                     <p class="text-gray-400">สั่งเมื่อ: ${esc(displayGRDate(group.poDate))}</p>
@@ -3983,7 +4074,7 @@
             const remainingBills = Math.max(0, grCompletedTotal - grCompletedNextOffset);
             htmlStr += `<button type="button" onclick="loadMoreCompletedGR()" class="w-full mt-1 py-3 text-sm font-semibold text-brand-blue bg-white border border-brand-blue/30 rounded-lg hover:bg-brand-blueLight transition col-span-full">โหลดประวัติเพิ่ม (${remainingBills} บิลที่เหลือ)</button>`;
         }
-        container.innerHTML = htmlStr; lucide.createIcons({ root: container });
+        container.innerHTML = htmlStr || `<div class="col-span-full p-6 text-center text-slate-600">${hasFilters ? 'ไม่พบบิลตามตัวกรองนี้ · ล้างตัวกรองเพื่อดูรายการอื่น' : 'ยังไม่มีงานรับสินค้าที่รอดำเนินการ'}</div>`; lucide.createIcons({ root: container });
         renderGRReconciliationNotice();
         renderDeliveryPlanSummary();
         renderWarehouseChips();
@@ -4044,11 +4135,11 @@
                     </div>
                     ${deliveryPlanBadge(group)}
                 </div>
-                <div class="grid grid-cols-2 gap-2 mt-3 text-[11px] text-gray-500">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-sm text-gray-600">
                     <p>ที่มา: <span class="font-bold text-gray-700">${esc(deliverySourceText(group.planSource))}</span></p>
-                    <p>คาดว่าจะเข้าใน: <span class="font-bold text-gray-700">${esc(deliveryPlanText(group))}</span></p>
-                    <p>Vendor Avg: <span class="font-bold text-gray-700">${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : '-'}</span></p>
-                    <p>ตัวอย่าง: <span class="font-bold text-gray-700">${esc(group.vendorLeadSampleCount || 0)} ครั้ง</span></p>
+                    <p>${group.planSource === 'estimated_p75' ? 'คาดการณ์รับครั้งแรก' : 'กำหนดรับที่มีข้อมูล'}: <span class="font-bold text-gray-700">${esc(deliveryPlanText(group))}</span></p>
+                    ${group.planSource === 'estimated_p75' ? `<p>ระยะเวลาส่งเฉลี่ย: ${group.vendorAvgLeadDays ? esc(group.vendorAvgLeadDays) + ' วัน' : 'ไม่ได้บันทึก'}</p><p>ใช้ประวัติ ${esc(group.vendorLeadSampleCount || 0)} บิล · จำนวนข้อมูลไม่ใช่ความแม่นยำ</p>` : ''}
+                    ${!group.plannedDate ? `<p class="sm:col-span-2">${esc(deliveryPlanReason(group))}</p>` : ''}
                 </div>
                 ${cleanDirectPoRemark(group.billRemark) ? `
                 <div class="mt-3 pt-2.5 border-t border-brand-blue/10 text-xs bg-amber-50 text-amber-900 border border-amber-200/80 rounded-lg px-3 py-2 flex items-start gap-1.5">
@@ -4161,51 +4252,45 @@
             const itemRemarkText = cleanDirectPoRemark(rawItemRemark);
             const itemRemarkHtml = itemRemarkText ? `<span class="block text-xs text-amber-800 font-normal mt-0.5 italic">↳ หมายเหตุจาก PO: ${esc(itemRemarkText)}</span>` : '';
             htmlStr += `
-            <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}">
-                <div class="mb-3 border-b border-gray-100 pb-2">
-                    <div class="font-bold text-gray-800 w-full">
-                        <div class="flex items-start gap-2 text-sm">
-                            <span class="text-brand-blue bg-brand-blueLight/50 px-2 py-0.5 rounded">${i+1}</span>
-                            <span class="po-product-name">${esc(item.product)}</span>
-                            <button type="button" data-text="${itemSpeechText}" onclick="speakText(this.dataset.text)" class="text-brand-orange bg-brand-orangeLight/50 hover:bg-brand-orangeLight p-1.5 rounded-full transition outline-none shadow-sm active:scale-95 flex-shrink-0 border border-brand-orange/10" title="ฟังชื่อสินค้า">
-                                <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                        ${itemRemarkHtml}
-                    </div>
+            <div class="border border-gray-200 rounded-xl p-4 bg-white shadow-sm po-item-row hover:border-brand-blue/30 transition" data-rownum="${item.rowNumber}" data-uid="${item.uid}" ${showOrderedQuantity ? `data-ordered="${esc(itemQtyVal)}"` : ''}>
+                <span class="po-product-name" hidden>${esc(item.product)}</span>
+                <div class="gr-po-reference">
+                    <div>${orderedQtyBadge}${itemRemarkHtml}</div>
+                    <button type="button" data-text="${esc(itemSpeechText)}" onclick="speakText(this.dataset.text)" class="gr-item-audio text-brand-orange" aria-label="ฟังชื่อสินค้า ${esc(item.product)}" title="ฟังชื่อสินค้า"><i data-lucide="volume-2" class="w-4 h-4"></i></button>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-1">
-                    <div class="po-qty-field min-w-0"><div class="flex items-center justify-between gap-1.5 flex-wrap mb-1"><label class="block text-[10px] text-gray-500 font-medium m-0">${isSplitActive ? 'จำนวน (คลังที่ 1)' : 'จำนวนรับจริง'}</label>${orderedQtyBadge}</div>
-                    <input type="number" class="input-field po-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${itemQty1}"></div>
-                    <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
-                    <input type="text" class="input-field po-unit py-2 bg-gray-50 text-gray-500 border-gray-200" placeholder="หน่วย" value="${item.unit || ''}" readonly tabindex="-1"></div>
-                    <div><span class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
-                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? esc(item.noExpiry ? (item.lotCode || '') : (item.exp || '')) : ''}" oninput="handleExpiryInputChange(this)">
-                    <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="po-no-expiry" aria-label="ไม่มีวันหมดอายุ ${esc(item.product)}" ${isSavedData && item.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
-                    <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
+                <fieldset class="gr-destination gr-main-destination"><legend>ปลายทางรับที่ 1</legend>
+                <div class="gr-destination-fields gr-primary-fields">
+                    <div class="po-qty-field min-w-0"><label class="gr-field-label">${isSplitActive ? 'จำนวนปลายทาง 1' : 'จำนวนรับ'} (${esc(item.unit || 'ไม่ระบุหน่วย')})</label>
+                    <input type="number" class="input-field po-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${itemQty1}">
+                    <input type="hidden" class="po-unit" value="${esc(item.unit || '')}"></div>
                     <div><label class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="po-old-stock-label">${needsSecondOldStock ? `สต๊อกเก่า ${esc(parsedLoc.wh || group.warehouse)}` : 'สต๊อกเก่า'}</span> <span class="text-red-500">*</span></label>
                     <input type="number" min="0" class="input-field po-old-stock py-2 bg-white border-gray-200 focus:border-brand-blue" data-warehouse="${esc(parsedLoc.wh || group.warehouse)}" placeholder="ใส่ 0 หากไม่มี" value="${esc(oldStock1)}"></div>
                 </div>
-                <div class="mt-3 bg-gray-50/70 p-3 rounded-lg border border-gray-100">
+                ${locInputsHtml('po', group.warehouse, parsedLoc)}
+                </fieldset>
+                <div class="gr-expiry-field">
+                    <div><span class="gr-field-label"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
+                    <input type="text" class="input-field po-exp py-2 border-gray-200 focus:border-brand-blue" placeholder="31/12/2026 หรือ 31/12/2569" value="${isSavedData ? esc(item.noExpiry ? (item.lotCode || '') : (item.exp || '')) : ''}" oninput="handleExpiryInputChange(this)">
+                    <div class="exp-preview-wrap text-sm mt-1"></div></div>
+                    <label class="gr-no-expiry"><input type="checkbox" class="po-no-expiry" aria-label="ไม่มีวันหมดอายุ ${esc(item.product)}" ${isSavedData && item.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
+                </div>
+                <div class="gr-split-controls">
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="block text-[10px] text-gray-500 font-medium">ตำแหน่งเก็บ (Loc.IN) <span class="text-red-500">*</span></label>
-                        <button type="button" onclick="toggleItemSplit(this)" class="po-split-btn text-[11px] flex items-center gap-1 text-brand-blue bg-brand-blueLight/50 hover:bg-brand-blueLight px-2 py-1 rounded-md font-bold transition active:scale-95">${isSplitActive ? '<i data-lucide="x" class="w-3.5 h-3.5"></i> ยกเลิกแยกคลัง' : '<i data-lucide="split" class="w-3.5 h-3.5"></i> แยกคลัง'}</button>
+                        <button type="button" onclick="toggleItemSplit(this)" aria-expanded="${isSplitActive}" class="po-split-btn text-sm flex items-center gap-1 text-brand-blue bg-brand-blueLight/50 hover:bg-brand-blueLight px-2 py-1 rounded-md font-bold transition active:scale-95">${isSplitActive ? '<i data-lucide="x" class="w-3.5 h-3.5"></i> ปิดปลายทางที่ 2' : '<i data-lucide="split" class="w-3.5 h-3.5"></i> แบ่งรับสองปลายทาง'}</button>
                     </div>
-                    ${locInputsHtml('po', group.warehouse, parsedLoc)}
-                    <div class="po-split ${isSplitActive ? '' : 'hidden'} mt-2 pt-2 border-t border-dashed border-gray-200">
-                        <p class="text-[10px] text-gray-500 mb-1 font-medium">คลังที่ 2 (เก็บส่วนที่เหลือ)</p>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <select class="input-field po-loc-wh2 py-2 text-sm border-gray-200 m-0" onchange="syncSplitOldStock(this.closest('.po-item-row'))">${whSelectOptions(parsedLoc2.wh || group.warehouse)}</select>
-                            <select class="input-field po-loc-floor2 py-2 text-sm border-gray-200 m-0">${floorSelectOptions(parsedLoc2.floor || '')}</select>
-                            <input type="text" class="input-field po-loc-zone2 py-2 text-sm border-gray-200 m-0" placeholder="โซน (ไม่บังคับ)" value="${esc(parsedLoc2.zone || '')}">
-                            <input type="number" class="input-field po-qty2 py-2 text-sm border-gray-200 m-0 bg-orange-50/50 text-brand-orange font-bold" placeholder="จำนวนคลังที่ 2" value="${itemQty2}">
+                    <fieldset class="gr-destination po-split ${isSplitActive ? '' : 'hidden'}"><legend>ปลายทางรับที่ 2</legend>
+                        <div class="gr-destination-fields">
+                            <label><span class="gr-field-label">คลังที่รับ</span><select class="input-field po-loc-wh2 py-2 text-sm border-gray-200 m-0" onchange="syncSplitOldStock(this.closest('.po-item-row'))">${whSelectOptions(parsedLoc2.wh || group.warehouse)}</select></label>
+                            <label><span class="gr-field-label">ชั้น</span><select class="input-field po-loc-floor2 py-2 text-sm border-gray-200 m-0">${floorSelectOptions(parsedLoc2.floor || '')}</select></label>
+                            <label><span class="gr-field-label">โซน (ไม่บังคับ)</span><input type="text" class="input-field po-loc-zone2 py-2 text-sm border-gray-200 m-0" placeholder="โซน" value="${esc(parsedLoc2.zone || '')}"></label>
+                            <label><span class="gr-field-label">จำนวนรับปลายทางที่ 2</span><input type="number" class="input-field po-qty2 py-2 text-sm border-gray-200 m-0 bg-orange-50/50 text-brand-orange font-bold" oninput="syncSplitOldStock(this.closest('.po-item-row'))" placeholder="ระบุจำนวนรับ" value="${itemQty2}"></label>
                         </div>
                         <div class="po-old-stock2-field ${needsSecondOldStock ? '' : 'hidden'} mt-2">
                             <label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อกเก่า ${esc(parsedLoc2.wh)} <span class="text-red-500">*</span></label>
                             <input type="number" min="0" class="input-field po-old-stock2 py-2 bg-white border-gray-200 focus:border-brand-blue" data-warehouse="${esc(parsedLoc2.wh || group.warehouse)}" placeholder="ใส่ 0 หากไม่มี" value="${esc(needsSecondOldStock ? oldStock2 : '')}">
                         </div>
-                        <p class="text-[10px] text-gray-400 mt-1">จำนวนรับจริงด้านบน = คลังที่ 1 · ระบบรวมยอดทั้งสองคลังให้อัตโนมัติ</p>
-                    </div>
+                        <p class="text-sm text-slate-600 mt-2">กรอกจำนวนที่จะรับเข้าปลายทางนี้ · หากเป็นคลังเดียวกัน ใช้สต๊อกเก่าร่วมกัน · ว่างหรือ 0 คือยังไม่รับ</p>
+                    </fieldset>
                 </div>
             </div>`;
         });
@@ -4216,6 +4301,8 @@
         currentBillHadLoadedExtras = loadedExtras.length > 0;
         loadedExtras.forEach(item => addExtraItemRow(item));
         container.querySelectorAll('.po-exp').forEach(initExpiryInputPreview);
+        window.GrReceivingUX?.reset(document.getElementById('form-receiving'));
+        window.GrReceivingUX?.enhance(document.getElementById('form-receiving'));
         
         // ผูก Event ให้กับ 3 ปุ่มใหม่
         document.getElementById('btn-draft').onclick = (e) => submitReceiving(e, 'Draft GR');
@@ -4391,9 +4478,10 @@
         const defWh = (currentActiveGroup && currentActiveGroup.warehouse) || '';
         const parsedLoc = parseLoc(initial.locIn || '');
         const suggestionId = `ex-product-options-${++grExtraProductSuggestionId}`;
+        div.dataset.legacy = String(Object.keys(initial).length > 0);
         div.className = "extra-item-row bg-white p-4 rounded-xl border border-orange-200 shadow-sm relative";
         div.innerHTML = `
-            <button type="button" onclick="this.closest('.extra-item-row').remove()" class="absolute top-2 right-2 text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+            <button type="button" onclick="removeExtraItem(this)" aria-label="ลบรายการนอกบิล" class="gr-remove-extra absolute top-2 right-2 text-red-700 hover:text-red-800 bg-red-50 p-1.5 rounded-md transition"><i data-lucide="x" class="w-4 h-4"></i></button>
             <div class="pr-8 mb-3 relative">
                 <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อสินค้า (พิมพ์ค้นหา หรือ พิมพ์ชื่อใหม่) <span class="text-red-500">*</span></label>
                 <input type="text" class="input-field ex-product py-2.5 font-medium border-orange-300 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="เช่น แลกฟรี กล่องเขียว..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${suggestionId}" value="${esc(initial.product || '')}">
@@ -4404,22 +4492,37 @@
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">จำนวนรับ <span class="text-red-500">*</span></label>
                 <input type="number" class="input-field ex-qty bg-orange-50/50 text-brand-orange py-2 font-bold border-brand-orange/30 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange" placeholder="ระบุเลข" value="${esc(initial.grQty ?? '')}"></div>
                 <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">หน่วย</label>
-                <input type="text" class="input-field ex-unit py-2 border-gray-200 bg-gray-50 text-gray-600" placeholder="หน่วย" readonly tabindex="-1" value="${esc(initial.unit || '')}"></div>
+                <input type="text" class="input-field ex-unit py-2 border-gray-200 text-gray-700" placeholder="${Object.keys(initial).length && !initial.unit ? 'ไม่ระบุ (ข้อมูลเดิม)' : 'เช่น กล่อง หรือ ถุง'}" ${initial.sku ? 'readonly' : ''} value="${esc(initial.unit || '')}"></div>
+                <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อกเก่า <span class="text-red-500">*</span></label>
+                <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ใส่ 0 หากไม่มี" value="${esc(initial.oldStock ?? '')}"></div>
                 <div><span class="block text-[10px] text-gray-500 mb-1 font-medium"><span class="exp-field-label">วันหมดอายุ / รหัส Lot</span> <span class="exp-required-star text-red-500">*</span></span>
                 <input type="text" class="input-field ex-exp py-2 border-orange-200 focus:border-brand-orange" placeholder="31/12/2026 หรือ 31/12/2569" value="${esc(initial.noExpiry ? (initial.lotCode || '') : (initial.exp || ''))}" oninput="handleExpiryInputChange(this)">
                 <label class="inline-flex items-center gap-1.5 text-[10px] text-gray-600 mt-2 cursor-pointer"><input type="checkbox" class="ex-no-expiry" ${initial.noExpiry ? 'checked' : ''} onchange="handleNoExpiryChange(this)"> ไม่มีวันหมดอายุ</label>
                 <div class="exp-preview-wrap text-[11px] mt-1"></div></div>
-                <div><label class="block text-[10px] text-gray-500 mb-1 font-medium">สต๊อกเก่า <span class="text-red-500">*</span></label>
-                <input type="number" class="input-field ex-old-stock py-2 border-orange-200 focus:border-brand-orange" placeholder="ใส่ 0 หากไม่มี" value="${esc(initial.oldStock ?? '')}"></div>
             </div>
             <div class="mt-3">
-                <label class="block text-[10px] text-gray-500 mb-1 font-medium">ตำแหน่งเก็บ (Loc.IN) <span class="text-red-500">*</span></label>
+                <label class="block text-[10px] text-gray-500 mb-1 font-medium">ตำแหน่งจัดเก็บ <span class="text-red-500">*</span></label>
                 ${locInputsHtml('ex', defWh, parsedLoc)}
             </div>
         `;
         container.appendChild(div);
+        const kind = document.createElement('p');
+        kind.className = 'gr-extra-kind';
+        kind.textContent = initial.sku ? 'สินค้าจากแค็ตตาล็อก — ใช้หน่วยของสินค้า' : 'รายการนอกแค็ตตาล็อก — ระบุหน่วยตามฉลาก';
+        div.appendChild(kind);
         initExpiryInputPreview(div.querySelector('.ex-exp'));
         setupAutocomplete(div.querySelector('.ex-product')); lucide.createIcons({ root: div });
+        window.GrReceivingUX?.enhance(document.getElementById('form-receiving'));
+    }
+
+    function removeExtraItem(button) {
+        const row = button.closest('.extra-item-row');
+        const hasValues = Array.from(row.querySelectorAll('input')).some(input => input.type !== 'checkbox' && input.value.trim());
+        if (hasValues && !window.confirm('ลบรายการนอกบิลนี้ออกจากฟอร์ม? รายการที่บันทึกไว้จะยังไม่เปลี่ยนจนกว่าจะบันทึกบิล')) return;
+        row.remove();
+        const form = document.getElementById('form-receiving');
+        window.GrReceivingUX?.enhance(form);
+        window.GrReceivingUX?.refreshErrors(form);
     }
 
     function setupAutocomplete(inputEl) {
@@ -4434,6 +4537,9 @@
             inputEl.dataset.selectedUnit = String(product.unit || '');
             row.querySelector('.ex-sku').value = inputEl.dataset.selectedSku;
             row.querySelector('.ex-unit').value = inputEl.dataset.selectedUnit;
+            row.querySelector('.ex-unit').readOnly = true;
+            row.querySelector('.gr-extra-kind').textContent = 'สินค้าจากแค็ตตาล็อก — ใช้หน่วยของสินค้า';
+            row.dataset.legacy = 'false';
             inputEl.removeAttribute('aria-activedescendant');
             suggestionBox.classList.add('hidden');
             setExpanded(false);
@@ -4454,12 +4560,16 @@
             const val = this.value.trim().toLowerCase(); suggestionBox.innerHTML = '';
             activeIndex = -1;
             filteredProducts = [];
+            const hadCatalogIdentity = Boolean(inputEl.dataset.selectedSku || inputEl.closest('.extra-item-row')?.querySelector('.ex-sku').value);
             delete inputEl.dataset.selectedSku;
             delete inputEl.dataset.selectedUnit;
             const row = inputEl.closest('.extra-item-row');
             if (row) {
                 row.querySelector('.ex-sku').value = '';
-                row.querySelector('.ex-unit').value = '';
+                if (hadCatalogIdentity) row.querySelector('.ex-unit').value = '';
+                row.querySelector('.ex-unit').readOnly = false;
+                row.querySelector('.gr-extra-kind').textContent = 'รายการนอกแค็ตตาล็อก — ระบุหน่วยตามฉลาก';
+                row.dataset.legacy = 'false';
             }
             if (!val || !appData.products || appData.products.length === 0) { setExpanded(false); suggestionBox.classList.add('hidden'); return; }
             const normalizedVal = normalizeGRProductText(val);
@@ -4502,7 +4612,8 @@
 
     function initExpiryInputPreview(inputEl) {
         if (!inputEl) return;
-        const checkbox = inputEl.parentElement.querySelector('.po-no-expiry, .ex-no-expiry');
+        const scope = inputEl.closest?.('.gr-expiry-field') || inputEl.parentElement;
+        const checkbox = scope.querySelector('.po-no-expiry, .ex-no-expiry');
         if (checkbox) syncNoExpiryControl(checkbox, false);
         else updateExpiryPreview(inputEl);
     }
@@ -4510,11 +4621,12 @@
     function syncNoExpiryControl(checkbox, clearValue) {
         const input = checkbox.parentElement.parentElement.querySelector('.po-exp, .ex-exp');
         if (!input) return;
-        if (clearValue && !(checkbox.checked && looksLikeLotCode(input.value.trim()))) input.value = '';
+        // Switching label meaning never discards the employee's raw label/Lot text.
         input.disabled = checkbox.disabled;
         input.placeholder = checkbox.checked ? 'รหัส Lot เช่น G2C (ถ้ามี)' : '31/12/2026 หรือ 31/12/2569';
         const label = input.parentElement.querySelector('.exp-field-label');
         if (label) label.textContent = checkbox.checked ? 'รหัส Lot (ถ้ามี)' : 'วันหมดอายุ / รหัส Lot';
+        if (input.hasAttribute?.('aria-label')) input.setAttribute('aria-label', input.getAttribute('aria-label').replace(/วันหมดอายุ หรือเลข Lot|เลข Lot \(ไม่บังคับ\)/, checkbox.checked ? 'เลข Lot (ไม่บังคับ)' : 'วันหมดอายุ หรือเลข Lot'));
         input.parentElement.querySelector('.exp-required-star')?.classList.toggle('hidden', checkbox.checked);
         input.classList.toggle('bg-gray-100', input.disabled);
         updateExpiryPreview(input);
@@ -4535,33 +4647,30 @@
 
     function updateExpiryPreview(inputEl) {
         if (!inputEl || typeof GrExpiry === 'undefined') return;
-        const wrap = inputEl.parentElement ? inputEl.parentElement.querySelector('.exp-preview-wrap') : null;
+        const scope = inputEl.closest?.('.gr-expiry-field') || inputEl.parentElement;
+        const wrap = scope ? scope.querySelector('.exp-preview-wrap') : null;
         if (!wrap) return;
 
         const val = inputEl.value.trim();
         if (!val) {
             wrap.innerHTML = '';
-            inputEl.classList.remove('input-error');
             delete inputEl.dataset.resolvedIso;
             return;
         }
 
         if (val.length > 200) {
-            inputEl.classList.add('input-error');
             delete inputEl.dataset.resolvedIso;
-            wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium text-[11px]">⚠️ ความยาวเกิน 200 ตัวอักษร</span>`;
+            wrap.innerHTML = '';
             return;
         }
 
-        if (inputEl.parentElement.querySelector('.po-no-expiry, .ex-no-expiry')?.checked) {
-            inputEl.classList.remove('input-error');
+        if (scope.querySelector('.po-no-expiry, .ex-no-expiry')?.checked) {
             delete inputEl.dataset.resolvedIso;
             wrap.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium text-[11px]">รหัส Lot: ${esc(val)}</span>`;
             return;
         }
 
         const res = GrExpiry.parseExpiryInput(val);
-        inputEl.classList.remove('input-error');
         delete inputEl.dataset.resolvedIso;
 
         if (res.valid) {
@@ -4570,7 +4679,7 @@
         } else {
             wrap.innerHTML = looksLikeLotCode(val)
                 ? `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">หากเป็นรหัส Lot ให้เลือก “ไม่มีวันหมดอายุ”</span>`
-                : `<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-medium text-[11px]">บันทึกเป็นข้อความ: ${esc(val)}</span>`;
+                : `<span class="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-medium text-sm">${/^[0-9๐-๙]{1,4}[./-][0-9๐-๙]{1,2}[./-][0-9๐-๙]{1,4}$/.test(val) ? 'วันที่นี้อ่านไม่ได้ กรุณาตรวจฉลากอีกครั้ง · ' : ''}เก็บตามข้อความบนฉลาก: ${esc(val)}</span>`;
         }
     }
 
@@ -4588,6 +4697,8 @@
           return showNotification("ไม่มีสิทธิ์ดำเนินการนี้", "error");
       }
       const isDraft = targetStatus === 'Draft GR';
+      const receivingForm = document.getElementById('form-receiving');
+      if (window.GrReceivingUX && !window.GrReceivingUX.validate(receivingForm, { isDraft, appendMode, requireExtraUnit: true })) return;
       
       const ataInput = document.getElementById('r-ata'); const receiverInput = document.getElementById('r-receiver');
       ataInput.classList.remove('input-error'); receiverInput.classList.remove('input-error');
@@ -4769,7 +4880,10 @@
           delete bulkPayload.replaceExtras;
       }
 
-      try { GrDashboard.writeMetadata(bulkPayload); } catch (error) { return showNotification(error.message, 'warning'); }
+      try { GrDashboard.writeMetadata(bulkPayload); } catch (error) {
+          window.GrReceivingUX?.serverError(receivingForm, error.message);
+          return showNotification(error.message, 'warning');
+      }
 
       const actionButtons = ['btn-draft', 'btn-review', 'btn-confirm-receive', 'btn-recall', 'btn-reset']
           .map(id => document.getElementById(id))
@@ -4804,6 +4918,7 @@
           } 
           else {
               if (appendMode && res.status === 409) clearGRAppendReviewSnapshot();
+              window.GrReceivingUX?.serverError(receivingForm, 'บันทึกไม่สำเร็จ: ' + (res.message || res.error || 'กรุณาตรวจสอบสถานะล่าสุด'));
               showNotification("เกิดข้อผิดพลาด: " + (res.message || res.error || ''), "error");
           }
       } finally {

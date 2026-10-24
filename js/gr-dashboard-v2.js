@@ -28,6 +28,7 @@ var GrDashboard = (() => {
       panel?.classList.toggle('hidden',key!==name);
     });
     el('gr-report-filters')?.classList.toggle('hidden',name==='product');
+    el('gr-report-filter-disclosure')?.classList.toggle('hidden',name==='product');
     if(name==='overview'&&['search','warehouse','receiver','issue','liftOnly','vendor','sku','exactDate','selectedDay'].some(key=>grDashboardState[key])) return reset();
     if(name==='product') prepareProductHistoryDashboard();
     else if(!grDashboardState.loaded&&!grDashboardState.loading) load();
@@ -68,6 +69,7 @@ var GrDashboard = (() => {
     el('dashboard-lift-only').checked=false;return load(true);
   }
   function chips() {
+    if (typeof window !== 'undefined') window.GrWorkflowUI?.filterSummary();
     const s=grDashboardState,labels=[s.vendor&&'Vendor: '+s.vendor,s.sku&&'SKU: '+s.sku,s.exactDate&&'วันที่: '+date(s.exactDate),s.liftOnly&&'ใช้ลิฟท์',s.issue&&('หมายเหตุ: '+(issues[s.issue]||{any:'พบปัญหา',normal:'ปกติ',unknown:'ยังไม่ได้ระบุ'}[s.issue]))].filter(Boolean);
     el('gr-filter-chips').textContent=labels.join(' · ');
   }
@@ -161,7 +163,7 @@ var GrDashboard = (() => {
     const sort=el('vl-sort-by').value;
     rows.sort((a,b)=>sort==='name_asc'?a.label.localeCompare(b.label,'th'):sort==='lead_asc'?(a.avgLeadtime??Infinity)-(b.avgLeadtime??Infinity):sort==='lead_desc'?(b.avgLeadtime??-1)-(a.avgLeadtime??-1):sort==='ontime_desc'?(b.onTimeRate??-1)-(a.onTimeRate??-1):b.value-a.value);
     const metric=v=>v==null?'—':number(v);
-    el('vl-vendor-list').innerHTML=rows.map(r=>`<article class="gr-vendor-card"><h3>${html(r.label)}</h3><p>${number(r.value)} บิล · ${number(r.totalItems)} รายการ</p><p>Leadtime <strong>${metric(r.avgLeadtime)} วัน</strong></p><p class="gr-card-hint">คำนวณจาก ${number(r.samples)} บิลในช่วงที่เลือก · ${r.samples>=8?'ข้อมูลระดับสูง':r.samples>=3?'ข้อมูลระดับปานกลาง':'ข้อมูลเบื้องต้น'}</p><p>มัธยฐาน ${metric(r.medianLeadDays)} · P75 ${metric(r.p75LeadDays)} วัน</p><p>ส่งไวสุด–ช้าสุด ${metric(r.minLeadDays)}–${metric(r.maxLeadDays)} วัน</p><p>${r.onTimeRate==null?'ยังไม่มีวันนัด':`ตรงเวลา ${metric(r.onTimeRate)}% จาก ${number(r.onTimeSamples)} บิลที่มีวันนัด`}</p><p>รับล่าสุด ${date(r.latestAtaDate)}</p><button type="button" data-chart="vendor" data-key="${html(r.key)}">ดูบิลรับสินค้า →</button></article>`).join('')||'<p>ไม่พบ Vendor ตามตัวกรองนี้</p>';
+    el('vl-vendor-list').innerHTML=rows.map(r=>`<article class="gr-vendor-card"><h3>${html(r.label)}</h3><p>${number(r.value)} บิล · ${number(r.totalItems)} รายการ</p><p>ระยะเวลาตั้งแต่สั่งถึงรับเฉลี่ย <strong>${metric(r.avgLeadtime)} วัน</strong></p><p class="gr-card-hint">ใช้ข้อมูล ${number(r.samples)} บิลในช่วงที่เลือก · จำนวนข้อมูลไม่ใช่ระดับความแม่นยำ</p><p>ค่ากลาง ${metric(r.medianLeadDays)} วัน · ประมาณ 3 ใน 4 ของประวัติส่งภายใน ${metric(r.p75LeadDays)} วัน (P75)</p><p>ส่งไวสุด–ช้าสุด ${metric(r.minLeadDays)}–${metric(r.maxLeadDays)} วัน</p><p>${r.onTimeRate==null?'ยังไม่มีวันนัด':`ตรงเวลา ${metric(r.onTimeRate)}% จาก ${number(r.onTimeSamples)} บิลที่มีวันนัด`}</p><p>รับล่าสุด ${date(r.latestAtaDate)}</p><button type="button" data-chart="vendor" data-key="${html(r.key)}">ดูบิลรับสินค้า →</button></article>`).join('')||'<p>ไม่พบผู้ขายตามตัวกรองนี้</p>';
   }
   function review(first,readonly=false) {
     const container=el('gr-issue-review');if(!container)return;

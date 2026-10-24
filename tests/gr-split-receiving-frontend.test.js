@@ -126,6 +126,7 @@ const secondWarehouse = { value: 'W5' };
 const secondLabel = { textContent: '' };
 let secondHidden = false;
 const splitControls = {
+    '.po-qty2': { value: '10' },
     '.po-split': { classList: { contains: () => false } },
     '.po-loc-wh': firstWarehouse,
     '.po-loc-wh2': secondWarehouse,
@@ -146,6 +147,31 @@ firstWarehouse.value = 'W2';
 context.syncSplitOldStock(splitRow);
 assert.strictEqual(firstCount.value, '', 'changing the first warehouse clears its previous count');
 assert.strictEqual(secondHidden, true, 'one warehouse needs only one count');
+firstWarehouse.value = 'W1';
+secondWarehouse.value = 'W5';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(firstCount.value, '4', 'returning to a counted warehouse restores its own count');
+assert.strictEqual(secondCount.value, '0', 'zero survives returning to its original warehouse');
+firstWarehouse.value = 'W5';
+context.syncSplitOldStock(splitRow);
+firstCount.value = '9';
+context.syncSplitOldStock(splitRow);
+firstWarehouse.value = 'W1';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(firstCount.value, '4');
+assert.strictEqual(secondCount.value, '9', 'shared count edit survives when first destination leaves the shared warehouse');
+secondWarehouse.value = 'W1';
+context.syncSplitOldStock(splitRow);
+firstCount.value = '0';
+context.syncSplitOldStock(splitRow);
+secondWarehouse.value = 'W5';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(firstCount.value, '0');
+assert.strictEqual(secondCount.value, '9', 'separating the second destination restores its independent count');
+splitControls['.po-qty2'].value = '0';
+context.syncSplitOldStock(splitRow);
+assert.strictEqual(secondHidden, true, 'zero second quantity does not require a second count');
+assert.strictEqual(secondCount.value, '9', 'inactive destination retains its count for reopening');
 console.log('[PASS] 5. Changing a destination clears its stale checked count');
 
 console.log('\n🌟 ALL GR SPLIT FRONTEND TESTS PASSED (100%)! 🌟');

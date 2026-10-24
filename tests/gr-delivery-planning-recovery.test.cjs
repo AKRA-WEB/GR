@@ -44,7 +44,7 @@ test('denied planning drops permitted-plan reuse and offers Main; retry cannot q
 });
 test('fresh malformed planning success remains error; explicit successful empty response is distinct',async()=>{
  const f=rig();f.setHandler(async()=>response(200,{success:true}));await f.c.loadGRDeliveryPlanningBackground();assert.equal(f.c.grDeliveryPlanningLoaded,false);assert.match(f.markup(),/โหลดแผนรับสินค้าไม่สำเร็จ/);
- f.setHandler(async()=>response(200,{success:true,deliveryPlanning:{sampleCount:0,vendorCount:0},planByUid:{}}));await f.c.retryGRDeliveryPlanning();assert.equal(f.c.grDeliveryPlanningLoaded,true);assert.doesNotMatch(f.markup(),/role="alert"/);assert.match(f.markup(),/0 ตัวอย่าง/);
+ f.setHandler(async()=>response(200,{success:true,deliveryPlanning:{sampleCount:0,vendorCount:0},planByUid:{}}));await f.c.retryGRDeliveryPlanning();assert.equal(f.c.grDeliveryPlanningLoaded,true);assert.doesNotMatch(f.markup(),/role="alert"/);assert.match(f.markup(),/มีงานรอรับ แต่ยังไม่มีวันที่ใช้จัดลงปฏิทิน/);
 });
 test('successful empty planning after a warm plan removes obsolete derived hints without changing receiving fields',async()=>{
  const f=rig();f.c.appData.pendingPOs[0].remark='unchanged draft';await f.c.loadGRDeliveryPlanningBackground(true);
@@ -99,4 +99,13 @@ test('obsolete failed read retry cannot run under a replacement owner and hidden
 test('explicit local demo still loads fictional planning with no token, session cache or network',async()=>{
  const f=rig();f.window.location.hostname='127.0.0.1';f.window.location.search='?demo=1';f.window.appSession=f.c.getLocalPreviewSession();f.c.appData=f.c.getLocalPreviewData();
  await f.c.loadGRDeliveryPlanningBackground(true);assert.equal(f.c.grDeliveryPlanningLoaded,true);assert.equal(f.calls.length,0);assert.equal(f.c.appData.deliveryPlanning.sampleCount,48);assert.doesNotMatch(f.markup(),/role="alert"/);
+});
+
+test('today filter excludes unknown dates instead of coercing null to zero',async()=>{
+ const f=rig();f.setHandler(async()=>response(200,{success:true,deliveryPlanning:{pendingItemCount:1,confirmedCount:0},planByUid:{'plan-item':{plannedDate:'',daysUntil:null,planSource:'no_data',planReason:'model_not_validated'}}}));
+ await f.c.loadGRDeliveryPlanningBackground(true);f.c.setDeliveryPlanDayFilter(0);
+ assert.equal(f.c.getFilteredReceivingGroups().length,0,'unknown is not today');
+ f.setHandler(async()=>response(200,{success:true,deliveryPlanning:{pendingItemCount:1,confirmedCount:1},planByUid:{'plan-item':{expectedDate:'2026-10-23',plannedDate:'2026-10-23',daysUntil:0,planSource:'confirmed'}}}));
+ await f.c.loadGRDeliveryPlanningBackground(true);
+ assert.equal(f.c.getFilteredReceivingGroups().length,1,'real zero days remains today');
 });

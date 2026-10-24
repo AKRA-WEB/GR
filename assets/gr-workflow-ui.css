@@ -1,0 +1,65 @@
+.gr-responsive-table td { overflow-wrap: anywhere; }
+.gr-sidebar__menu [aria-current="page"] { background: #2563eb; color: white; }
+#dashboard-product-submit { background: #b84004; color: white; min-height: 44px; }
+#dashboard-product-submit:hover { background: #963603; }
+#dashboard-product-results dd { overflow-wrap: anywhere; }
+#dashboard-product-results :is(button, a), .gr-vendor-card button { min-height: 44px; }
+.gr-reset-filters { min-height: 44px; padding: 8px 12px; color: #1e3a8a; text-decoration: underline; }
+.gr-reset-filters[hidden] { display: none; }
+.gr-report-filter-summary { min-height: 44px; padding: 12px; cursor: pointer; font-size: 14px; color: #334155; }
+#gr-report-filter-summary { font-weight: 400; overflow-wrap: anywhere; }
+#gr-main .gr-warehouse-chips > span { grid-column: 1 / -1; }
+#gr-main .gr-bill-card__item p { font-size: 16px !important; white-space: normal; overflow-wrap: anywhere; }
+#gr-main .gr-count-block span { font-size: 14px !important; line-height: 1.6; }
+.gr-shell #form-receiving .input-field { font-size: 16px; min-height: 44px; }
+#gr-main :is(button, a, select, input):focus-visible { outline: 3px solid #1e40af; outline-offset: 3px; }
+#gr-bill-detail-modal { overflow-wrap: anywhere; }
+#gr-bill-detail-modal button { min-height: 44px; min-width: 44px; flex-shrink: 0; }
+.gr-plan-agenda { display: grid; gap: 12px; margin-top: 16px; }
+.gr-plan-agenda button { text-align: left; padding: 16px; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; overflow-wrap: anywhere; }
+.gr-plan-agenda strong, .gr-plan-agenda span { display: block; }
+.gr-plan-mobile-day { display: none; }
+.gr-plan-agenda { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.gr-plan-agenda button { font-size: 16px; line-height: 1.6; min-width: 0; }
+#delivery-plan-summary [class*="text-[11px]"], #delivery-plan-summary [class*="text-[10px]"] { font-size: 14px; }
+@media (max-width: 767px) {
+  .gr-sidebar__brand { display: none; }
+  .gr-sidebar__menu { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%; }
+  .gr-sidebar__menu button { min-width: 0; min-height: 44px; padding: 8px 6px; font-size: 14px; white-space: normal; justify-content: center; }
+  .gr-sidebar__menu button svg { display: none; }
+  .gr-topbar .h-16 { height: 48px; }
+  .gr-topbar button { min-height: 44px; min-width: 44px; }
+  .gr-main { padding: 12px; }
+  #gr-main .gr-filter-bento { grid-template-columns: 1fr; }
+  #gr-main .gr-filter-bento .input-field { font-size: 16px; min-height: 44px; }
+  #gr-main #wh-chips button { border-radius: 8px; font-size: 14px !important; }
+  .gr-topbar { min-height: 56px; }
+  .gr-topbar > div > div { height: 56px; }
+  .gr-responsive-table-wrap { overflow: visible !important; border: 0; }
+  .gr-responsive-table { display: block; width: 100%; min-width: 0 !important; }
+  .gr-responsive-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .gr-responsive-table tbody { display: grid; gap: 12px; width: 100%; }
+  .gr-responsive-table tbody tr { display: block; min-width: 0; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+  .gr-responsive-table tbody td { display: block; width: 100%; min-width: 0 !important; max-width: none; padding: 6px 0; text-align: left !important; white-space: normal !important; font-size: 16px; }
+  .gr-responsive-table tbody td::before { content: attr(data-label); display: block; color: #475569; font-size: 14px; font-weight: 500; line-height: 1.5; margin-bottom: 2px; }
+  .gr-responsive-table tbody td[colspan]::before { display: none; }
+  .gr-responsive-table tbody td:first-child { padding-top: 0; }
+  .gr-responsive-table button { min-height: 44px; width: 100%; }
+  .gr-responsive-table td div { font-size: 14px; white-space: normal; }
+  .gr-responsive-table td > div:first-child { font-size: 16px; }
+  #gr-bill-detail-modal { padding: 0 !important; }
+  #gr-bill-detail-modal > div { border-radius: 0; height: 100dvh; max-height: 100dvh; }
+  #gr-bill-detail-modal .grid { grid-template-columns: 1fr; }
+  #gr-bill-detail-modal .grid > div { min-width: 0; }
+  #modal-bill-gr { overflow-wrap: anywhere; }
+  #dashboard-product-results dl { grid-template-columns: 1fr; }
+  #dashboard-product-results dl > div { grid-column: auto; }
+  #delivery-plan-calendar-body > .grid { grid-template-columns: 1fr; }
+  #delivery-plan-calendar-body > .gr-plan-calendar { display: none; }
+  .gr-plan-mobile-day { display: block; font-size: 16px; margin-top: 12px; }
+  .gr-plan-mobile-day select { font-size: 16px; min-height: 44px; }
+  #delivery-plan-calendar-body > .grid button { min-height: 70px; }
+  .gr-report-filter :is(input, select, button) { font-size: 16px; min-height: 44px; }
+  .gr-card-hint, #gr-coverage { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #gr-main * { scroll-behavior: auto !important; } }
