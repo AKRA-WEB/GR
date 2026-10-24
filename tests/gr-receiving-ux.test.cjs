@@ -91,14 +91,59 @@ console.log('PASS compact item progress: 10-item partial receipt, zero rows, ext
 
 ten.forEach(f => { f.fields['.gr-item-disclosure'] = { open: true }; });
 const quantities = ten.map(f => f.fields['.po-qty'].value);
-UX.foldComplete(multi);
-assert.deepEqual(ten.map(f => f.fields['.gr-item-disclosure'].open), [false, false, false, false, true, true, true, true, true, true], 'optional bulk fold only affects completed rows');
-UX.foldComplete(multi);
-assert.deepEqual(ten.map(f => f.fields['.po-qty'].value), quantities, 'folding never changes quantities or inactive rows');
-UX.expandItems(multi);
-assert.ok(ten.every(f => f.fields['.gr-item-disclosure'].open), 'one action restores every row');
-assert.deepEqual(ten.map(f => f.fields['.po-qty'].value), quantities, 'restoring never changes entered values');
-console.log('PASS low-click controls: optional complete-only fold and restore-all preserve values and partial receiving');
+const events = target => {
+  const listeners = {};
+  target.addEventListener = (name, fn) => (listeners[name] ||= []).push(fn);
+  target.emit = (name, event = {}) => (listeners[name] || []).forEach(fn => fn(event));
+  return target;
+};
+const doc = events({ activeElement: null, hasFocus: () => true });
+events(multi);
+multi.ownerDocument = doc;
+multi.contains = row => ten.some(f => f.row === row);
+ten.forEach(f => Object.values(f.fields).forEach(field => { field.closest = () => f.row; }));
+const timers = [], realTimeout = global.setTimeout;
+global.setTimeout = fn => timers.push(fn);
+const flush = () => { while (timers.length) timers.shift()(); };
+const leave = f => { doc.activeElement = null; multi.emit('focusout', { target: f.fields['.po-qty'], relatedTarget: null }); flush(); };
+try {
+  UX.bindAutoFold(multi);
+  f = ten[0];
+  const qty = f.fields['.po-qty'], stock = f.fields['.po-old-stock'], details = f.fields['.gr-item-disclosure'];
+  leave(f);
+  assert.equal(details.open, true, 'loaded complete rows stay open until edited');
+  doc.activeElement = qty;
+  multi.emit('input', { target: qty }); flush();
+  assert.equal(details.open, true, 'typing never folds a complete row');
+  doc.activeElement = stock;
+  multi.emit('focusout', { target: qty, relatedTarget: stock }); flush();
+  assert.equal(details.open, true, 'moving between fields stays open');
+  doc.emit('pointerdown');
+  leave(f);
+  assert.equal(details.open, true, 'held pointer cannot shrink the target before its click');
+  doc.emit('pointerup');
+  assert.equal(details.open, true, 'click handlers run before the deferred collapse');
+  flush();
+  assert.equal(details.open, false, 'completed edited row folds after leaving');
+  details.open = true;
+  leave(f);
+  assert.equal(details.open, true, 'manual reopen without an edit remains open');
+  multi.emit('input', { target: qty });
+  multi.emit('click', { target: { closest: selector => selector === '.gr-item-toggle' ? {} : f.row } });
+  leave(f);
+  assert.equal(details.open, true, 'explicit manual toggle clears pending edit state');
+  for (const item of ten) { multi.emit('change', { target: item.fields['.po-qty'] }); leave(item); }
+  assert.deepEqual(ten.map(f => f.fields['.gr-item-disclosure'].open), [false, false, false, false, true, true, true, true, true, true], 'only complete rows fold, partial/invalid/unreceived rows stay open');
+  details.open = true;
+  multi.emit('input', { target: qty });
+  doc.activeElement = null;
+  multi.emit('focusout', { target: qty, relatedTarget: null });
+  doc.activeElement = stock;
+  flush();
+  assert.equal(details.open, true, 'focus restored by save or internal action prevents collapse');
+  assert.deepEqual(ten.map(f => f.fields['.po-qty'].value), quantities, 'automatic folding never changes quantities');
+} finally { global.setTimeout = realTimeout; }
+console.log('PASS automatic folding: typing/internal focus, pointer click order, manual reopen, optional rows and restored focus');
 
 // Execute validation rendering with an input adapter; native focus/geometry is checked in-browser.
 f = fixture({ values: { 'old-stock': '', 'loc-floor': '' } });

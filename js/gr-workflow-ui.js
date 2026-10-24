@@ -36,8 +36,6 @@
     summary.textContent = `· ${labels.filter(Boolean).join(' · ')}`;
   }
   document.addEventListener('DOMContentLoaded', () => {
-    const disclosure = document.getElementById('gr-report-filter-disclosure');
-    if (disclosure && window.matchMedia('(max-width: 767px)').matches) disclosure.open = false;
     navigation('receiving-list-view');
     filterSummary();
   });

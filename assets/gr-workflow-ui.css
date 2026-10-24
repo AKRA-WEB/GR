@@ -6,9 +6,12 @@
 #dashboard-product-results :is(button, a), .gr-vendor-card button { min-height: 44px; }
 .gr-reset-filters { min-height: 44px; padding: 8px 12px; color: #1e3a8a; text-decoration: underline; }
 .gr-reset-filters[hidden] { display: none; }
-.gr-report-filter-summary { min-height: 44px; padding: 12px; cursor: pointer; font-size: 14px; color: #334155; }
+.gr-report-filter-summary { padding: 12px; font-size: 14px; color: #334155; }
 #gr-report-filter-summary { font-weight: 400; overflow-wrap: anywhere; }
 #gr-main .gr-warehouse-chips > span { grid-column: 1 / -1; }
+#gr-main #wh-chips button[aria-pressed="true"] { background: #1e40af !important; color: #fff !important; border-color: #1e40af !important; box-shadow: 0 0 0 3px #bfdbfe; font-weight: 800; }
+#gr-main #wh-chips button[aria-pressed="true"]::before { content: '✓'; margin-right: 5px; font-weight: 800; }
+#gr-main #wh-chips button[aria-pressed="true"] > span { background: #fff; color: #1e40af; }
 #gr-main .gr-bill-card__item p { font-size: 16px !important; white-space: normal; overflow-wrap: anywhere; }
 #gr-main .gr-count-block span { font-size: 14px !important; line-height: 1.6; }
 .gr-shell #form-receiving .input-field { font-size: 16px; min-height: 44px; }

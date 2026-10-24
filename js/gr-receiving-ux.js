@@ -202,25 +202,48 @@
       const status = summary.querySelector('.gr-item-status');
       status.dataset.state = item.state;
       status.hidden = item.state === 'incomplete';
-      status.textContent = item.state === 'complete' ? 'กรอกครบ' : item.state === 'unreceived' ? 'ยังไม่รับ' : '';
+      status.textContent = item.state === 'complete' ? 'กรอกครบแล้ว' : item.state === 'unreceived' ? 'ยังไม่รับ' : '';
+      status.title = item.state === 'complete' ? 'ข้อมูลครบ ยังไม่ได้บันทึกรับสินค้า' : '';
     }
-    const progress = form.querySelector('#gr-item-progress');
-    if (progress) progress.textContent = `สินค้า ${states.length} รายการ · รับครั้งนี้ ${states.filter(item => item.receiving).length}`;
-    const fold = form.querySelector('#gr-fold-complete');
-    if (fold) fold.disabled = !states.some(item => item.state === 'complete' && item.row.querySelector('.gr-item-disclosure')?.open);
-    const expand = form.querySelector('#gr-expand-items');
-    if (expand) expand.disabled = !states.some(item => !item.row.querySelector('.gr-item-disclosure')?.open);
     return states;
   }
-  function foldComplete(form) {
-    for (const item of itemStates(form)) {
-      if (item.state === 'complete') item.row.querySelector('.gr-item-disclosure').open = false;
-    }
-    refreshItems(form);
-  }
-  function expandItems(form) {
-    all(form, '.gr-item-disclosure').forEach(details => { details.open = true; });
-    refreshItems(form);
+  function bindAutoFold(form) {
+    const doc = form.ownerDocument;
+    const edited = new WeakSet();
+    const pending = new Set();
+    let pointerDown = false;
+    const rowOf = target => target?.closest?.('.po-item-row, .extra-item-row');
+    const settle = () => {
+      if (pointerDown || !doc.hasFocus()) return;
+      for (const row of pending) {
+        pending.delete(row);
+        if (!edited.has(row) || row.contains(doc.activeElement) || !form.contains(row)) continue;
+        const item = itemStates(form).find(item => item.row === row);
+        if (item?.state === 'complete') {
+          row.querySelector('.gr-item-disclosure').open = false;
+          edited.delete(row);
+        }
+      }
+    };
+    const defer = () => setTimeout(settle, 0);
+    const markEdited = event => { const row = rowOf(event.target); if (row) edited.add(row); };
+    form.addEventListener('input', markEdited);
+    form.addEventListener('change', markEdited);
+    form.addEventListener('focusout', event => {
+      const row = rowOf(event.target);
+      if (row && !row.contains(event.relatedTarget)) { pending.add(row); defer(); }
+    });
+    form.addEventListener('click', event => {
+      if (event.target.closest?.('.gr-item-toggle')) {
+        const row = rowOf(event.target);
+        edited.delete(row);
+        pending.delete(row);
+      }
+    });
+    // Wait until the click finishes so shrinking a row cannot move its target away.
+    doc.addEventListener('pointerdown', () => { pointerDown = true; }, true);
+    doc.addEventListener('pointerup', () => { pointerDown = false; defer(); }, true);
+    doc.addEventListener('pointercancel', () => { pointerDown = false; pending.clear(); }, true);
   }
   function makeDisclosure(row) {
     if (row.querySelector('.gr-item-disclosure')) return null;
@@ -233,12 +256,16 @@
       span.className = `gr-item-${name}`;
       summary.appendChild(span);
     }
+    const chevron = document.createElement('span');
+    chevron.className = 'gr-item-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    summary.appendChild(chevron);
     const body = document.createElement('div');
     body.className = 'gr-item-body';
     while (row.firstChild) body.appendChild(row.firstChild);
     details.append(summary, body);
     row.appendChild(details);
-    // Every normal field is immediately editable; folding is explicitly optional.
+    // Start open; only edited, complete rows fold after the employee leaves them.
     details.open = true;
     details.addEventListener('toggle', () => { const form = row.closest('form'); if (form) refreshItems(form); });
     return details;
@@ -302,6 +329,7 @@
     if (rounds) rounds.setAttribute('aria-label', 'จำนวนรอบลิฟท์');
     if (!form.dataset.grUxBound) {
       form.dataset.grUxBound = 'true';
+      bindAutoFold(form);
       const refresh = () => {
         refreshSummary(form);
         refreshErrors(form);
@@ -316,5 +344,5 @@
     delete form.grValidationOptions;
     form.querySelector('.gr-server-error')?.remove();
   }
-  return { collectErrors, validate, enhance, reset, refreshSummary, refreshErrors, destinationSummary, itemStates, foldComplete, expandItems, focusError, serverError };
+  return { collectErrors, validate, enhance, reset, refreshSummary, refreshErrors, destinationSummary, itemStates, bindAutoFold, focusError, serverError };
 });
