@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="tailwind.css?v=20261013.02">
   <script src="js/supabase-gr-client.js?v=20261013.02" defer></script>
   <script src="js/gr-expiry.js" defer></script>
-  <script src="js/gr-receiving-ux.js?v=20261024.03" defer></script>
-  <link rel="stylesheet" href="assets/gr-receiving-ux.css?v=20261024.03">
+  <script src="js/gr-receiving-ux.js?v=20261024.04" defer></script>
+  <link rel="stylesheet" href="assets/gr-receiving-ux.css?v=20261024.04">
   <script src="js/bm-date-display.js?v=20261013.02" defer></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
@@ -807,7 +807,7 @@
             </select>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2"><button type="button" id="gr-clear-list-filters" class="gr-reset-filters" onclick="clearReceivingFilters()" hidden>ล้างตัวกรองทั้งหมด</button><button type="button" class="gr-reset-filters" onclick="openVendorLeadtimeDashboard(); switchVendorLeadtimeTab('bills')">ดูประวัติบิลสำเร็จ</button></div>
+          <div class="flex flex-wrap items-center gap-2"><button type="button" id="gr-clear-list-filters" class="gr-reset-filters" onclick="clearReceivingFilters()" hidden>ล้างตัวกรองทั้งหมด</button><button type="button" class="gr-reset-filters" onclick="openDeliveryPlanView()">แผนสินค้าเข้า</button><button type="button" class="gr-reset-filters" onclick="openVendorLeadtimeDashboard(); switchVendorLeadtimeTab('bills')">ดูประวัติบิลสำเร็จ</button></div>
 
           <div id="wh-chips" class="gr-warehouse-chips flex flex-wrap gap-2 mb-5 px-1"></div>
 
@@ -1205,7 +1205,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261024.03';
+    const CURRENT_VERSION = '20261024.04';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
