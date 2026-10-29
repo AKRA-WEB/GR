@@ -3,6 +3,7 @@
 <html lang="th">
 <head>
     <script src="js/akra-shell-bridge.js?v=20261013.02"></script>
+    <script src="js/session-expiry.js?v=20261029.01"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="preconnect" href="https://hgxrrskztbpejirrdpbq.supabase.co" crossorigin>
@@ -1196,7 +1197,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261024.05';
+    const CURRENT_VERSION = '20261029.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1651,7 +1652,7 @@
         const action = document.getElementById('auth-error-action');
         action.innerText = state.action || 'กลับหน้าหลัก';
         action.onclick = state.type === 'network' || state.type === 'server' ? () => AuthGuard.init() : () => state.type === 'session' || state.type === 'changed' ? window.AkraModule.authRequired(APP_CONFIG.PORTAL_URL) : window.AkraModule.home(APP_CONFIG.PORTAL_URL);
-        if (window.AkraModule?.embedded && (state.type === 'session' || state.type === 'changed')) window.AkraModule.authRequired(APP_CONFIG.PORTAL_URL);
+        if (state.type === 'session' || (window.AkraModule?.embedded && state.type === 'changed')) window.AkraModule.authRequired(APP_CONFIG.PORTAL_URL);
     }
     var UI = {
         showLoading: () => { document.body.classList.add('loading-active'); document.getElementById('auth-loading').classList.remove('hidden'); document.getElementById('auth-error').classList.add('hidden'); document.getElementById('app-content').classList.add('hidden'); },
@@ -1728,7 +1729,26 @@
         return apiCall(action, payload);
     }
 
-    var grAuthAttempt = 0, grPendingVerification = null;
+    var grAuthAttempt = 0, grPendingVerification = null, grExpiryWatcher = null;
+    function grExpiryToken() {
+        // Main may temporarily suspend token access while refreshing permissions.
+        // This fallback only decides UI expiry; requests still require the bridge.
+        try { return getSessionToken(); } catch (_) { return window.appSession?.token || ''; }
+    }
+    function checkGRSessionExpiry() {
+        if (isLocalPreviewMode()) return true;
+        if (!window.AkraSessionExpiry) return true; // Server verification remains mandatory.
+        if (window.appSession && !window.AkraSessionExpiry.isExpired(grExpiryToken())) return true;
+        if (!receivingMutationInFlight) expireGRSession();
+        return false;
+    }
+    function expireGRSession() {
+        grExpiryWatcher?.stop();
+        grExpiryWatcher = null;
+        invalidateGRAuthStartup();
+        window.appSession = null;
+        showGRAuthFailure({reason:'session_expired'});
+    }
     function grAuthRawSession() { try { return localStorage.getItem(APP_CONFIG.STORAGE_KEY); } catch (_) { return null; } }
     function invalidateGRAuthStartup() { ++grAuthAttempt; grPendingVerification = null; grAppendReviewSnapshot = null; }
     window.addEventListener('storage', event => {
@@ -1829,6 +1849,13 @@
             }
         },
         bindEvents: () => {
+            grExpiryWatcher?.stop();
+            if (!isLocalPreviewMode()) grExpiryWatcher = window.AkraSessionExpiry?.watch({
+                getToken: grExpiryToken,
+                isBusy: () => receivingMutationInFlight || window.AkraModule?.getWorkState?.().busy === true,
+                onWarning: () => { if (!window.AkraModule?.embedded) showNotification('เซสชันจะหมดอายุภายใน 5 นาที กรุณาบันทึกหรือพักบิล แล้วเข้าสู่ระบบใหม่', 'warning'); },
+                onExpire: expireGRSession
+            });
             window.AkraModule?.watchSession?.({appId:'app-gr', user:window.appSession, token:window.appSession?.token,
                 invalidated:() => { invalidateGRAuthStartup(); window.appSession = null; showGRAuthFailure({ reason: 'session_changed' }); },
                 refreshed:token => { grAppendReviewSnapshot = null; if (window.appSession) window.appSession.token = token; }
@@ -2897,6 +2924,7 @@
     }
 
     async function apiCall(action, payload = null) {
+      if (!checkGRSessionExpiry()) return {success:false, reason:'session_expired', message:'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'};
       if (await AppVersionGuard.blockIfStale(action)) return { success: false, error: 'พบเวอร์ชันใหม่ กรุณารีโหลดก่อนทำรายการ' };
       if (action === 'bulkReceivePO' && payload?.appendReviewSet && !isCurrentGRAppendReviewSnapshot(currentActiveGroup)) {
         clearGRAppendReviewSnapshot();
@@ -2923,6 +2951,10 @@
         } catch (error) {
           console.error('Supabase GR request failed:', { action, reason: error && error.reason });
           if (isReadApiAction(action)) return grReadFailure(error);
+          if (grErrorState(error)?.type === 'session') {
+              window.appSession = null;
+              showGRAuthFailure(error);
+          }
           return { success: false, reason: error?.reason || '', status: error?.status || 0, message: error?.message || 'เชื่อมต่อฐานข้อมูล GR ไม่สำเร็จ' };
         }
       }
@@ -4082,6 +4114,7 @@
         openReceivingDetail(index);
     }
     function openReceivingDetail(index) {
+        if (!checkGRSessionExpiry()) return;
         const group = groupedPOs[index];
         if (!group) return;
         if (grReconcilingBillKeys.get(poBillGroupKey(group)) === grSessionCacheScope()) {

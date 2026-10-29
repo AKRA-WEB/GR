@@ -51,6 +51,42 @@ test(repo+' explicit denial and mandatory-password rejection never keep an unver
  for(const reason of ['permission_denied','invalid_or_expired_token','mandatory_password_change_required']){const f=fixture(),p=f.c.AuthGuard.init();await tick();f.requests[0].resolve(response(reason==='permission_denied'?403:401,{reason}));await p;assert.equal(f.domains.length,0);assert.equal(f.storage.has(f.key),false);assert.equal(f.window.appSession,null);const retry=f.c.AuthGuard.init();await tick();assert.equal(f.requests.length,1);await retry;}
 });
 
+test('GR expired entry redirects to Main with zero domain reads; network error stays retryable', async()=>{
+ for(const reason of ['invalid_or_expired_token','network']){
+  const f=fixture(), pending=f.c.AuthGuard.init(); await tick();
+  if(reason==='network') f.requests[0].reject(new TypeError('offline'));
+  else f.requests[0].resolve(response(401,{reason}));
+  await pending;
+  assert.equal(f.domains.length,0);
+  assert.equal(f.retired.includes('auth'),reason!=='network');
+ }
+});
+
+test('GR open-form and write preflight stop expired sessions before any domain request', async()=>{
+ for(const action of ['open','write']){
+  const f=fixture(), pending=f.c.AuthGuard.init(); await tick();
+  f.requests[0].resolve(response(200,{valid:true,user:f.user})); await pending;
+  f.window.AkraSessionExpiry={isExpired:()=>true};
+  const reads=f.domains.length;
+  if(action==='open') f.c.openReceivingDetail(0);
+  else assert.equal((await f.c.apiCall('bulkReceivePO',{})).reason,'session_expired');
+  assert.equal(f.window.appSession,null); assert.equal(f.retired.at(-1),'auth');
+  assert.equal(f.domains.length,reads); assert.equal(f.requests.length,1);
+ }
+});
+
+test('GR expiry observer survives temporary embedded token suspension without granting API access', async()=>{
+ const f=fixture({embedded:true}),pending=f.c.AuthGuard.init(); await tick();
+ f.requests[0].resolve(response(200,{valid:true,user:f.user})); await pending;
+ const token=f.window.appSession.token;
+ f.window.AkraModule.getToken=()=>{throw Error('shell_session_unavailable');};
+ let checked;
+ f.window.AkraSessionExpiry={isExpired:value=>{checked=value;return false;}};
+ assert.equal(f.c.checkGRSessionExpiry(),true); assert.equal(checked,token);
+ assert.throws(()=>f.c.getSessionToken(),/shell_session_unavailable/);
+ assert.equal(f.retired.length,0);
+});
+
 test(repo+' same-object token refresh fences old startup success/rejection, and startup storage signout clears a pending cold token',async()=>{
  for(const outcome of ['network','success']){const f=fixture(),first=f.c.AuthGuard.init();await tick();f.requests[0].resolve(response(200,{valid:true,user:f.user}));await first;const owner=f.window.appSession,p=f.c.AuthGuard.init();await tick();owner.token='refreshed';if(outcome==='network')f.requests[1].reject(new TypeError('offline'));else f.requests[1].resolve(response(200,{valid:true,user:f.user}));await p;assert.equal(f.window.appSession,owner);assert.equal(owner.token,'refreshed');assert.equal(f.domains.length,1);assert.equal(f.shown.length,1);}
  const f=fixture(),pending=f.c.AuthGuard.init();await tick();f.requests[0].reject(new TypeError('offline'));await pending;f.setMain('signed-out');for(const callback of f.events.storage||[])callback({key:'akra_main_session',oldValue:'before',newValue:'signed-out'});const next=f.c.AuthGuard.init();await tick();assert.equal(f.requests.length,1);await next;assert.equal(f.domains.length,0);
