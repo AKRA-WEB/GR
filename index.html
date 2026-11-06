@@ -732,7 +732,9 @@
     .gr-load-error button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
   </style>
   <link rel="stylesheet" href="assets/gr-dashboard-v2.css?v=20261019.02">
-  <script src="js/gr-dashboard-v2.js?v=20261023.01" defer></script>
+  <link rel="stylesheet" href="assets/gr-vendor-calendar.css?v=20261106.02">
+  <script src="js/gr-vendor-calendar.js?v=20261106.02" defer></script>
+  <script src="js/gr-dashboard-v2.js?v=20261106.02" defer></script>
   <script src="js/gr-workflow-ui.js?v=20261024.05" defer></script>
   <link rel="stylesheet" href="assets/gr-workflow-ui.css?v=20261024.05">
 </head>
@@ -982,8 +984,10 @@
                 </div>
               </div>
 
-              <!-- Vendor Cards Container -->
-              <div id="vl-vendor-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+              <div id="gr-vendor-workspace">
+                <div id="vl-vendor-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+                <section id="gr-vendor-calendar" aria-label="ความถี่และปฏิทินวันส่งของ Vendor" hidden></section>
+              </div>
             </div>
 
             <!-- Tab 3: Lazy Loaded Product History Drilldown -->
@@ -1197,7 +1201,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261029.01';
+    const CURRENT_VERSION = '20261106.02';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }

@@ -1,0 +1,61 @@
+#gr-vendor-calendar{background:#fff;color:#334155;border:1px solid #e2e8f0;border-radius:14px;padding:24px;line-height:1.7}
+#gr-vendor-calendar[hidden]{display:none}
+#gr-vendor-calendar>[data-vc=close]{display:inline-block}
+.gr-vendor-rail-choice{display:none}
+#gr-vendor-workspace.vc-workspace-open{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:start}
+.vc-workspace-open #vl-vendor-list{display:grid;grid-template-columns:1fr;gap:8px}
+.vc-workspace-open .gr-vendor-card{padding:10px 12px;border:0;border-radius:8px;background:transparent}
+.vc-workspace-open .gr-vendor-card:has([aria-pressed=true]){background:#e3edfc}
+.vc-workspace-open .gr-vendor-card h3,.vc-workspace-open .gr-vendor-card p:not(:first-of-type),.vc-workspace-open .gr-vendor-card>button:not(.gr-vendor-rail-choice){display:none}
+.vc-workspace-open .gr-vendor-card>.gr-vendor-rail-choice{display:block;text-align:left;font-size:14px;font-weight:600;color:#203047;min-height:44px;width:100%;margin:0;text-decoration:none}
+.vc-workspace-open .gr-vendor-card p:first-of-type{font-size:12px;color:#53657d}
+#gr-vendor-calendar .vc-day-bills{margin-top:16px}
+#gr-vendor-calendar .vc-day-bills h5{font-size:12px;color:#53657d;margin:0 0 8px}
+#gr-vendor-calendar .vc-bill-link{display:block;min-height:44px;font-size:13px;color:#2458a6;border:0;border-bottom:1px solid #e2e8f0;border-radius:0;background:transparent;padding:8px 0;text-align:left;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+@media(max-width:1050px){#gr-vendor-workspace.vc-workspace-open{grid-template-columns:180px minmax(0,1fr)}#gr-vendor-calendar .vc-layout{grid-template-columns:1fr}#gr-vendor-calendar .vc-detail{border-left:0;padding:18px 0 0;border-top:1px solid #dfe6ee}}
+@media(max-width:700px){#gr-vendor-workspace.vc-workspace-open{display:flex;flex-direction:column}#gr-vendor-workspace.vc-workspace-open #gr-vendor-calendar{order:-1;width:100%}.vc-workspace-open #vl-vendor-list{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}#gr-vendor-calendar .vc-week{gap:3px}#gr-vendor-calendar .vc-weekday{padding:8px 0}#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:11px}#gr-vendor-calendar .vc-monthbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#gr-vendor-calendar .vc-monthbar h4{grid-row:1;grid-column:1/-1;text-align:center}#gr-vendor-calendar .vc-monthbar button{min-height:44px}}
+#gr-vendor-calendar h3{font-size:22px;font-weight:700;color:#0f172a;margin:16px 0 8px}
+#gr-vendor-calendar h4{font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px}
+#gr-vendor-calendar p{margin:6px 0}
+#gr-vendor-calendar button,#gr-vendor-calendar select,#gr-vendor-calendar input{font:inherit;min-height:44px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;background:#fff;color:#334155;max-width:100%}
+#gr-vendor-calendar button{cursor:pointer}
+#gr-vendor-calendar button:hover{background:#f1f5f9}
+#gr-vendor-calendar button:disabled{opacity:.4;cursor:default}
+#gr-vendor-calendar :focus-visible{outline:2px solid #2458a6;outline-offset:3px}
+#gr-vendor-calendar .vc-controls{display:flex;gap:16px;flex-wrap:wrap;align-items:end;margin:20px 0 10px}
+#gr-vendor-calendar label{display:grid;gap:6px;min-width:160px}
+#gr-vendor-calendar label[hidden]{display:none}
+#gr-vendor-calendar .vc-summary{padding:16px 0;border-block:1px solid #e2e8f0;margin:20px 0 24px}
+#gr-vendor-calendar .vc-summary>strong{font-size:20px;color:#2458a6}
+#gr-vendor-calendar .vc-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+#gr-vendor-calendar .vc-weekday{text-align:center;background:#f1f5f9;padding:12px 4px;border-radius:8px;font-variant-numeric:tabular-nums}
+#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday strong,#gr-vendor-calendar .vc-weekday small{display:block}
+#gr-vendor-calendar .vc-weekday strong{font-size:24px}
+#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:13px}
+#gr-vendor-calendar .vc-track{height:5px;background:#cbd5e1;margin:8px 4px}
+#gr-vendor-calendar .vc-track>div{height:100%;background:#2458a6}
+#gr-vendor-calendar .vc-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(180px,1fr);gap:28px;margin-top:28px}
+#gr-vendor-calendar .vc-monthbar{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+#gr-vendor-calendar .vc-monthbar h4{margin:0}
+#gr-vendor-calendar .vc-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+#gr-vendor-calendar .vc-dow{text-align:center;font-size:13px;color:#475569}
+#gr-vendor-calendar .vc-date{display:grid;align-content:center;text-align:center;min-height:60px;padding:5px 1px;font-variant-numeric:tabular-nums}
+#gr-vendor-calendar .vc-date small{display:block;font-size:11px}
+#gr-vendor-calendar .vc-hit{background:#e4efff}
+#gr-vendor-calendar .vc-date[aria-pressed="true"]{outline:2px solid #2458a6;outline-offset:1px}
+#gr-vendor-calendar .vc-detail{padding-top:6px}
+#gr-vendor-calendar .vc-detail button{margin-top:12px;color:#2458a6}
+#gr-vendor-calendar .vc-note{margin-top:24px}
+.gr-vendor-card .gr-vendor-calendar-action{display:block;min-height:44px;color:#2458a6}
+@media(max-width:640px){#gr-vendor-calendar{padding:16px 10px}#gr-vendor-calendar .vc-layout{grid-template-columns:1fr;gap:18px}#gr-vendor-calendar .vc-week{gap:3px}#gr-vendor-calendar .vc-weekday{padding:9px 1px}#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:11px}#gr-vendor-calendar .vc-weekday strong{font-size:20px}#gr-vendor-calendar .vc-date{min-height:48px}#gr-vendor-calendar .vc-calendar{gap:3px}#gr-vendor-calendar input,#gr-vendor-calendar select{font-size:16px}#gr-vendor-calendar .vc-controls label{flex:1}#gr-vendor-calendar .vc-monthbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#gr-vendor-calendar .vc-monthbar h4{grid-row:1;grid-column:1/-1;text-align:center}}
+
+/* Accepted compact Vendor detail styling. */
+#gr-vendor-calendar{--ui-line:#dfe6ee;--ui-ink:#192b43;--ui-muted:#53657d;--ui-blue:#2458a6}
+#gr-vendor-calendar{padding:24px 28px;border:1px solid var(--ui-line);border-radius:16px;background:white;box-shadow:none}
+#gr-vendor-calendar>[data-vc=close]{display:inline-block;margin-bottom:12px}#gr-vendor-calendar>h3{font-size:24px;line-height:1.35;letter-spacing:-.02em;margin:0 0 8px;color:var(--ui-ink)}#gr-vendor-calendar>.gr-card-hint{font-size:12px;max-width:80ch;margin:0;color:var(--ui-muted)}#gr-vendor-calendar .vc-controls{margin:16px 0 6px;gap:12px}#gr-vendor-calendar label{font-size:12px;color:var(--ui-muted)}#gr-vendor-calendar select,#gr-vendor-calendar input{font-size:14px;color:var(--ui-ink);border-color:#bdc9d9;padding:7px 12px}#gr-vendor-calendar #vc-period{font-size:12px;margin:0;color:var(--ui-muted)}
+#gr-vendor-calendar .vc-summary{display:flex;align-items:baseline;gap:8px 22px;flex-wrap:wrap;padding:16px 0;margin:16px 0 18px;border-color:var(--ui-line)}#gr-vendor-calendar .vc-summary>strong{font-size:18px;font-weight:700;color:var(--ui-blue)}#gr-vendor-calendar .vc-summary>p{font-size:14px;margin:0}#gr-vendor-calendar .vc-summary>p:last-child{flex-basis:100%;font-size:12px;color:var(--ui-muted)}#gr-vendor-calendar h4{font-size:14px;font-weight:600;margin-bottom:12px}#gr-vendor-calendar .vc-week{gap:6px}#gr-vendor-calendar .vc-weekday{background:#f4f6f9;padding:8px 4px;border-radius:8px}#gr-vendor-calendar .vc-weekday.vc-hit{background:#e3edfc}#gr-vendor-calendar .vc-weekday strong{font-size:23px;line-height:1.5}#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:12px;color:#40536d}#gr-vendor-calendar .vc-track{height:4px;margin:7px 8px;background:#d7e0eb}#gr-vendor-calendar .vc-track>div{background:var(--ui-blue)}
+#gr-vendor-calendar .vc-layout{grid-template-columns:minmax(0,1.7fr) minmax(190px,1fr);gap:24px;margin-top:22px;padding-top:22px;border-top:1px solid var(--ui-line)}#gr-vendor-calendar .vc-monthbar{margin-bottom:12px;gap:8px}#gr-vendor-calendar .vc-monthbar h4{font-size:16px}#gr-vendor-calendar .vc-monthbar button{font-size:12px;min-height:36px;padding:5px 8px;border-color:var(--ui-line)}#gr-vendor-calendar .vc-calendar{gap:4px}#gr-vendor-calendar .vc-dow{padding:4px 0 6px;font-size:12px}#gr-vendor-calendar .vc-date{min-height:55px;border-color:#e2e8f0;border-radius:7px;font-size:14px;color:#34455e}#gr-vendor-calendar .vc-date small{font-size:11px;color:#53657d}#gr-vendor-calendar .vc-date.vc-hit{background:#e7f0ff;border-color:#cbdcf6;color:#1f4e91}#gr-vendor-calendar .vc-date.vc-hit small{color:#1f4e91}#gr-vendor-calendar .vc-date:disabled{background:#f8fafc;color:#6f7f95;opacity:.6;border-color:transparent}#gr-vendor-calendar .vc-date[aria-pressed=true]{background:#2458a6;color:white;outline:2px solid #2458a6;outline-offset:1px;border-color:#2458a6}#gr-vendor-calendar .vc-date[aria-pressed=true] small{color:white}
+#gr-vendor-calendar .vc-detail{border-left:1px solid var(--ui-line);padding:0 0 0 22px}#gr-vendor-calendar .vc-detail h4{font-size:16px;margin-bottom:8px}#gr-vendor-calendar .vc-detail>p{font-size:13px;color:var(--ui-muted)}#gr-vendor-calendar .vc-detail>[data-vc=bills]{font-size:13px;margin-top:14px;color:var(--ui-blue);border-color:#bdcfe8;min-height:40px}#gr-vendor-calendar .vc-note{margin-top:18px;font-size:12px;color:var(--ui-muted)}.vc-day-bills{margin-top:18px}.vc-day-bills h5{font-size:12px;font-weight:600;color:var(--ui-muted);margin:0 0 8px}.vc-bill-link{font-size:13px;color:var(--ui-ink);padding:9px 0;border-bottom:1px solid var(--ui-line);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.vc-day-bills-empty{font-size:13px;color:var(--ui-muted)}
+
+@media(max-width:1050px){#gr-vendor-calendar .vc-layout{grid-template-columns:1fr}#gr-vendor-calendar .vc-detail{border-left:0;border-top:1px solid #dfe6ee;padding:18px 0 0}}
+@media(max-width:640px){#gr-vendor-calendar{padding:18px 12px}#gr-vendor-calendar .vc-week{gap:3px}#gr-vendor-calendar .vc-weekday{padding:8px 0}#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:11px}#gr-vendor-calendar .vc-date{min-height:48px}#gr-vendor-calendar .vc-monthbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#gr-vendor-calendar .vc-monthbar h4{grid-row:1;grid-column:1/-1;text-align:center}#gr-vendor-calendar .vc-monthbar button{min-height:44px}#gr-vendor-calendar input,#gr-vendor-calendar select{font-size:16px}}

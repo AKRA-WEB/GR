@@ -20,6 +20,7 @@ var GrDashboard = (() => {
   }
   function filters() { const s=grDashboardState;return {schemaVersion:2,preset:s.preset,dateFrom:s.dateFrom,dateTo:s.dateTo,exactDate:s.exactDate,warehouse:s.warehouse||'',receiver:s.receiver||'',issue:s.issue||'',liftOnly:!!s.liftOnly,search:s.search||'',vendor:s.vendor||'',sku:s.sku||''}; }
   function tab(name) {
+    if(name!=='benchmarks'&&typeof GrVendorCalendar!=='undefined')GrVendorCalendar.invalidate();
     currentVendorLeadtimeTab=name;
     ['overview','benchmarks','product','bills'].forEach(key=>{
       const button=el({overview:'tab-btn-dashboard-overview',benchmarks:'tab-btn-vendor-benchmarks',product:'tab-btn-product-drilldown',bills:'tab-btn-approved-bills'}[key]);
@@ -76,6 +77,7 @@ var GrDashboard = (() => {
   async function load(force=false,append=false) {
     const s=grDashboardState;
     if(append&&(s.loading||!s.hasMore))return;
+    if(!append&&typeof GrVendorCalendar!=='undefined')GrVendorCalendar.invalidate();
     const query=filters();
     const offset=append?s.offset:0;
     const requestKey=JSON.stringify({query,offset,limit:s.limit});
@@ -163,7 +165,13 @@ var GrDashboard = (() => {
     const sort=el('vl-sort-by').value;
     rows.sort((a,b)=>sort==='name_asc'?a.label.localeCompare(b.label,'th'):sort==='lead_asc'?(a.avgLeadtime??Infinity)-(b.avgLeadtime??Infinity):sort==='lead_desc'?(b.avgLeadtime??-1)-(a.avgLeadtime??-1):sort==='ontime_desc'?(b.onTimeRate??-1)-(a.onTimeRate??-1):b.value-a.value);
     const metric=v=>v==null?'—':number(v);
-    el('vl-vendor-list').innerHTML=rows.map(r=>`<article class="gr-vendor-card"><h3>${html(r.label)}</h3><p>${number(r.value)} บิล · ${number(r.totalItems)} รายการ</p><p>ระยะเวลาตั้งแต่สั่งถึงรับเฉลี่ย <strong>${metric(r.avgLeadtime)} วัน</strong></p><p class="gr-card-hint">ใช้ข้อมูล ${number(r.samples)} บิลในช่วงที่เลือก · จำนวนข้อมูลไม่ใช่ระดับความแม่นยำ</p><p>ค่ากลาง ${metric(r.medianLeadDays)} วัน · ประมาณ 3 ใน 4 ของประวัติส่งภายใน ${metric(r.p75LeadDays)} วัน (P75)</p><p>ส่งไวสุด–ช้าสุด ${metric(r.minLeadDays)}–${metric(r.maxLeadDays)} วัน</p><p>${r.onTimeRate==null?'ยังไม่มีวันนัด':`ตรงเวลา ${metric(r.onTimeRate)}% จาก ${number(r.onTimeSamples)} บิลที่มีวันนัด`}</p><p>รับล่าสุด ${date(r.latestAtaDate)}</p><button type="button" data-chart="vendor" data-key="${html(r.key)}">ดูบิลรับสินค้า →</button></article>`).join('')||'<p>ไม่พบผู้ขายตามตัวกรองนี้</p>';
+    const deliverySummary=r=>{
+      if(res.vendorDeliveryCalendarVersion!==1||typeof GrVendorCalendar==='undefined')return '';
+      try{const s=GrVendorCalendar.summarize(r.deliveryDays,res.filters.dateFrom,res.filters.dateTo);
+        return '<p class="gr-card-hint">พบการส่ง '+s.totalDays+' วัน'+(s.peak.length?' · ส่งบ่อย: '+s.peak.join(' / '):'')+'</p>';
+      }catch{return '';}
+    };
+    el('vl-vendor-list').innerHTML=rows.map(r=>`<article class="gr-vendor-card"><button type="button" class="gr-vendor-rail-choice" data-vendor-calendar="${html(r.key)}" ${r.key==='ไม่ระบุ'?'disabled':''}>${html(r.label)}</button><h3>${html(r.label)}</h3><p>${number(r.value)} บิล · ${number(r.totalItems)} รายการ</p><p>ระยะเวลาตั้งแต่สั่งถึงรับเฉลี่ย <strong>${metric(r.avgLeadtime)} วัน</strong></p><p class="gr-card-hint">ใช้ข้อมูล ${number(r.samples)} บิลในช่วงที่เลือก · จำนวนข้อมูลไม่ใช่ระดับความแม่นยำ</p><p>ค่ากลาง ${metric(r.medianLeadDays)} วัน · ประมาณ 3 ใน 4 ของประวัติส่งภายใน ${metric(r.p75LeadDays)} วัน (P75)</p><p>ส่งไวสุด–ช้าสุด ${metric(r.minLeadDays)}–${metric(r.maxLeadDays)} วัน</p><p>${r.onTimeRate==null?'ยังไม่มีวันนัด':`ตรงเวลา ${metric(r.onTimeRate)}% จาก ${number(r.onTimeSamples)} บิลที่มีวันนัด`}</p><p>รับล่าสุด ${date(r.latestAtaDate)}</p>${deliverySummary(r)}<button type="button" class="gr-vendor-calendar-action" data-vendor-calendar="${html(r.key)}" ${r.key==='ไม่ระบุ'?'disabled':''}>${r.key==='ไม่ระบุ'?'ยังไม่ระบุ Vendor ของบิล':'ดูความถี่และปฏิทินวันส่ง →'}</button><button type="button" data-chart="vendor" data-key="${html(r.key)}">ดูบิลรับสินค้า →</button></article>`).join('')||'<p>ไม่พบผู้ขายตามตัวกรองนี้</p>';
   }
   function review(first,readonly=false) {
     const container=el('gr-issue-review');if(!container)return;
@@ -210,6 +218,8 @@ var GrDashboard = (() => {
     el('vendor-leadtime-view').addEventListener('click',event=>{
       if(Date.now()<suppressClickUntil){event.preventDefault();return;}
       const card=event.target.closest('[data-card]');if(card){drillCard(card.dataset.card);return;}
+      const calendar=event.target.closest('[data-vendor-calendar]');
+      if(calendar&&typeof GrVendorCalendar!=='undefined'){GrVendorCalendar.open(calendar.dataset.vendorCalendar,calendar);return;}
       const chart=event.target.closest('[data-chart]');if(chart)drillChart(chart.dataset.chart,chart.dataset.key);
     });
     ['gr-kpi-row','gr-chart-row'].forEach(id=>{

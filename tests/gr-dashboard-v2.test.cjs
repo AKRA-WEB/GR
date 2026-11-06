@@ -9,6 +9,30 @@ function fixture(){
  return {api:c.GrDashboard,node,state,pending,events,c,billRenders,dailyRenders};
 }
 function watchWrites(target){let value=target.innerHTML,count=0;Object.defineProperty(target,'innerHTML',{get(){return value;},set(next){count++;value=next;}});return()=>count;}
+test('actual calendar drilldown preserves Dashboard page size and scopes the requested day',async()=>{
+ const f=fixture();Object.assign(f.state,{preset:'custom',limit:50,analytics:{filters:{dateFrom:'2026-10-01',dateTo:'2026-10-31'}}});
+ f.node('vc-range').focus=()=>{};f.node('gr-vendor-calendar').replaceChildren=()=>{};
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/gr-vendor-calendar.js'),'utf8'),f.c);
+ f.c.GrVendorCalendar.open('Vendor A');assert.equal(f.pending[0].query.limit,1);
+ f.pending[0].resolve({success:true,vendorDeliveryCalendarVersion:1,filters:{dateFrom:'2026-10-01',dateTo:'2026-10-31'},total:2,vendorBreakdown:[{key:'Vendor A',deliveryDays:[{date:'2026-10-06',billCount:2}]}]});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ f.node('gr-vendor-calendar').onclick({target:{closest:()=>({dataset:{vc:'bills'}})}});
+ assert.equal(f.state.limit,50);assert.equal(f.pending[1].query.limit,50);assert.equal(f.pending[1].query.exactDate,'2026-10-06');assert.equal(f.pending[1].query.vendor,'Vendor A');
+ f.pending[1].resolve(result(2));await new Promise(resolve=>setTimeout(resolve,0));
+});
+test('Vendor calendar action routes exact historical name, escapes cards and retires on report reload',async()=>{
+ const f=fixture(),opened=[];let invalidations=0;
+ f.c.GrVendorCalendar={...require('../js/gr-vendor-calendar.js'),open:(...args)=>opened.push(args),invalidate:()=>invalidations++};
+ const r=result(1);r.vendorDeliveryCalendarVersion=1;r.filters={dateFrom:'2026-10-01',dateTo:'2026-10-31'};
+ r.vendorBreakdown=[{key:'<Vendor & A>',label:'<Vendor & A>',value:2,deliveryDays:[{date:'2026-10-06',billCount:2}]}];
+ f.api.renderVendors(r);
+ assert.match(f.node('vl-vendor-list').innerHTML,/พบการส่ง 1 วัน · ส่งบ่อย: อังคาร/);
+ assert.match(f.node('vl-vendor-list').innerHTML,/data-vendor-calendar="&lt;Vendor &amp; A&gt;"/);
+ const trigger={dataset:{vendorCalendar:'<Vendor & A>'}};
+ f.events['vendor-leadtime-view:click']({target:{closest:s=>s==='[data-vendor-calendar]'?trigger:null}});
+ assert.equal(opened[0][0],'<Vendor & A>');assert.equal(opened[0][1],trigger);
+ const load=f.api.load();assert.equal(invalidations,1);f.pending[0].resolve(result(0));await load;
+});
 function result(total){return {success:true,schemaVersion:2,total,bills:[{grId:String(total)}],filters:{dateFrom:'2026-09-25',dateTo:'2026-09-25'},summary:{approvedBills:total,problemBills:0,liftRounds:0,overallAvgLeadDays:null,leadtimeSamples:0},receivers:[],dailyStats:[],vendorBreakdown:[]};}
 test('slow earlier filter response cannot replace the newest report',async()=>{
  const f=fixture();const first=f.api.load();f.state.warehouse='W2';const second=f.api.load();
