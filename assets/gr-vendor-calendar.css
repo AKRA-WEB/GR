@@ -59,3 +59,15 @@
 
 @media(max-width:1050px){#gr-vendor-calendar .vc-layout{grid-template-columns:1fr}#gr-vendor-calendar .vc-detail{border-left:0;border-top:1px solid #dfe6ee;padding:18px 0 0}}
 @media(max-width:640px){#gr-vendor-calendar{padding:18px 12px}#gr-vendor-calendar .vc-week{gap:3px}#gr-vendor-calendar .vc-weekday{padding:8px 0}#gr-vendor-calendar .vc-weekday span,#gr-vendor-calendar .vc-weekday small{font-size:11px}#gr-vendor-calendar .vc-date{min-height:48px}#gr-vendor-calendar .vc-monthbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#gr-vendor-calendar .vc-monthbar h4{grid-row:1;grid-column:1/-1;text-align:center}#gr-vendor-calendar .vc-monthbar button{min-height:44px}#gr-vendor-calendar input,#gr-vendor-calendar select{font-size:16px}}
+#gr-vendor-calendar .vc-weekday.vc-frequency-0{background:#f1f5f9;color:#40536d}
+#gr-vendor-calendar .vc-weekday.vc-frequency-1,#gr-vendor-calendar .vc-date.vc-frequency-1,#gr-vendor-calendar .vc-frequency-legend .vc-frequency-1{background:#eff6ff;color:#1e3a5f}
+#gr-vendor-calendar .vc-weekday.vc-frequency-2,#gr-vendor-calendar .vc-date.vc-frequency-2,#gr-vendor-calendar .vc-frequency-legend .vc-frequency-2{background:#bfdbfe;color:#14365e}
+#gr-vendor-calendar .vc-weekday.vc-frequency-3,#gr-vendor-calendar .vc-date.vc-frequency-3,#gr-vendor-calendar .vc-frequency-legend .vc-frequency-3{background:#3670b5;color:#fff}
+#gr-vendor-calendar .vc-weekday.vc-frequency-4,#gr-vendor-calendar .vc-date.vc-frequency-4,#gr-vendor-calendar .vc-frequency-legend .vc-frequency-4{background:#173f7a;color:#fff}
+#gr-vendor-calendar .vc-weekday[class*=vc-frequency-] span,#gr-vendor-calendar .vc-weekday[class*=vc-frequency-] small,#gr-vendor-calendar .vc-date[class*=vc-frequency-] small{color:inherit}
+#gr-vendor-calendar .vc-weekday.vc-frequency-3 .vc-track,#gr-vendor-calendar .vc-weekday.vc-frequency-4 .vc-track{background:rgba(255,255,255,.3)}
+#gr-vendor-calendar .vc-weekday.vc-frequency-3 .vc-track>div,#gr-vendor-calendar .vc-weekday.vc-frequency-4 .vc-track>div{background:#fff}
+#gr-vendor-calendar .vc-frequency-legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:12px 0 8px;color:#334155;font-size:12px}
+#gr-vendor-calendar .vc-frequency-legend>span{display:inline-flex;align-items:center;gap:6px}
+#gr-vendor-calendar .vc-frequency-legend i{display:inline-block;width:16px;height:16px;border-radius:3px}
+#gr-vendor-calendar .vc-frequency-legend small{font-size:11px;color:#53657d}

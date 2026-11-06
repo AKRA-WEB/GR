@@ -1,5 +1,8 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const calendar=require('../js/gr-vendor-calendar.js');
+test('frequency colors use four fixed percentage bands; zero and absent weekdays stay separate',()=>{
+ for(const [count,total,level,label] of [[0,13,0,'ไม่พบการส่ง'],[1,4,1,'น้อยมาก'],[2,4,2,'น้อย'],[3,4,3,'กลาง'],[4,4,4,'มาก'],[0,0,0,'ไม่มีวันในช่วงนี้'],[8,13,3,'กลาง'],[1,13,1,'น้อยมาก']])assert.deepEqual(calendar.frequency(count,total),{level,label});
+});
 test('distinct dates, all weekday denominators, ties and zero days',()=>{
  const result=calendar.summarize([{date:'2026-10-05',billCount:8},{date:'2026-10-06',billCount:2},{date:'2026-10-13',billCount:1}],'2026-10-01','2026-10-31');
  assert.equal(result.totalDays,3);assert.deepEqual(result.counts,[1,2,0,0,0,0,0]);assert.deepEqual(result.denominators,[4,4,4,5,5,5,4]);assert.deepEqual(result.peak,['อังคาร']);
