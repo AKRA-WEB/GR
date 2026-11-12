@@ -1201,7 +1201,7 @@
   </div>
   <div id="toast-container" class="toast-container"></div>
   <script>
-    const CURRENT_VERSION = '20261106.03';
+    const CURRENT_VERSION = '20261112.01';
     const PERF_MODE = new URLSearchParams(window.location.search).get('perf') === '1';
     const VERSION_CHECK_TIMEOUT_MS = 5000;
     function perfLog(label, startTs) { if (PERF_MODE) console.log('[GR perf] ' + label + ': ' + (Date.now() - startTs) + 'ms'); }
@@ -1764,6 +1764,8 @@
 
     var AuthGuard = {
         init: async () => {
+            // Main must not replace the shared token while this startup is fenced to it.
+            window.AkraModule?.startWork?.();
             grAppendReviewSnapshot = null;
             const attempt = ++grAuthAttempt;
             const embedded = !!window.AkraModule?.embedded, mainStamp = window.AkraModule?.sessionStamp?.();
@@ -1850,6 +1852,8 @@
                     return;
                 }
                 showGRAuthFailure(error);
+            } finally {
+                window.AkraModule?.endWork?.();
             }
         },
         bindEvents: () => {
